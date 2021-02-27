@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.5' # Time-stamp: <2021-02-26T16:28:45Z>
+__version__ = '0.0.6' # Time-stamp: <2021-02-27T15:41:14Z>
 ## Language: Japanese/UTF-8
 
 """マッチングのシミュレーション"""
@@ -1097,8 +1097,8 @@ def initialize (economy):
                 if p.sex == 'F':
                     if p.age < 40:
                         pregnant = random.random() < 0.1
-                    elif p.age < 60:
-                        pregnant = random.random() < (0.1 / (60 - 40)) \
+                    elif p.age < 50:
+                        pregnant = random.random() < (0.1 / (50 - 40)) \
                             * (p.age - 40)
                     else:
                         pregnant = False
@@ -1165,8 +1165,8 @@ def initialize (economy):
                 if p.sex == 'F' and p.pregnancy is None:
                     if p.age < 40:
                         pregnant = random.random() < 0.1
-                    elif p.age < 60:
-                        pregnant = random.random() < (0.1 / (60 - 40)) \
+                    elif p.age < 50:
+                        pregnant = random.random() < (0.1 / (50 - 40)) \
                             * (p.age - 40)
                     else:
                         pregnant = False
@@ -1192,7 +1192,7 @@ def initialize (economy):
                 else:
                     a.tmp_relative_spouse_asset = sasset / passet
 
-            if p.sex == 'F' and p.age >= 12 and p.age <= 60 \
+            if p.sex == 'F' and p.age >= 12 and p.age <= 50 \
                and p.children and p.pregnancy is None:
                 if random.random() < 0.3:
                     w = Wait()
@@ -1819,15 +1819,22 @@ def update_death (economy):
                     if random.random() < ARGS.infant_death_rate:
                         p.die()
 
+
 def reduce_tombs (economy):
+    l = [t for t in economy.tombs.values()
+         if (economy.term - t.death_term) > 30 * 12]
+
     r = len(economy.tombs) - sum(ARGS.population)
-    if r > 0:
-        l = sorted(economy.tombs.values(),
+    if r >= len(l):
+        for t in l:
+            del economy.tombs[t.person.id]
+    elif r > 0:
+        l = sorted(l,
                    key=(lambda t: t.person.cum_donation *
                         (0.98 ** (economy.term - t.death_term))))[0:r]
         for t in l:
             del economy.tombs[t.person.id]
-
+        
 
 def update_economy (economy):
     print("\nEconomy:...", flush=True)

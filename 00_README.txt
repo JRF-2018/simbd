@@ -1,7 +1,7 @@
 
 
     仏教的哲学的社会シミュレーション
-    (Created: 2021-02-27, Time-stamp: <2021-02-26T16:38:39Z>)
+    (Created: 2021-02-27, Time-stamp: <2021-02-27T15:22:11Z>)
 
 
 ** このファイルについて
@@ -96,7 +96,7 @@ https://gist.github.com/JRF-2018/39ed54ff14cb3c79c21f42f7254fa7bc
 
   * test_of_matching_1.py
 
-不倫のマッチングのシミュレーション
+不倫のマッチングのシミュレーション。
 
 初期には↓で公開されてました。
 
@@ -105,7 +105,7 @@ https://gist.github.com/JRF-2018/2792da451992dae3e918c72a66ab67b0
 
   * test_of_reduce_2.py
 
-不倫の終る確率のテスト
+不倫の終る確率のテスト。
 
 初期には↓で公開されてました。
 
@@ -114,7 +114,7 @@ https://gist.github.com/JRF-2018/dee67ffed33e367bec68cc36e1e663dd
 
   * test_of_matching_2.py
 
-マッチングのシミュレーション
+マッチングのシミュレーション。
 
 初期には↓で公開されてました。
 
@@ -123,11 +123,16 @@ https://gist.github.com/JRF-2018/6650bc84f238e40826251c400f45f328
 
   * test_of_increase_1.py
 
-増えていく確率のテスト
+増えていく確率のテスト。
 
 初期には↓で公開されてました。
 
 https://gist.github.com/JRF-2018/aace48ebc44229844b6f75a39a287578
+
+
+  * test_of_inheritance_1.py
+
+相続のテスト。
 
 
 
