@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.6' # Time-stamp: <2021-02-27T15:41:14Z>
+__version__ = '0.0.7' # Time-stamp: <2021-02-28T17:45:55Z>
 ## Language: Japanese/UTF-8
 
 """マッチングのシミュレーション"""
@@ -265,12 +265,15 @@ class Person0 (Serializable):
         self.biological_father = '' # 実夫
         self.biological_mother = '' # 実母
         self.want_child_base = 2    # 欲しい子供の数の基準額
+        self.supporting = []   # 被扶養者の家族の ID
+        self.supported = None  # 扶養してくれてる者の ID
 
         self.cum_donation = 0  # 欲しい子供の数の基準額
 
         self.hating = {}       # 恨み
         self.hating_unknown = 0     # 対象が確定できない恨み
-
+        self.political_hating = 0   # 政治的な恨み
+        
         self.tmp_luck = None   # 幸運度
         self.tmp_score = None  # スコア
         self.tmp_asset_rank = None  # 資産順位 / 総人口
@@ -301,7 +304,7 @@ class PersonEC (Person0):
         economy = self.economy
         if relation.spouse is '':
             return relation.tmp_relative_spouse_asset
-        elif relation.spouse not in economy.people:
+        elif not economy.is_living(relation.spouse):
             return 1.0
         else:
             s = economy.people[relation.spouse]
@@ -327,14 +330,14 @@ class PersonBT (Person0):
         ch = 0
         t = []
         if isinstance(rel, Marriage):
-            if rel.spouse is '' or rel.spouse not in economy.people:
+            if rel.spouse is '' or not economy.is_living(rel.spouse):
                 return p.children_wanting() > len(p.children)
             else:
                 s = economy.people[rel.spouse]
                 return p.children_wanting() > len(p.children)
 
         elif isinstance(rel, Adultery):
-            if rel.spouse is '' or rel.spouse not in economy.people:
+            if rel.spouse is '' or not economy.is_living(rel.spouse):
                 return p.adultery_want_child() > 0
             else:
                 s = economy.people[rel.spouse]
@@ -429,8 +432,11 @@ class PersonBT (Person0):
         p.biological_mother = m.id
         p.biological_father = rel.spouse
         p.mother = m.id
+
+        p.supported = m.id
+        m.supporting.append(p.id)
         
-        if rel.spouse is '' or rel.spouse not in economy.people:
+        if rel.spouse is '' or not economy.is_living(rel.spouse):
             f = None
             p.father = ''
             ch = Child()
@@ -499,7 +505,7 @@ class PersonBT (Person0):
             if foster_father == mf_id:
                 ch.father = father_mfather_thinks
                 if foster_father is not '' \
-                   and foster_father in economy.people:
+                   and economy.is_living(foster_father):
                     f = economy.people[foster_father]
                     f.children.append(ch)
             else:
@@ -508,7 +514,7 @@ class PersonBT (Person0):
 
             if m.marriage is not None and father_mfather_thinks == rel.spouse \
                and m.marriage.spouse is not '' \
-               and m.marriage.spouse in economy.people:
+               and economy.is_living(m.marriage.spouse):
                 f = economy.people[m.marriage.spouse]
                 f.hating[m.id] += np_clip(f.hating[m.id] + 0.3, 0, 1)
                 if random.random() < 0.5 or rel.spouse is '':
@@ -525,7 +531,7 @@ class PersonDT (Person0):
         economy = self.economy
 
         rel.end = economy.term
-        if rel.spouse is not '' and rel.spouse in economy.people:
+        if rel.spouse is not '' and economy.is_living(rel.spouse):
             s = economy.people[rel.spouse]
             if s.marriage is not None and s.marriage.spouse == p.id:
                 s.marriage.end = economy.term
@@ -549,32 +555,67 @@ class PersonDT (Person0):
         ch.death_term = economy.term
         p.children.remove(ch)
         p.trash.append(ch)
-        
-    def die (self):
+
+    def die_supporting (self, new_supporter):
         p = self
         economy = self.economy
-        dt = Death()
-        dt.term = economy.term
-        p.death = dt
-        tomb = Tomb()
-        tomb.death_term = economy.term
-        tomb.person = p
-        economy.tombs[p.id] = tomb
+        d = None
+        if new_supporter is not None \
+           and new_supporter is not '' and economy.is_living(new_supporter):
+            d = economy.people[new_supporter].district
+        for x in p.supporting:
+            if x is not '' and economy.is_living(x):
+                s = economy.people[x]
+                assert s.supported == p.id
+                s.supported = new_supporter
+                if d is not None:
+                    s.district = d
+        p.supporting = []
 
-        if p.marriage is not None:
-            p.die_relation(p.marriage)
-        for a in p.adulteries:
-            p.die_relation(a)
-
-        # father mother は死んでも情報の更新はないが、child は欲しい子
-        # 供の数に影響するため、更新が必要。
-        if p.father is not '' and p.father in economy.people:
-            economy.people[p.father].die_child(p.id)
-        if p.mother is not '' and p.mother in economy.people:
-            economy.people[p.mother].die_child(p.id)
+    def die_supported (self):
+        p = self
+        economy = self.economy
+        if p.supported is not '' and economy.is_living(p.supported):
+            s = economy.people[p.supported]
+            s.supporting.remove(p.id)
         
+    def do_inheritance (self):
+        p = self
+        economy = self.economy
+        assert p.death is not None
+        q = p.death.inheritance_ratio
 
-        # 本来はさらに扶養・相続に関する処理が必要
+        if q is None:
+            economy.cur_forfeit_prop += self.prop
+            economy.cur_forfeit_land += self.land
+            self.prop = 0
+            self.land = 0
+            return
+        
+        a = self.prop + self.land * ARGS.prop_value_of_land
+        land = self.land
+        prop = self.prop
+        for x, y in sorted(q.items(), key=lambda x: x[1], reverse=True):
+            a1 = a * y
+            l = math.floor(a1 / ARGS.prop_value_of_land)
+            if l > land:
+                l = land
+                land = 0
+            else:
+                land -= l
+            if x is '':
+                economy.cur_forfeit_land += l
+                economy.cur_forfeit_prop += a1 - l * ARGS.prop_value_of_land
+                prop -= a1 - l * ARGS.prop_value_of_land
+            else:
+                assert economy.is_living(x)
+                p1 = economy.people[x]
+                p1.land += l
+                p1.prop += a1 - l * ARGS.prop_value_of_land
+                prop -= a1 - l * ARGS.prop_value_of_land
+
+        self.land = 0
+        self.prop = 0
 
 
 class PersonAD (Person0):
@@ -672,7 +713,7 @@ class PersonAD (Person0):
         q = ((0.1 - 1) / (3 - 0)) * (x - 0) + 1
         hating = 0
         rel_favor = 0
-        if a.spouse is not '' and a.spouse in economy.people:
+        if a.spouse is not '' and economy.is_living(a.spouse):
             s = economy.people[a.spouse]
             if p.id in s.hating:
                 hating = s.hating[p.id]
@@ -738,13 +779,15 @@ class Wait (Serializable):
 class Death (Serializable):
     def __init__ (self):
         self.term = None
+        self.inheritance_ratio = None
     
 class Tomb (Serializable):
     def __init__ (self):
         self.death_term = None
         self.person = None
 
-class Economy (Frozen):
+
+class Economy0 (Frozen):
     def __init__ (self):
         self.term = 0
         self.people = OrderedDict()
@@ -753,6 +796,98 @@ class Economy (Frozen):
 
         self.want_child_mag = 1.0
         self.prev_birth = ARGS.min_birth
+
+        self.cur_forfeit_prop = 0
+        self.cur_forfeit_land = 0
+
+class EconomyDT (Economy0):
+    def is_living (self, id_or_person):
+        s = id_or_person
+        if type(id_or_person) is not str:
+            s = id_or_person.id
+        return s in self.people and self.people[s].death is None
+
+    def die (self, persons):
+        economy = self
+        if isinstance(persons, base.Person):
+            persons = [persons]
+        for p in persons:
+            assert p.death is None
+            dt = Death()
+            dt.term = economy.term
+            p.death = dt
+            tomb = Tomb()
+            tomb.death_term = economy.term
+            tomb.person = p
+            economy.tombs[p.id] = tomb
+
+        for p in persons:
+            p.death.inheritance_ratio = calc_inheritance_ratio(economy, p.id)
+
+        for p in persons:
+            spouse = None
+            if p.marriage is not None \
+               and (p.marriage.spouse is ''
+                    or economy.is_living(p.marriage.spouse)):
+                spouse = p.marriage.spouse
+                                           
+            if p.marriage is not None:
+                p.die_relation(p.marriage)
+            for a in p.adulteries:
+                p.die_relation(a)
+
+            # father mother は死んでも情報の更新はないが、child は欲し
+            # い子供の数に影響するため、更新が必要。
+            if p.father is not '' and economy.is_living(p.father):
+                economy.people[p.father].die_child(p.id)
+            if p.mother is not '' and economy.is_living(p.mother):
+                economy.people[p.mother].die_child(p.id)
+
+            fst_heir = None
+            if p.death.inheritance_ratio is None:
+                l1 = [(x, y) for x, y
+                      in p.death.inheritance_ratio.items()
+                      if x is not '' and economy.is_living(x)
+                      and economy.people[x].supported is None
+                      and economy.people[x].age >= 18]
+                if l1:
+                    fst_heir = max(l1, key=lambda x: x[1])[0]
+
+            if (fst_heir is None or fst_heir not in p.children) \
+               and spouse is not None and spouse in p.supporting:
+                if spouse is '':
+                    fst_heir = ''
+                    p.supporting.remove(spouse)
+                else:
+                    s = economy.people[spouse]
+                    if s.age >= 18 and s.age < 70:
+                        fst_heir = spouse
+                        s.supported = None
+                        p.supporting.remove(spouse)
+
+            if p.supporting:
+                if p.supported is not None \
+                   and economy.is_living(p.supported):
+                    p.die_supporting(p.supported)
+                elif fst_heir is None or p.death.inheritance_ratio is None:
+                    p.die_supporting(None)
+                else:
+                    p.die_supporting(fst_heir)
+                p.supporting = []
+
+            if p.supported:
+                p.die_supported()
+                p.supported = None
+
+            p.supported = fst_heir
+            if fst_heir is not None and fst_heir is not '':
+                economy.people[fst_heir].supporting.append(p.id)
+        
+        for p in persons:
+            p.do_inheritance()
+
+class Economy (EconomyDT):
+    pass
 
 
 class EconomyPlot0 (Frozen):
@@ -1230,6 +1365,31 @@ def initialize (economy):
                     c.birth_term = random.randint(fc.birth_term,
                                                   economy.term)
 
+    for p in economy.people.values():
+        if p.death is not None:
+            continue
+        if p.age < 10:
+            p.supported = ''
+        elif p.age < 18:
+            if random.random() < 0.5:
+                p.supported = ''
+        elif p.age >= 70:
+            if random.random() < 0.5:
+                p.supported = ''
+        else:
+            for c in p.children:
+                c_age = (economy.term - c.birth_term) / 12
+                if c_age < 10:
+                    p.supporting.append('')
+                elif c_age < 18:
+                    if random.random() < 0.7:
+                        p.supporting.append('')
+            if p.age > 50:
+                if random.random() < 0.7:
+                    p.supporting.append('')
+                    if random.random() < 0.7:
+                        p.supporting.append('')
+        
 
 def choose_from_districts (m_district, f_district, m_choice_nums,
                            f_choice_nums,
@@ -1382,7 +1542,7 @@ def update_adultery_hating (economy, person, adultery):
     a = adultery
     success = True
     if p.sex is 'M':
-        if a.spouse is '' or a.spouse not in economy.people:
+        if a.spouse is '' or not economy.is_living(a.spouse):
             if a.begin == a.end:
                 hating = random.random() < 0.1
             else:
@@ -1403,7 +1563,7 @@ def update_adultery_hating (economy, person, adultery):
                     p.hating[s.id] = 0
                 p.hating[s.id] = np_clip(p.hating[s.id] + 0.5, 0, 1)
             if s.marriage is not None \
-               and s.marriage.spouse in economy.people:
+               and economy.is_living(s.marriage.spouse):
                 ss = economy.people[s.marriage.spouse]
                 if a.pregnancy:
                     hating = 0.8
@@ -1424,7 +1584,7 @@ def update_adultery_hating (economy, person, adultery):
                         ss.hating_unknown += 0.1 * hating
                         ss.hating_unknown = np_clip(ss.hating_unknown, 0, 1)
             for a in s.adulteries:
-                if a.spouse in economy.people:
+                if economy.is_living(a.spouse):
                     ss = economy.people[a.spouse]
                     hating = 0.4
                     hated = random.random() < 0.15
@@ -1441,7 +1601,7 @@ def update_adultery_hating (economy, person, adultery):
                             ss.hating_unknown = np_clip(ss.hating_unknown,
                                                         0, 1)
     else: # p.sex is 'F':
-        if a.spouse is '' or a.spouse not in economy.people:
+        if a.spouse is '' or not economy.is_living(a.spouse):
             if a.begin == a.end:
                 hating = random.random() < 0.2
             else:
@@ -1462,7 +1622,7 @@ def update_adultery_hating (economy, person, adultery):
                     p.hating[s.id] = 0
                 p.hating[s.id] = np_clip(p.hating[s.id] + 0.5, 0, 1)
             if s.marriage is not None \
-               and s.marriage.spouse in economy.people:
+               and economy.is_living(s.marriage.spouse):
                 ss = economy.people[s.marriage.spouse]
                 if a.pregnancy:
                     hating = 0.6
@@ -1483,7 +1643,7 @@ def update_adultery_hating (economy, person, adultery):
                         ss.hating_unknown += 0.1 * hating
                         ss.hating_unknown = np_clip(ss.hating_unknown, 0, 1)
             for a in s.adulteries:
-                if a.spouse in economy.people:
+                if economy.is_living(a.spouse):
                     ss = economy.people[a.spouse]
                     hating = 0.4
                     hated = random.random() < 0.15
@@ -1550,7 +1710,7 @@ def get_pregnant_adulterers (economy):
         if p.death is None and p.sex == 'F' and p.pregnancy is None:
             for a in p.adulteries:
                 wc = p.want_child(a)
-                if a.spouse is '' or a.spouse not in economy.people:
+                if a.spouse is '' or not economy.is_living(a.spouse):
                     ft = random.random()
                     if ft < 0.1:
                         ft = 0
@@ -1602,7 +1762,7 @@ def remove_some_adulterers (economy):
         p.adulteries.remove(a)
         p.trash.append(a)
         update_adultery_hating(economy, p, a)
-        if a.spouse is '' or a.spouse not in economy.people:
+        if a.spouse is '' or not economy.is_living(a.spouse):
             n_u += 1
         else:
             s = economy.people[a.spouse]
@@ -1694,6 +1854,7 @@ def update_birth (economy):
         l[i].tmp_asset_rank = (s - i) / s
 
     l = []
+    dying = []
     # p.fertility は流産と成功した誕生のとき上がり、「堕胎」のとき下がる。
     for p in economy.people.values():
         if p.death is None and p.pregnancy is not None:
@@ -1713,7 +1874,7 @@ def update_birth (economy):
                 else:
                     l.append((p, p.want_child(preg.relation)))
                 if random.random() < ARGS.multipara_death_rate:
-                    p.die()
+                    dying.append(p)
     
     pp = 0
     for p in economy.people.values():
@@ -1749,6 +1910,10 @@ def update_birth (economy):
                     p.fertility += 0.1
                     p.fertility = np_clip(p.fertility, 0, 1)
             else:
+                sp = p.pregnancy.relation.spouse
+                if sp not in p.hating:
+                    p.hating[sp] = 0
+                p.hating[sp] = np_clip(p.hating[sp] + 0.5, 0, 1)
                 p.abort_pregnancy()
                 if p.fertility != 0:
                     p.fertility -= 0.1
@@ -1761,6 +1926,10 @@ def update_birth (economy):
             if wc:
                 l2.append(p)
             else:
+                sp = p.pregnancy.relation.spouse
+                if sp not in p.hating:
+                    p.hating[sp] = 0
+                p.hating[sp] = np_clip(p.hating[sp] + 0.5, 0, 1)
                 p.abort_pregnancy()
                 if p.fertility != 0:
                     p.fertility -= 0.1
@@ -1773,10 +1942,14 @@ def update_birth (economy):
                     p.fertility += 0.1
                     p.fertility = np_clip(p.fertility, 0, 1)
             else:
+                p.political_hating = np_clip(p.political_hating + 0.1,
+                                             0, 1)
                 p.abort_pregnancy()
                 if p.fertility != 0:
                     p.fertility -= 0.1
                     p.fertility = np_clip(p.fertility, 0, 1)
+   
+    economy.die(dying)
 
 
 def update_fertility (economy):
@@ -1799,26 +1972,262 @@ def update_fertility (economy):
                         p.fertility = 0
 
 
+def calc_descendant_inheritance_ratio (economy, id1, excluding=None):
+    if excluding != id1 and (id1 is '' or economy.is_living(id1)):
+        return {id1: 1.0}
+    p = None
+    if economy.is_living(id1):
+        p = economy.people[id1]
+    elif id1 in economy.tombs:
+        p = economy.tombs[id1].person
+    else:
+        return None
+
+    children = []
+    children.extend(p.children)
+    children.extend([x for x in p.trash if isinstance(x, Child)])
+    l = []
+    for c in children:
+        if excluding != c.id:
+            q = calc_descendant_inheritance_ratio(economy, c.id,
+                                                  excluding=excluding)
+            if q is not None:
+                l.append(q)
+    if l:
+        r = {}
+        for q in l:
+            for x, y in q.items():
+                if x not in r:
+                    r[x] = 0
+                if x is '':
+                    r[x] += y / len(l)
+                else:
+                    r[x] = max([y / len(l), r[x]])
+        return r
+    else:
+        return None
+
+def calc_inheritance_ratio_1 (economy, id1):
+    if economy.is_living(id1):
+        p = economy.people[id1]
+    elif id1 in economy.tombs:
+        p = economy.tombs[id1].person
+    else:
+        return None
+
+    spouse = None
+    if p.marriage is not None and economy.is_living(p.marriage.spouse):
+        spouse = p.marriage.spouse
+
+    r = {}
+    dq = calc_descendant_inheritance_ratio(economy, id1, excluding=id1)
+    if dq is not None:
+        if spouse is None:
+            return dq
+        else:
+            r[spouse] = 0.5
+            for x, y in dq.items():
+                if x not in r:
+                    r[x] = 0
+                if x is '':
+                    r[x] += 0.5 * y
+                else:
+                    r[x] = max([0.5 * y, r[x]])
+            return r
+
+    l = []
+
+    if p.father is '' or economy.is_living(p.father):
+        l.append(p.father)
+    if p.mother is '' or economy.is_living(p.mother):
+        l.append(p.mother)
+
+    if not l:
+        s = [p.father, p.mother]
+        for i in range(4):
+            s2 = []
+            for x in s:
+                if x is not '' and economy.is_living(x):
+                    l.append(x)
+                else:
+                    if x in economy.tombs:
+                        q = economy.tombs[x].person
+                        s2.append(q.father)
+                        s2.append(q.mother)
+            if l:
+                break
+            else:
+                s = s2
+        
+    if l:
+        if spouse is None:
+            for x in l:
+                if x not in r:
+                    r[x] = 0
+                if x is '':
+                    r[x] += 1/len(l)
+                else:
+                    r[x] = max([1/len(l), r[x]])
+            return r
+        else:
+            r[spouse] = 2/3
+            for x in l:
+                if x not in r:
+                    r[x] = 0
+                if x is '':
+                    r[x] += (1/3) * (1/len(l))
+                else:
+                    r[x] = max([(1/3) * (1/len(l)), r[x]])
+            return r
+
+    l = []
+    q = calc_descendant_inheritance_ratio(economy, p.father, excluding=id1)
+    if q is not None:
+        l.append(q)
+    q = calc_descendant_inheritance_ratio(economy, p.mother, excluding=id1)
+    if q is not None:
+        l.append(q)
+    if l:
+        if spouse is None:
+            for q in l:
+                for x, y in q.items():
+                    if x not in r:
+                        r[x] = 0
+                    if x is '':
+                        r[x] += y / len(l)
+                    else:
+                        r[x] = max([y / len(l), r[x]])
+            return r
+        else:
+            r[spouse] = 3/4
+            for q in l:    
+                for x, y in q.items():
+                    if x not in r:
+                        r[x] = 0
+                    if x is '':
+                        r[x] += (1/4) * (y / len(l))
+                    else:
+                        r[x] = max([(1/4) * (y / len(l)), r[x]])
+            return r
+
+    if spouse is not None:
+        return {spouse: 1.0}
+    
+    return None
+
+def calc_inheritance_ratio (economy, id1):
+    if id1 in economy.people and economy.people[id1].death is None:
+        p = economy.people[id1]
+    elif id1 in economy.tombs:
+        p = economy.tombs[id1].person
+    else:
+        return None
+
+    spouse = None
+    if p.marriage is not None and economy.is_living(p.marriage.spouse):
+        spouse = p.marriage.spouse
+    supported = None
+    if p.supported is not None and spouse is not None \
+       and spouse != p.supported:
+        supported = p.supported
+    if supported is not None and supported is not '' \
+       and not economy.is_living(supported):
+        supported = None
+
+    q = calc_inheritance_ratio_1(economy, id1)
+    if q is not None:
+        s = sum(list(q.values()))
+        for x, v in q.items():
+            q[x] = v / s
+
+    if supported is not None:
+        if q is None:
+            return {supported: 1.0}
+        r = {}
+        r[supported] = 0.2
+        for x, y in q.items():
+            if x not in r:
+                r[x] = 0
+            r[x] += 0.8 * y
+        return r
+
+    l = [x for x in p.supporting if x is '' or economy.is_living(x)]
+    if l:
+        if q is None:
+            q = {}
+        for x in l:
+            if x not in q:
+                q[x] = 0
+            q[x] += 0.1
+        k = sum(list(q.values()))
+        r = {}
+        for x, y in q.items():
+            r[x] = y / k
+        return r
+
+    return q
+
+
+def recalc_inheritance_ratio_1 (economy, inherit_ratio, excluding):
+    q = inherit_ratio
+    r = {}
+    if q is None:
+        return r
+    for x, y in q.items():
+        if x not in excluding:
+            if x in economy.people and economy.people[x].death is not None:
+                excluding.add(x)
+                q1 = recalc_inheritance_ratio_1(economy,
+                                                economy.people[x].death
+                                                .inheritance_ratio,
+                                                excluding)
+                for x1, y1 in q1.items():
+                    if x1 not in r:
+                        r[x1] = 0
+                    r[x1] += y * y1
+            else:
+                if x not in r:
+                    r[x] = 0
+                r[x] += y
+    return r
+
+def recalc_inheritance_ratio (economy, person):
+    p = person
+    assert p.death is not None
+    r = recalc_inheritance_ratio_1(economy,
+                                   p.death.inheritance_ratio,
+                                   set([person.id]))
+    if r:
+        s = sum(list(r.values()))
+        for x, y in r.items():
+            r[x] = y / s
+        return r
+    else:
+        return None
+
+
 def update_death (economy):
     print("\nDeath:...", flush=True)
 
+    l = []
     for p in economy.people.values():
         if p.death is None:
             if random.random() < ARGS.general_death_rate:
-                p.die()
+                l.append(p)
             else:
                 if p.age > 110:
-                    p.die()
+                    l.append(p)
                 elif p.age > 80 and p.age <= 100:
                     if random.random() < ARGS.a80_death_rate:
-                        p.die()
+                        l.append(p)
                 elif p.age > 60 and p.age <= 80:
                     if random.random() < ARGS.a60_death_rate:
-                        p.die()
+                        l.append(p)
                 elif p.age >= 0 and p.age <= 3:
                     if random.random() < ARGS.infant_death_rate:
-                        p.die()
-
+                        l.append(p)
+    economy.die(l)
+                        
 
 def reduce_tombs (economy):
     l = [t for t in economy.tombs.values()
@@ -1834,7 +2243,85 @@ def reduce_tombs (economy):
                         (0.98 ** (economy.term - t.death_term))))[0:r]
         for t in l:
             del economy.tombs[t.person.id]
-        
+
+
+def make_support_consistent (economy):
+    for p in economy.people.values():
+        if p.supporting and p.supported is not None:
+            s = p.supported
+            check = set([s])
+            while s is not '':
+                assert economy.is_living(s)
+                s1 = economy.people[s].supported
+                if s1 is None:
+                    break
+                if s1 in check:
+                    raise ValueError("A supporting tree loops.")
+                check.add(s1)
+                s = s1
+            supported = s
+            d = None
+            if s is not '':
+                d = economy.people[s].district
+            for id1 in p.supporting:
+                if id1 is not '':
+                    assert id1 in economy.people
+                    p1 = economy.people[id1]
+                    p1.supported = supported
+                    if d is not None:
+                        p1.district = d
+            p.supporting = []
+
+    supportings = OrderedDict()
+    for p in economy.people.values():
+        if p.supported not in supportings:
+            supportings[p.supported] = []
+        supportings[p.supported].append(p.id)
+
+    for p in economy.people.values():
+        if p.supporting:
+            if not [True for x in p.supporting if x is not '']:
+                continue
+            if p.id not in supportings:
+                raise ValueError("A supporting tree is inconsistent.")
+            l1 = supportings[p.id]
+            l2 = p.supporting
+            for x in l2:
+                if x is not '':
+                    try:
+                        l1.remove(x)
+                    except:
+                        raise ValueError("A supporting tree is inconsistent.")
+
+
+def update_unknown_support (economy):
+    for p in economy.people.values():
+        if p.death is not None:
+            continue
+        if p.supported is '':
+            if p.age >= 18 and p.age < 70:
+                p.supported = None
+        if '' in p.supporting:
+            l1 = [x for x in p.supporting if x is not '']
+            l2 = [x for x in p.supporting if x is '']
+            l3 = [c for c in p.children if c.id is ''
+                  and economy.term - c.birth_term == 18 * 12]
+            for i in range(len(l3)):
+                if l2:
+                    l2.pop()
+            if economy.term - p.birth_term == 60 * 12:
+                if l2:
+                    l2.pop()
+            l1.extend(l2)
+            p.supporting = l1
+
+
+def update_support (economy):
+    print("\nSupport:...", flush=True)
+
+    make_support_consistent(economy)
+    update_unknown_support(economy)
+
 
 def update_economy (economy):
     print("\nEconomy:...", flush=True)
@@ -1887,9 +2374,10 @@ def step (economy):
         l = []
         for p in economy.people.values():
             if p.death is not None:
-                l.append(p)
-        for p in l:
-            # ここで相続分の精算をする予定。
+                l.append((p, recalc_inheritance_ratio(economy, p)))
+        for p, q in l:
+            p.death.inheritance_ratio = q
+            p.do_inheritance()
             del economy.people[p.id]
             p.economy = None
 
@@ -1899,6 +2387,7 @@ def step (economy):
     update_adulteries(economy)
     update_marriages(economy)
     update_birth(economy)
+    update_support(economy)
     
     print("\nReduce Tombs:...", flush=True)
     reduce_tombs(economy)

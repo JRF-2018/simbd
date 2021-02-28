@@ -1,7 +1,7 @@
 
 
     仏教的哲学的社会シミュレーション
-    (Created: 2021-02-27, Time-stamp: <2021-02-27T15:22:11Z>)
+    (Created: 2021-02-27, Time-stamp: <2021-02-27T19:17:19Z>)
 
 
 ** このファイルについて
@@ -131,6 +131,11 @@ https://gist.github.com/JRF-2018/aace48ebc44229844b6f75a39a287578
 
 
   * test_of_inheritance_1.py
+
+相続のテスト。
+
+
+  * test_of_inheritance_2.py
 
 相続のテスト。
 
