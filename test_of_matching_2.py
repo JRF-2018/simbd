@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.7' # Time-stamp: <2021-02-28T17:45:55Z>
+__version__ = '0.0.8' # Time-stamp: <2021-03-03T15:14:21Z>
 ## Language: Japanese/UTF-8
 
 """マッチングのシミュレーション"""
@@ -123,6 +123,10 @@ ARGS.new_adulteries_pregnant_mag = None
 # 40歳以上の男性の生殖能力の衰えのパラメータ
 ARGS.male_fertility_reduce_rate = calc_increase_rate(12, 0.1)
 ARGS.male_fertility_reduce = 0.9
+# 結婚または不倫している場合の不倫再発率
+ARGS.with_spouse_adultery_reboot_rate = calc_increase_rate(12 * 10, 10/100)
+# 結婚も不倫していない場合の不倫再発率
+ARGS.adultery_reboot_rate = calc_increase_rate(12, 10/100)
 
 SAVED_ECONOMY = None
 
@@ -977,13 +981,17 @@ class EconomyPlotBT (EconomyPlot0):
                 bins=ARGS.bins)
         mb = 0
         md = 0
+        dp = [0] * len(ARGS.population)
         for p in economy.people.values():
             if p.death is not None and p.death.term == economy.term:
                 md += 1
             if p.birth_term == economy.term:
                 mb += 1
+            if p.death is None:
+                dp[p.district] += 1
         print("New Birth:", mb, "New Death:", md,
               "WantChildMag:", economy.want_child_mag)
+        print("District Population:", dp)
 
     def view_male_fertility (self, ax, economy):
         l = [x.fertility for x in economy.people.values()
@@ -1215,6 +1223,7 @@ def initialize (economy):
                     else:
                         m_age = random.uniform(35, p.age)
                 m.begin = economy.term - int((p.age - m_age) * 12)
+                m.init_favor = random.uniform(-1.0, 6.0)
                 no_child = random.random() < 0.3
                 if not no_child:
                     c = Child()
@@ -1285,6 +1294,7 @@ def initialize (economy):
                 if p.age - years < 12:
                     years = p.age - 12
                 a.begin = economy.term - int(years * 12)
+                a.init_favor = random.uniform(-1.0, 6.0)
                 if not no_child:
                     c = Child()
                     a.children.append(c)
@@ -1368,6 +1378,10 @@ def initialize (economy):
     for p in economy.people.values():
         if p.death is not None:
             continue
+        if p.sex == 'F' and p.marriage is not None:
+            p.supported = ''
+            continue
+
         if p.age < 10:
             p.supported = ''
         elif p.age < 18:
@@ -1377,6 +1391,8 @@ def initialize (economy):
             if random.random() < 0.5:
                 p.supported = ''
         else:
+            if p.sex == 'M' and p.marriage is not None:
+                p.supporting.append('')
             for c in p.children:
                 c_age = (economy.term - c.birth_term) / 12
                 if c_age < 10:
@@ -1514,18 +1530,22 @@ def choose_adulterers (economy):
                                  ARGS.external_adultery_ratio_female)
 
 
-def match_favor (male, female, favor_func):
-    l = sorted(list(itertools.product(range(len(male)), range(len(female)))),
-               key=(lambda mf: favor_func(male[mf[0]], female[mf[1]])
-                    + favor_func(female[mf[1]], male[mf[0]])),
-               reverse=True)
+def match_favor (male, female, favor_func, threshold=None):
+    l = [(m, f,
+          favor_func(male[m], female[f]), favor_func(female[f], male[m]))
+         for m, f in itertools.product(range(len(male)), range(len(female)))]
+    if threshold is not None:
+        l = [(m, f, fm, ff) for m, f, fm, ff in l
+             if fm >= threshold and ff >= threshold]
+    
+    l = sorted(l, key=lambda x: x[2] + x[3], reverse=True)
     n_m = 0
     n_f = 0
     mdone = [False] * len(male)
     fdone = [False] * len(female)
     i = 0
     matches = []
-    for m, f in l:
+    for m, f, fm, ff in l:
         if not (n_m < len(male) and n_f < len(female)):
             break
         if (not mdone[m]) and (not fdone[f]):
@@ -1534,6 +1554,7 @@ def match_favor (male, female, favor_func):
             n_m += 1
             n_f += 1
             matches.append((male[m], female[f]))
+
     return matches
 
 
@@ -1680,6 +1701,14 @@ def remove_some_new_adulterers (economy, matches):
     for i in l1:
         m  = matches[i][0]
         f  = matches[i][1]
+        ex = False
+        for a in m.adulteries:
+            if a.spouse == f.id:
+                ex = True
+                break
+        if ex:
+            continue
+
         am = Adultery()
         af = Adultery()
         am.spouse = f.id
@@ -1688,6 +1717,23 @@ def remove_some_new_adulterers (economy, matches):
         af.spouse = m.id
         af.init_favor = f.adultery_favor(m)
         af.begin = economy.term
+
+        # # 時間を食うので以下のチェックは行わないことにする。
+        # amt = []
+        # aft = []
+        # for x in m.trash:
+        #     if isinstance(x, Marriage) or isinstance(x, Adultery):
+        #         if x.spouse == f.id:
+        #             amt.append(x.end - x.begin)
+        # for x in f.trash:
+        #     if isinstance(x, Marriage) or isinstance(x, Adultery):
+        #         if x.spouse == m.id:
+        #             aft.append(x.end - x.begin)
+        # if amt:
+        #     am.begin -= math.floor(max(amt) / 2)
+        # if aft:
+        #     af.begin -= math.floor(max(aft) / 2)
+        
         if i in s3:
             m.adulteries.append(am)
             f.adulteries.append(af)
@@ -1703,6 +1749,68 @@ def remove_some_new_adulterers (economy, matches):
                 if random.random() < ARGS.new_adulteries_pregnant_rate \
                    * (ft ** ARGS.new_adulteries_pregnant_mag):
                     f.get_pregnant(af)
+
+
+def reboot_some_adulteries (economy):
+    rebooting = 0
+    for p in economy.people.values():
+        if p.death is not None:
+            continue
+        reboot_rate = ARGS.adultery_reboot_rate
+        if p.marriage is not None or p.adulteries:
+            reboot_rate = ARGS.with_spouse_adultery_reboot_rate
+        if random.random() < reboot_rate:
+            rellist = [x for x in p.trash
+                       if (isinstance(x, Marriage) or isinstance(x, Adultery))]
+            if not rellist:
+                continue
+            l2 = [0.1 + math.log(1 + x.end - x.begin) \
+                  * np_clip(x.init_favor, 0, 10) for x in rellist]
+            l2 = np.array(l2).astype(np.longdouble)
+            y = np_random_choice(rellist, 1, replace=False,
+                                 p=l2/np.sum(l2))[0]
+            if y.spouse is '' or not economy.is_living(y.spouse):
+                continue
+            s = economy.people[y.spouse]
+            if s.marriage is not None or s.adulteries:
+                ex = False
+                for x1 in [s.marriage] + s.adulteries:
+                    if x1 is None:
+                        continue
+                    if x1.spouse == p.id:
+                        ex = True
+                        break
+                if ex:
+                    continue
+                if random.random() < 0.5:
+                    continue
+            rebooting += 1
+            a1 = Adultery()
+            a2 = Adultery()
+            p.adulteries.append(a1)
+            s.adulteries.append(a2)
+            a1.spouse = s.id
+            a1.init_favor = p.adultery_favor(s)
+            a1.begin = economy.term
+            a2.spouse = p.id
+            a2.init_favor = s.adultery_favor(p)
+            a2.begin = economy.term
+
+            a1t = []
+            a2t = []
+            for x in p.trash:
+                if isinstance(x, Marriage) or isinstance(x, Adultery):
+                    if x.spouse == s.id:
+                        a1t.append(x.end - x.begin)
+            for x in s.trash:
+                if isinstance(x, Marriage) or isinstance(x, Adultery):
+                    if x.spouse == p.id:
+                        a2t.append(x.end - x.begin)
+            if a1t:
+                a1.begin -= math.floor(max(a1t) / 2)
+            if a2t:
+                a2.begin -= math.floor(max(a2t) / 2)
+    print("Reboot:", rebooting)
 
 
 def get_pregnant_adulterers (economy):
@@ -1767,6 +1875,7 @@ def remove_some_adulterers (economy):
         else:
             s = economy.people[a.spouse]
             sa = [a for a in s.adulteries if a.spouse == p.id][0]
+            sa.end = economy.term
             s.adulteries.remove(sa)
             s.trash.append(sa)
             update_adultery_hating(economy, s, sa)
@@ -1825,6 +1934,7 @@ def update_adulteries (economy):
         p.tmp_luck = 0
     print("Updating...", flush=True)
     remove_some_new_adulterers(economy, matches)
+    reboot_some_adulteries(economy)
     get_pregnant_adulterers(economy)
     remove_some_adulterers(economy)
 
@@ -1913,7 +2023,7 @@ def update_birth (economy):
                 sp = p.pregnancy.relation.spouse
                 if sp not in p.hating:
                     p.hating[sp] = 0
-                p.hating[sp] = np_clip(p.hating[sp] + 0.5, 0, 1)
+                p.hating[sp] = np_clip(p.hating[sp] + 0.3, 0, 1)
                 p.abort_pregnancy()
                 if p.fertility != 0:
                     p.fertility -= 0.1
@@ -1929,7 +2039,7 @@ def update_birth (economy):
                 sp = p.pregnancy.relation.spouse
                 if sp not in p.hating:
                     p.hating[sp] = 0
-                p.hating[sp] = np_clip(p.hating[sp] + 0.5, 0, 1)
+                p.hating[sp] = np_clip(p.hating[sp] + 0.3, 0, 1)
                 p.abort_pregnancy()
                 if p.fertility != 0:
                     p.fertility -= 0.1

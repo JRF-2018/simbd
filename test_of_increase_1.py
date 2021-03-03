@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.3' # Time-stamp: <2021-02-24T11:37:55Z>
+__version__ = '0.0.4' # Time-stamp: <2021-03-03T15:15:21Z>
 ## Language: Japanese/UTF-8
 
 """増えていく確率のテスト"""
@@ -145,7 +145,17 @@ def main ():
     r3 = r2.subs([(R, Rational(5/100)), (k, 12 * 3)]).simplify().evalf()
     print(r3)
     print(q.subs([(r, r3), (k, 12)]).simplify().evalf())
-    
+
+    print("結婚または不倫している場合の不倫再発率")
+    r3 = r2.subs([(R, Rational(10/100)), (k, 12 * 10)]).simplify().evalf()
+    print(r3)
+    print(q.subs([(r, r3), (k, 12)]).simplify().evalf())
+
+    print("結婚も不倫していない場合の不倫再発率")
+    r3 = r2.subs([(R, Rational(10/100)), (k, 12)]).simplify().evalf()
+    print(r3)
+    print(q.subs([(r, r3), (k, 12)]).simplify().evalf())
+
     
 if __name__ == '__main__':
     parse_args()
