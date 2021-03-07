@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.1' # Time-stamp: <2021-02-27T19:03:12Z>
+__version__ = '0.0.2' # Time-stamp: <2021-03-06T19:57:35Z>
 ## Language: Japanese/UTF-8
 
 """相続のテスト"""
@@ -76,7 +76,7 @@ class Person (Serializable):
 class Death (Serializable):
     def __init__ (self):
         self.term = None
-        self.inheritance_ratio = None
+        self.inheritance_share = None
     
 class Economy (Frozen):
     def __init__ (self):
@@ -86,8 +86,8 @@ class Economy (Frozen):
         return id in self.people and self.people[id].death is None
 
 
-def recalc_inheritance_ratio_1 (economy, inherit_ratio, excluding):
-    q = inherit_ratio
+def recalc_inheritance_share_1 (economy, inherit_share, excluding):
+    q = inherit_share
     r = {}
     if q is None:
         return r
@@ -95,9 +95,9 @@ def recalc_inheritance_ratio_1 (economy, inherit_ratio, excluding):
         if x not in excluding:
             if x in economy.people and economy.people[x].death is not None:
                 excluding.add(x)
-                q1 = recalc_inheritance_ratio_1(economy,
+                q1 = recalc_inheritance_share_1(economy,
                                                 economy.people[x].death
-                                                .inheritance_ratio,
+                                                .inheritance_share,
                                                 excluding)
                 for x1, y1 in q1.items():
                     if x1 not in r:
@@ -109,11 +109,11 @@ def recalc_inheritance_ratio_1 (economy, inherit_ratio, excluding):
                 r[x] += y
     return r
 
-def recalc_inheritance_ratio (economy, person):
+def recalc_inheritance_share (economy, person):
     p = person
     assert p.death is not None
-    r = recalc_inheritance_ratio_1(economy,
-                                   p.death.inheritance_ratio,
+    r = recalc_inheritance_share_1(economy,
+                                   p.death.inheritance_share,
                                    set([person.id]))
     if r:
         s = sum(list(r.values()))
@@ -128,14 +128,14 @@ def initialize1 (economy):
     p0 = Person()
     p0.id = 'a'
     p0.death = Death()
-    p0.death.inheritance_ratio = {
+    p0.death.inheritance_share = {
         'b': 0.7,
         'c': 0.3
     }
     p1 = Person()
     p1.id = 'b'
     p1.death = Death()
-    p1.death.inheritance_ratio = {
+    p1.death.inheritance_share = {
         'a': 0.1,
         'c': 0.6,
         'd': 0.3
@@ -145,7 +145,7 @@ def initialize1 (economy):
     p3 = Person()
     p3.id = 'd'
     p3.death = Death()
-    p3.death.inheritance_ratio = {
+    p3.death.inheritance_share = {
         'a': 0.1,
         'c': 0.6,
         'e': 0.3
@@ -158,7 +158,7 @@ def main ():
     economy = Economy()
     initialize1(economy)
     p0 = economy.people['a']
-    print(recalc_inheritance_ratio(economy, p0))
+    print(recalc_inheritance_share(economy, p0))
 
 if __name__ == '__main__':
     parse_args()

@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.4' # Time-stamp: <2021-03-03T15:15:21Z>
+__version__ = '0.0.5' # Time-stamp: <2021-03-07T11:09:37Z>
 ## Language: Japanese/UTF-8
 
 """増えていく確率のテスト"""
@@ -26,17 +26,39 @@ ARGS = argparse.Namespace()
 ARGS.population = 100000
 ARGS.terms = 12
 ARGS.r = 0.001
+ARGS.R = 0.1
+ARGS.R2 = 0.05
+ARGS.terms2 = 12
+ARGS.min = 0.1
 
 def parse_args ():
     parser = argparse.ArgumentParser()
+    parser.add_argument("args", metavar='F', type=float, nargs='*')
     parser.add_argument("-n", "--population", type=int)
     parser.add_argument("-t", "--terms", type=int)
     parser.add_argument("-r", "--r", type=float)
+    parser.add_argument("-R", "--R", type=float)
+    parser.add_argument("--R2", type=float)
+    parser.add_argument("--terms2", "--t2", type=int)
+    parser.add_argument("--min", type=float)
     parser.parse_args(namespace=ARGS)
+
+    if len(ARGS.args) > 0:
+        ARGS.R = ARGS.args[0]
+    if len(ARGS.args) > 1:
+        ARGS.terms = ARGS.args[1]
+    if len(ARGS.args) > 2:
+        ARGS.R2 = ARGS.args[2]
+    if len(ARGS.args) > 3:
+        ARGS.terms2 = ARGS.args[3]
+    if len(ARGS.args) > 4:
+        ARGS.min = ARGS.args[4]
+    if len(ARGS.args) > 5:
+        parser.error("The length of arguments must be <= 5.")
 
 def sim (r):
     people = [False] * ARGS.population
-    for i in range(ARGS.terms):
+    for i in range(int(ARGS.terms)):
         for j in range(len(people)):
             if people[j] is False:
                 if random.random() < r:
@@ -156,7 +178,13 @@ def main ():
     print(r3)
     print(q.subs([(r, r3), (k, 12)]).simplify().evalf())
 
-    
+    r3 = r2.subs([(R, ARGS.R), (k, ARGS.terms)]).simplify().evalf()
+    print("r =", r3)
+    r4 = r2.subs([(R, ARGS.R2), (k, ARGS.terms2)]).simplify().evalf()
+    print("r2 =", r4)
+    m = math.log(r4 / r3) / math.log(ARGS.min)
+    print("m = ", m)
+
 if __name__ == '__main__':
     parse_args()
     main()

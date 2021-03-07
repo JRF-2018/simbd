@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.2' # Time-stamp: <2021-02-28T16:47:18Z>
+__version__ = '0.0.3' # Time-stamp: <2021-03-06T19:55:07Z>
 ## Language: Japanese/UTF-8
 
 """相続のテスト"""
@@ -90,7 +90,7 @@ class Person (Serializable):
         p = self
         economy = self.economy
         assert p.death is not None
-        q = p.death.inheritance_ratio
+        q = p.death.inheritance_share
 
         if q is None:
             economy.cur_forfeit_prop += self.prop
@@ -138,7 +138,7 @@ class Child (Serializable):
 class Death (Serializable):
     def __init__ (self):
         self.term = None
-        self.inheritance_ratio = None
+        self.inheritance_share = None
     
 class Tomb (Serializable):
     def __init__ (self):
@@ -156,7 +156,7 @@ class Economy (Frozen):
         return id in self.people and self.people[id].death is None
 
 
-def calc_descendant_inheritance_ratio (economy, id1, excluding=None):
+def calc_descendant_inheritance_share (economy, id1, excluding=None):
     if excluding != id1 and (id1 is '' or economy.is_living(id1)):
         return {id1: 1.0}
     p = None
@@ -173,7 +173,7 @@ def calc_descendant_inheritance_ratio (economy, id1, excluding=None):
     l = []
     for c in children:
         if excluding != c.id:
-            q = calc_descendant_inheritance_ratio(economy, c.id,
+            q = calc_descendant_inheritance_share(economy, c.id,
                                                   excluding=excluding)
             if q is not None:
                 l.append(q)
@@ -191,7 +191,7 @@ def calc_descendant_inheritance_ratio (economy, id1, excluding=None):
     else:
         return None
 
-def calc_inheritance_ratio_1 (economy, id1):
+def calc_inheritance_share_1 (economy, id1):
     if economy.is_living(id1):
         p = economy.people[id1]
     elif id1 in economy.tombs:
@@ -204,7 +204,7 @@ def calc_inheritance_ratio_1 (economy, id1):
         spouse = p.marriage.spouse
 
     r = {}
-    dq = calc_descendant_inheritance_ratio(economy, id1, excluding=id1)
+    dq = calc_descendant_inheritance_share(economy, id1, excluding=id1)
     if dq is not None:
         if spouse is None:
             return dq
@@ -265,10 +265,10 @@ def calc_inheritance_ratio_1 (economy, id1):
             return r
 
     l = []
-    q = calc_descendant_inheritance_ratio(economy, p.father, excluding=id1)
+    q = calc_descendant_inheritance_share(economy, p.father, excluding=id1)
     if q is not None:
         l.append(q)
-    q = calc_descendant_inheritance_ratio(economy, p.mother, excluding=id1)
+    q = calc_descendant_inheritance_share(economy, p.mother, excluding=id1)
     if q is not None:
         l.append(q)
     if l:
@@ -299,7 +299,7 @@ def calc_inheritance_ratio_1 (economy, id1):
     
     return None
 
-def calc_inheritance_ratio (economy, id1):
+def calc_inheritance_share (economy, id1):
     if id1 in economy.people and economy.people[id1].death is None:
         p = economy.people[id1]
     elif id1 in economy.tombs:
@@ -318,7 +318,7 @@ def calc_inheritance_ratio (economy, id1):
        and not economy.is_living(supported):
         supported = None
 
-    q = calc_inheritance_ratio_1(economy, id1)
+    q = calc_inheritance_share_1(economy, id1)
     if q is not None:
         s = sum(list(q.values()))
         for x, v in q.items():
@@ -553,32 +553,32 @@ def initialize6 (economy):
 def main ():
     economy = Economy()
     initialize1(economy)
-    print(calc_inheritance_ratio(economy, 'cur_dead'))
+    print(calc_inheritance_share(economy, 'cur_dead'))
     p0 = economy.people['cur_dead']
-    p0.death.inheritance_ratio = calc_inheritance_ratio(economy, 'cur_dead')
+    p0.death.inheritance_share = calc_inheritance_share(economy, 'cur_dead')
     p0.do_inheritance()
     print([(p.id, p.prop, p.land) for p in economy.people.values()])
 
     economy = Economy()
     initialize2(economy)
-    print(calc_inheritance_ratio(economy, 'cur_dead'))
+    print(calc_inheritance_share(economy, 'cur_dead'))
     economy = Economy()
     initialize3(economy)
-    print(calc_inheritance_ratio(economy, 'cur_dead'))
+    print(calc_inheritance_share(economy, 'cur_dead'))
     economy = Economy()
     initialize4(economy)
-    print(calc_inheritance_ratio(economy, 'cur_dead'))
+    print(calc_inheritance_share(economy, 'cur_dead'))
     economy = Economy()
     initialize5(economy)
-    print(calc_inheritance_ratio(economy, 'cur_dead'))
+    print(calc_inheritance_share(economy, 'cur_dead'))
     p0 = economy.people['cur_dead']
-    p0.death.inheritance_ratio = calc_inheritance_ratio(economy, 'cur_dead')
+    p0.death.inheritance_share = calc_inheritance_share(economy, 'cur_dead')
     p0.do_inheritance()
     print([(p.id, p.prop, p.land) for p in economy.people.values()])
 
     economy = Economy()
     initialize6(economy)
-    print(calc_inheritance_ratio(economy, 'cur_dead'))
+    print(calc_inheritance_share(economy, 'cur_dead'))
 
 if __name__ == '__main__':
     parse_args()
