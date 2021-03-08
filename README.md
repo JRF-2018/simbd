@@ -1,7 +1,7 @@
 # Buddhistic Philosophical Computer-Simulation of Society
 # 仏教的哲学的社会シミュレーション
 
-<!-- Time-stamp: "2021-02-26T17:04:57Z" -->
+<!-- Time-stamp: "2021-03-08T08:27:46Z" -->
 
 ## このプロジェクトについて
 
@@ -31,13 +31,18 @@
 
 今は仏教的でないとはいえ、著者である私(JRF)の中では、ずっとその関係を
 意識しているので「シミュレーション仏教」…  simulation buddhism の略と
-して、simbd をリポジトリ名にしています。
+して、simbd を GitHub のリポジトリ名にしています。
 
 ただ、ワールドワイドなインターネットで、このプロジェクトを探すには
 simbd だと短過ぎると同時に少し名前がふさわしくないかもしれません。そう
 であるなら、将来的には、"Buddhistic Philosophical Simulation of
 Society" を略して、bdpsimsoc あたりをプロジェクト名・アーカイブ名にし
 ようかと考えています。
+
+なお、今の GitHub のレポジトリは↓です。
+
+《JRF-2018/simbd: Buddhistic Philosophical Computer-Simulation of Society》  
+https://github.com/JRF-2018/simbd
 
 
 ## この次に読むべきものは？

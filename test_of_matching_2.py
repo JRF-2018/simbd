@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.10' # Time-stamp: <2021-03-07T15:48:45Z>
+__version__ = '0.0.11' # Time-stamp: <2021-03-08T11:21:41Z>
 ## Language: Japanese/UTF-8
 
 """結婚・不倫・扶養・相続などのマッチングのシミュレーション"""
@@ -85,8 +85,10 @@ ARGS.init_zero = False
 # 初期化の際の最大の年齢。
 ARGS.init_max_age = 100.0
 # 不倫の割合
-ARGS.adultery_rate = 0.11
+#ARGS.adultery_rate = 0.11
+ARGS.adultery_rate = 0.20
 # 新規不倫もあわせた不倫の割合
+#ARGS.new_adultery_rate = 0.22
 ARGS.new_adultery_rate = 0.22
 # 新規不倫のみ減りやすさを加重する
 ARGS.new_adultery_reduce = 0.6
@@ -96,11 +98,14 @@ ARGS.adultery_separability_mag = 2.0
 ARGS.external_adultery_rate_male = 0.3
 ARGS.external_adultery_rate_female = 0.1
 # 結婚者の割合
-ARGS.marriage_rate = 0.7
+#ARGS.marriage_rate = 0.7
+ARGS.marriage_rate = 0.768
 # 新規結婚者もあわせた結婚の割合
-ARGS.new_marriage_rate = 0.8
+#ARGS.new_marriage_rate = 0.8
+ARGS.new_marriage_rate = 0.77
 # 新規結婚者の上限の割合
-ARGS.marriage_max_increase_rate = 0.1
+#ARGS.marriage_max_increase_rate = 0.1
+ARGS.marriage_max_increase_rate = 0.05
 # 結婚者の好意度下限
 ARGS.marriage_favor_threshold = 2.0
 # 結婚の別れやすさの乗数
@@ -162,13 +167,13 @@ ARGS.adultery_elevate_rate = calc_increase_rate(12, 5/100)
 # 15歳から18歳までが早期に扶養から離れる最大の確率
 ARGS.become_adult_rate = calc_increase_rate(12 * 3, 50/100)
 # 70歳から90歳までの老人が扶養に入る確率
-ARGS.support_aged_rate = calc_increase_rate(12 * 10, 70/100)
+ARGS.support_aged_rate = calc_increase_rate(12 * 10, 90/100)
 # 親のいない者が老人を扶養に入れる確率
-ARGS.guard_aged_rate = calc_increase_rate(12 * 10, 50/100)
+ARGS.guard_aged_rate = calc_increase_rate(12 * 10, 90/100)
 # 子供の多い家が養子に出す確率
 ARGS.unsupport_unwanted_rate = calc_increase_rate(12 * 10, 50/100)
 # 子供の少ない家が養子をもらう確率
-ARGS.support_unwanted_rate = calc_increase_rate(12 * 10, 50/100)
+ARGS.support_unwanted_rate = calc_increase_rate(12 * 10, 80/100)
 
 
 SAVED_ECONOMY = None
@@ -1703,11 +1708,14 @@ class EconomyPlotMA (EconomyPlot0):
 
     def view_married (self, ax, economy):
         m = []
+        m2 = []
         for p in economy.people.values():
             if p.death is None and p.marriage is not None:
                 x = p.marriage
                 m.append(p.age - ((economy.term - x.begin) / 12))
-        ax.hist(m, bins=ARGS.bins)
+                m2.append(p.age)
+        ax.hist(m, bins=ARGS.bins, alpha=0.6)
+        ax.hist(m2, bins=ARGS.bins, alpha=0.6)
         print("Marriages:", len(m))
 
     def view_marriage_age_vs_years (self, ax, economy):
@@ -2575,9 +2583,10 @@ def elevate_some_to_marriages (economy):
                 continue
             elevate_rate = ARGS.adultery_elevate_rate
             if a.children:
-                elvate_rate = ARGS.with_child_adultery_elevate_rate
+                elevate_rate = ARGS.with_child_adultery_elevate_rate
             if p.age < 24 and s.age < 24:
-                elvate_rate = ARGS.a24_adultery_elevate_rate
+                if ARGS.a24_adultery_elevate_rate > elevate_rate:
+                    elevate_rate = ARGS.a24_adultery_elevate_rate
             if not (random.random() < elevate_rate):
                 continue
             # if not (p.marriage_favor(s) >= ARGS.marriage_favor_threshold
