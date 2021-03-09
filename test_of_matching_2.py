@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.11' # Time-stamp: <2021-03-08T11:21:41Z>
+__version__ = '0.0.12' # Time-stamp: <2021-03-09T08:32:48Z>
 ## Language: Japanese/UTF-8
 
 """結婚・不倫・扶養・相続などのマッチングのシミュレーション"""
@@ -172,8 +172,9 @@ ARGS.support_aged_rate = calc_increase_rate(12 * 10, 90/100)
 ARGS.guard_aged_rate = calc_increase_rate(12 * 10, 90/100)
 # 子供の多い家が養子に出す確率
 ARGS.unsupport_unwanted_rate = calc_increase_rate(12 * 10, 50/100)
-# 子供の少ない家が養子をもらう確率
-ARGS.support_unwanted_rate = calc_increase_rate(12 * 10, 80/100)
+# 子供の少ない家が養子をもらうのに手を上げる確率
+#ARGS.support_unwanted_rate = calc_increase_rate(12 * 10, 50/100)
+ARGS.support_unwanted_rate = 0.1
 
 
 SAVED_ECONOMY = None
@@ -377,7 +378,11 @@ class PersonEC (Person0):
         else:
             s = economy.people[relation.spouse]
             return s.asset_value() / p.asset_value()
-            
+
+    def change_district (self, new_district):
+        #土地を売ったり買ったりする処理が必要かも。
+        self.district = new_district
+
 
 class PersonBT (Person0):
     def children_wanting (self):
@@ -711,7 +716,7 @@ class PersonDT (Person0):
                 s.supported = new_supporter
                 if ns is not None:
                     ns.supporting.append(s.id)
-                    s.district = ns.district
+                    s.change_district(ns.district)
         p.supporting = []
 
     def die_supported (self):
@@ -1038,14 +1043,28 @@ class PersonMA (Person0):
                             l1.extend([c.id for c in r.children])
                         else:
                             l2.extend([c.id for c in r.children])
+                for x in [s1.father, s1.mother]:
+                    if x is '' or x == p1.father or x == p1.mother:
+                        continue
+                    l2.append(x)
+                    q = None
+                    if x in economy.people:
+                        q = economy.people[x]
+                    elif x in economy.tombs:
+                        q = economy.tombs[x].person
+                    if q is not None:
+                        if q.father is not '':
+                            l2.append(q.father)
+                        if q.mother is not '':
+                            l2.append(q.mother)
                 ch = set(l1)
-                ach = set(l2)
+                s1fam = set(l2)
                 l = []
                 for x in p1.supporting:
                     if x is '' or x in ch:
                         if random.random() < 0.5:
                             l.append(x)
-                    elif x in ach:
+                    elif x in s1fam:
                         l.append(x)
                 for x in l:
                     p1.supporting.remove(x)
@@ -1105,7 +1124,7 @@ class PersonSUP (Person0):
             p.supported = None
         p.supported = g.id
         g.supporting.append(p.id)
-        p.district = g.district
+        p.change_district(g.district)
         gs = None
         if g.marriage is not None:
             gs = g.marriage.spouse
@@ -1337,7 +1356,7 @@ class EconomyDT (Economy0):
             if fst_heir is not None and fst_heir is not '':
                 fh = economy.people[fst_heir]
                 fh.supporting.append(p.id)
-                p.district = fh.district
+                p.change_district(fh.district)
         
         for p in persons:
             p.do_inheritance()
@@ -1475,7 +1494,7 @@ class EconomyMA (Economy0):
                 s.supporting.remove(f.id)
         f.supported = m.id
         m.supporting.append(f.id)
-        m.district = f.district
+        m.change_district(f.district)
 
 
 class Economy (EconomyDT, EconomyMA):
@@ -2634,11 +2653,13 @@ def get_pregnant_adulteries (economy):
                            * (ft ** ARGS.intended_pregnant_mag):
                             p.get_pregnant(a)
                             n_i += 1
+                            break
                     else:
                         if random.random() < ARGS.unintended_pregnant_rate \
                            * (ft ** ARGS.unintended_pregnant_mag):
                             p.get_pregnant(a)
                             n_u += 1
+                            break
     print("Adultery Pregnancy 2:", n_i, n_u)
 
 
@@ -2990,6 +3011,8 @@ def update_birth (economy):
     q = math.ceil(max([(pp - economy.prev_birth) * 0.5 + economy.prev_birth,
                        ARGS.min_birth]))
     w = len([True for x in l if x[1]])
+    n_a = 0
+    n_b = 0
     if q >= w:
         if q > w:
             economy.want_child_mag += ARGS.want_child_mag_increase
@@ -3020,6 +3043,7 @@ def update_birth (economy):
                     p.hating[sp] = 0
                 p.hating[sp] = np_clip(p.hating[sp] + 0.3, 0, 1)
                 p.abort_pregnancy()
+                n_b += 1
                 if p.fertility != 0:
                     p.fertility -= 0.1
                     p.fertility = np_clip(p.fertility, 0, 1)
@@ -3036,6 +3060,7 @@ def update_birth (economy):
                     p.hating[sp] = 0
                 p.hating[sp] = np_clip(p.hating[sp] + 0.3, 0, 1)
                 p.abort_pregnancy()
+                n_b += 1
                 if p.fertility != 0:
                     p.fertility -= 0.1
                     p.fertility = np_clip(p.fertility, 0, 1)
@@ -3050,12 +3075,13 @@ def update_birth (economy):
                 p.political_hating = np_clip(p.political_hating + 0.1,
                                              0, 1)
                 p.abort_pregnancy()
+                n_a += 1
                 if p.fertility != 0:
                     p.fertility -= 0.1
                     p.fertility = np_clip(p.fertility, 0, 1)
    
     economy.die(dying)
-
+    print("Social Abortion:", n_a, n_b)
 
 def update_fertility (economy):
     print("\nFertility:...", flush=True)
@@ -3376,14 +3402,20 @@ def update_support_aged (economy):
             if not (random.random() < ARGS.support_aged_rate):
                 continue
         l = [c.id for c in p.children]
+        l2 = l[:]
+        for x in l2:
+            if x is not '' and economy.is_living(x):
+                q = economy.people[x]
+                for c in q.children:
+                    if c.id is not '' and economy.is_living(c.id):
+                        l.append(c.id)
         l2 = [r.id for r in p.trash if isinstance(r, Child)]
-        if l2:
-            for x in l2:
-                if x in economy.tombs:
-                    q = economy.tombs[x].person
-                    for c in q.children:
-                        if c.id is not '' and economy.is_living(c.id):
-                            l.append(c.id)
+        for x in l2:
+            if x in economy.tombs:
+                q = economy.tombs[x].person
+                for c in q.children:
+                    if c.id is not '' and economy.is_living(c.id):
+                        l.append(c.id)
         l2 = []
         for x in l:
             if x is '' or not economy.is_living(x):
@@ -3433,7 +3465,7 @@ def update_support_aged (economy):
         n_s += 1
         p.supported = g.id
         g.supporting.append(p.id)
-        p.district = g.district
+        p.change_district(g.district)
 
     print("Support Aged:", n_f, n_s - n_f)
 
@@ -3485,7 +3517,7 @@ def update_support_infant (economy):
         if p.age >= 10:
             p.supported = g.id
             g.supporting.append(p.id)
-            p.district = g.district
+            p.change_district(g.district)
         else:
             n_o += 1
             g.adopt_child(p)
@@ -3539,6 +3571,7 @@ def update_support_unwanted (economy):
             continue
         guard.append(p)
 
+    n_g = len(guard)
     n = min(len(guard), len(unsup))
     guard = sorted(guard, key=lambda x: x.tmp_asset_rank
                    + 0.5 * random.random(), reverse=True)[0:n]
@@ -3552,7 +3585,7 @@ def update_support_unwanted (economy):
         n_s += 1
         g.adopt_child(p)
 
-    print("Adoption Unwanted:", n_s)
+    print("Adoption Unwanted:", n_s, "(g:", n_g, ")")
 
 
 def update_become_adult (economy):
@@ -3656,7 +3689,7 @@ def make_support_consistent (economy):
                     p1 = economy.people[id1]
                     p1.supported = supported
                     if ns is not None:
-                        p1.district = ns.district
+                        p1.change_district(ns.district)
                         ns.supporting.append(id1)
             p.supporting = []
 
@@ -3827,7 +3860,7 @@ def main (eplot):
         with open(ARGS.pickle, 'wb') as f:
             pickle.dump((ARGS, economy), f)
 
-    print("\nEnd", flush=True)
+    print("\nFinish", flush=True)
     if not ARGS.no_view:
         plt.show()
 
