@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.3' # Time-stamp: <2021-03-06T19:55:07Z>
+__version__ = '0.0.4' # Time-stamp: <2021-03-09T18:25:38Z>
 ## Language: Japanese/UTF-8
 
 """相続のテスト"""
@@ -155,16 +155,20 @@ class Economy (Frozen):
     def is_living (self, id):
         return id in self.people and self.people[id].death is None
 
+    def get_person (self, id1):
+        economy = self
+        if id1 in economy.people:
+            return economy.people[id1]
+        elif id1 in economy.tombs:
+            return economy.tombs[id1].person
+        return None
+
 
 def calc_descendant_inheritance_share (economy, id1, excluding=None):
     if excluding != id1 and (id1 is '' or economy.is_living(id1)):
         return {id1: 1.0}
-    p = None
-    if economy.is_living(id1):
-        p = economy.people[id1]
-    elif id1 in economy.tombs:
-        p = economy.tombs[id1].person
-    else:
+    p = economy.get_person(id1)
+    if p is None:
         return None
 
     children = []
@@ -183,20 +187,14 @@ def calc_descendant_inheritance_share (economy, id1, excluding=None):
             for x, y in q.items():
                 if x not in r:
                     r[x] = 0
-                if x is '':
-                    r[x] += y / len(l)
-                else:
-                    r[x] = max([y / len(l), r[x]])
+                r[x] += y / len(l)
         return r
     else:
         return None
 
 def calc_inheritance_share_1 (economy, id1):
-    if economy.is_living(id1):
-        p = economy.people[id1]
-    elif id1 in economy.tombs:
-        p = economy.tombs[id1].person
-    else:
+    p = economy.get_person(id1)
+    if p is None:
         return None
 
     spouse = None
@@ -213,10 +211,7 @@ def calc_inheritance_share_1 (economy, id1):
             for x, y in dq.items():
                 if x not in r:
                     r[x] = 0
-                if x is '':
-                    r[x] += 0.5 * y
-                else:
-                    r[x] = max([0.5 * y, r[x]])
+                r[x] += 0.5 * y
             return r
 
     l = []
@@ -248,20 +243,14 @@ def calc_inheritance_share_1 (economy, id1):
             for x in l:
                 if x not in r:
                     r[x] = 0
-                if x is '':
-                    r[x] += 1/len(l)
-                else:
-                    r[x] = max([1/len(l), r[x]])
+                r[x] += 1/len(l)
             return r
         else:
             r[spouse] = 2/3
             for x in l:
                 if x not in r:
                     r[x] = 0
-                if x is '':
-                    r[x] += (1/3) * (1/len(l))
-                else:
-                    r[x] = max([(1/3) * (1/len(l)), r[x]])
+                r[x] += (1/3) * (1/len(l))
             return r
 
     l = []
@@ -277,10 +266,7 @@ def calc_inheritance_share_1 (economy, id1):
                 for x, y in q.items():
                     if x not in r:
                         r[x] = 0
-                    if x is '':
-                        r[x] += y / len(l)
-                    else:
-                        r[x] = max([y / len(l), r[x]])
+                    r[x] += y / len(l)
             return r
         else:
             r[spouse] = 3/4
@@ -288,10 +274,7 @@ def calc_inheritance_share_1 (economy, id1):
                 for x, y in q.items():
                     if x not in r:
                         r[x] = 0
-                    if x is '':
-                        r[x] += (1/4) * (y / len(l))
-                    else:
-                        r[x] = max([(1/4) * (y / len(l)), r[x]])
+                    r[x] += (1/4) * (y / len(l))
             return r
 
     if spouse is not None:
@@ -300,11 +283,8 @@ def calc_inheritance_share_1 (economy, id1):
     return None
 
 def calc_inheritance_share (economy, id1):
-    if id1 in economy.people and economy.people[id1].death is None:
-        p = economy.people[id1]
-    elif id1 in economy.tombs:
-        p = economy.tombs[id1].person
-    else:
+    p = economy.get_person(id1)
+    if p is None:
         return None
 
     spouse = None
@@ -385,7 +365,7 @@ def initialize1 (economy):
     p9.id = 'grandfather'
     p9.economy = economy
     p10 = Person()
-    p10.id = 'dead_uncle'
+    p10.id = 'dead_brother'
     p10.economy = economy
     p11 = Person()
     p11.id = 'niece1'
@@ -465,37 +445,38 @@ def initialize1 (economy):
     c.id = 'dead_father'
     c.father = 'grandfather'
     c.mother = ''
-    p9.children.append(c)
+    p9.trash.append(c)
     p10.death = Death()
     p10.father = 'dead_father'
     p10.mother = 'dead_mother'
     c = Child()
-    c.id = 'dead_uncle'
+    c.id = 'dead_brother'
     c.father = 'dead_father'
     c.mother = 'dead_mother'
     p1.trash.append(c)
-    p11.father = 'dead_uncle'
+    p2.trash.append(c)
+    p11.father = 'dead_brother'
     p11.mother = ''
     c = Child()
     c.id = 'niece1'
-    c.father = 'dead_uncle'
+    c.father = 'dead_brother'
     c.mother = ''
     p10.children.append(c)
-    p12.father = 'dead_uncle'
+    p12.father = 'dead_brother'
     p12.mother = ''
     c = Child()
     c.id = 'niece2'
-    c.father = 'dead_uncle'
+    c.father = 'dead_brother'
     c.mother = ''
     p10.children.append(c)
     c = Child()
     c.id = ''
-    c.father = 'dead_uncle'
+    c.father = 'dead_brother'
     c.mother = ''
     p10.children.append(c)
     c = Child()
     c.id = ''
-    c.father = 'dead_uncle'
+    c.father = 'dead_brother'
     c.mother = ''
     p10.children.append(c)
 
@@ -550,6 +531,16 @@ def initialize6 (economy):
         t.person = p
         economy.tombs[p.id] = t
 
+def initialize7 (economy):
+    initialize5(economy)
+    p10 = economy.tombs['dead_brother'].person
+    c = Child()
+    c.id = 'spouse'
+    c.father = 'dead_brother'
+    c.mother = ''
+    p10.children.append(c)
+
+
 def main ():
     economy = Economy()
     initialize1(economy)
@@ -578,6 +569,10 @@ def main ():
 
     economy = Economy()
     initialize6(economy)
+    print(calc_inheritance_share(economy, 'cur_dead'))
+
+    economy = Economy()
+    initialize7(economy)
     print(calc_inheritance_share(economy, 'cur_dead'))
 
 if __name__ == '__main__':

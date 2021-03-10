@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.12' # Time-stamp: <2021-03-09T08:32:48Z>
+__version__ = '0.0.13' # Time-stamp: <2021-03-10T13:28:14Z>
 ## Language: Japanese/UTF-8
 
 """結婚・不倫・扶養・相続などのマッチングのシミュレーション"""
@@ -334,6 +334,8 @@ class Person0 (Serializable):
         self.children = []     # 子供 (養子含む)
         self.father = ''       # 養夫
         self.mother = ''       # 養母
+        self.initial_father = '' # 実夫とされるもの
+        self.initial_mother = '' # 実母とされるもの
         self.biological_father = '' # 実夫
         self.biological_mother = '' # 実母
         self.want_child_base = 2    # 欲しい子供の数の基準額
@@ -663,6 +665,8 @@ class PersonBT (Person0):
                         f.hating[rel.spouse] = 0
                     f.hating[rel.spouse] = np_clip(f.hating[rel.spouse]
                                                    + 0.6, 0, 1)
+        p.initial_father = p.father
+        p.initial_mother = p.mother
 
 class PersonDT (Person0):
     def die_relation (self, relation):
@@ -1047,16 +1051,26 @@ class PersonMA (Person0):
                     if x is '' or x == p1.father or x == p1.mother:
                         continue
                     l2.append(x)
-                    q = None
-                    if x in economy.people:
-                        q = economy.people[x]
-                    elif x in economy.tombs:
-                        q = economy.tombs[x].person
+                    q = economy.get_person(x)
+                    l3 = []
                     if q is not None:
-                        if q.father is not '':
-                            l2.append(q.father)
-                        if q.mother is not '':
-                            l2.append(q.mother)
+                        l3.append(q)
+                        if q.marriage is not None \
+                           and q.marriage.spouse is not '':
+                            y = q.marriage.spouse
+                            l2.append(y)
+                            qs = economy.get_person(y)
+                            if qs is not None:
+                                l3.append(qs)
+                    for q1 in l3:
+                        for y in [q1.father, q1.mother]:
+                            if y is not '':
+                                l2.append(y)
+                                g = economy.get_person(y)
+                                if g is not None:
+                                    if g.marriage is not None \
+                                       and g.marriage.spouse is not '':
+                                        l2.append(g.marriage.spouse)
                 ch = set(l1)
                 s1fam = set(l2)
                 l = []
@@ -1161,10 +1175,7 @@ class PersonSUP (Person0):
 
         pf = None
         if p.father is not '':
-            if p.father in economy.people:
-                pf = economy.people[p.father]
-            if p.father in economy.tombs:
-                pf = economy.tombs[p.father].person
+            pf = economy.get_person(p.father)
         if pf is not None:
             ch = None
             for c in pf.children:
@@ -1176,10 +1187,7 @@ class PersonSUP (Person0):
 
         pm = None
         if p.mother is not '':
-            if p.mother in economy.people:
-                pm = economy.people[p.mother]
-            if p.mother in economy.tombs:
-                pm = economy.tombs[p.mother].person
+            pm = economy.get_person(p.mother)
         if pm is not None:
             ch = None
             for c in pm.children:
@@ -1188,6 +1196,14 @@ class PersonSUP (Person0):
                     break
             if ch is not None:
                 pm.children.remove(ch)
+        if g.sex == 'M':
+            p.father = g.id
+            if gs is not None:
+                p.mother = gs
+        else:
+            p.mother = g.id
+            if gs is not None:
+                p.father = gs
 
 
 class Person (PersonEC, PersonBT, PersonDT, PersonAD, PersonMA, PersonSUP):
@@ -1268,6 +1284,14 @@ class EconomyDT (Economy0):
         if type(id_or_person) is not str:
             s = id_or_person.id
         return s in self.people and self.people[s].death is None
+
+    def get_person (self, id1):
+        economy = self
+        if id1 in economy.people:
+            return economy.people[id1]
+        elif id1 in economy.tombs:
+            return economy.tombs[id1].person
+        return None
 
     def die (self, persons):
         economy = self
@@ -2611,6 +2635,8 @@ def elevate_some_to_marriages (economy):
             # if not (p.marriage_favor(s) >= ARGS.marriage_favor_threshold
             #         and s.marriage_favor(p) >= ARGS.marriage_favor_threshold):
             #     continue
+            if check_consanguineous_marriage(economy, p, s):
+                continue
             elevating += 1
             economy.marry(p, s)
             a1t = []
@@ -2920,6 +2946,135 @@ def calc_with_support_asset_rank (economy):
         l[i][0].tmp_asset_rank = (s - i) / s
 
 
+# 近親婚のチェック
+def check_consanguineous_marriage (economy, male, female):
+    if male.id == female.id:
+        # print("本人")
+        return True
+    malespouse = set()
+    femalespouse = set()
+    for r in male.trash:
+        if isinstance(r, Marriage):
+            if r.spouse is not '':
+                malespouse.add(r.spouse)
+    for r in female.trash:
+        if isinstance(r, Marriage):
+            if r.spouse is not '':
+                femalespouse.add(r.spouse)
+    if female.id in malespouse:
+        return False
+
+    l = []
+    l.append((male, female.id, True))
+    l.append((female, male.id, True))
+    for x in malespouse:
+        p = economy.get_person(x)
+        if p is not None:
+            l.append((p, female.id, False))
+    for x in femalespouse:
+        p = economy.get_person(x)
+        if p is not None:
+            l.append((p, male.id, False))
+
+    # 直系血族と直系姻族のチェック (養子・養親含む)
+    for x, y, kinship_check in l:
+        # 尊属のチェック
+        s = set()
+        ex = set()
+        for z in [x.initial_father, x.initial_mother, x.father, x.mother]:
+            if z is not '':
+                s.add(z)
+        if y in s:
+            # print("父母")
+            return True
+        ex.update(s)
+        while s:
+            s2 = set()
+            for z in s:
+                p = economy.get_person(z)
+                if p is not None:
+                    if p.initial_father is not '' \
+                       and p.initial_father not in ex:
+                        s2.add(p.initial_father)
+                        ex.add(p.initial_father)
+                    if p.initial_mother is not '' \
+                       and p.initial_mother not in ex:
+                        s2.add(p.initial_mother)
+                        ex.add(p.initial_mother)
+                    if kinship_check:
+                        for r in [p.marriage] + p.trash:
+                            if r is None:
+                                continue
+                            if isinstance(r, Marriage) and r.spouse is not '':
+                                if y == r.spouse:
+                                    # print("尊属の配偶者")
+                                    return True
+            if y in s2:
+                # print("尊属")
+                return True
+            s = s2
+        
+        # 卑属のチェック
+        s = set()
+        ex = set()
+        for c in x.children:
+            s.add(c.id)
+        for c in x.trash:
+            if isinstance(c, Child):
+                s.add(c.id)
+        if y in s:
+            return True
+        ex.update(s)
+        while s:
+            s2 = set()
+            for z in s:
+                p = economy.get_person(z)
+                if p is not None:
+                    for c in p.children:
+                        if c.relation != 'O' and c.id not in ex:
+                            s2.add(c.id)
+                            ex.add(c.id)
+                    for c in p.trash:
+                        if isinstance(c, Child) and c.relation != 'O' \
+                           and c.id not in ex:
+                            s2.add(c.id)
+                            ex.add(c.id)
+                    if kinship_check:
+                        for r in [p.marriage] + p.trash:
+                            if r is None:
+                                continue
+                            if isinstance(r, Marriage) and r.spouse is not '':
+                                if y == r.spouse:
+                                    # print("卑属の配偶者")
+                                    return True
+            if y in s2:
+                # print("卑属")
+                return True
+            s = s2
+
+    # 三親等内の傍系血族のチェック
+    for x, y in [(male, female.id), (female, male.id)]:
+        for z in [x.initial_father, x.initial_mother]:
+            if z is '':
+                continue
+            p = economy.get_person(z)
+            if p is not None:
+                for r in p.children + p.trash:
+                    if isinstance(r, Child) and r.relation != 'O':
+                        if r.id == y:
+                            # print("二親等の傍系血族")
+                            return True
+                        p1 = economy.get_person(r.id)
+                        if p1 is not None:
+                            for r1 in p1.children + p1.trash:
+                                if isinstance(r1, Child) \
+                                   and r1.relation != 'O':
+                                    if r1.id == y:
+                                        # print("三親等の傍系血族")
+                                        return True
+    return False
+
+
 def update_marriages (economy):
     print("\nMarriages:...", flush=True)
 
@@ -2962,8 +3117,13 @@ def update_marriages (economy):
     for p in economy.people.values():
         p.tmp_luck = 0
     print("Updating...", flush=True)
+    n_r = 0
     for m, f in matches:
+        if check_consanguineous_marriage(economy, m, f):
+            n_r += 1
+            continue
         economy.marry(m ,f)
+    print("Reject:", n_r)
     elevate_some_to_marriages(economy)
     get_pregnant_marriages(economy)
     remove_socially_some_marriages(economy)
@@ -3106,12 +3266,8 @@ def update_fertility (economy):
 def calc_descendant_inheritance_share (economy, id1, excluding=None):
     if excluding != id1 and (id1 is '' or economy.is_living(id1)):
         return {id1: 1.0}
-    p = None
-    if economy.is_living(id1):
-        p = economy.people[id1]
-    elif id1 in economy.tombs:
-        p = economy.tombs[id1].person
-    else:
+    p = economy.get_person(id1)
+    if p is None:
         return None
 
     children = []
@@ -3130,21 +3286,15 @@ def calc_descendant_inheritance_share (economy, id1, excluding=None):
             for x, y in q.items():
                 if x not in r:
                     r[x] = 0
-                if x is '':
-                    r[x] += y / len(l)
-                else:
-                    r[x] = max([y / len(l), r[x]])
+                r[x] += y / len(l)
         return r
     else:
         return None
 
 
 def calc_inheritance_share_1 (economy, id1):
-    if economy.is_living(id1):
-        p = economy.people[id1]
-    elif id1 in economy.tombs:
-        p = economy.tombs[id1].person
-    else:
+    p = economy.get_person(id1)
+    if p is None:
         return None
 
     spouse = None
@@ -3161,10 +3311,7 @@ def calc_inheritance_share_1 (economy, id1):
             for x, y in dq.items():
                 if x not in r:
                     r[x] = 0
-                if x is '':
-                    r[x] += 0.5 * y
-                else:
-                    r[x] = max([0.5 * y, r[x]])
+                r[x] += 0.5 * y
             return r
 
     l = []
@@ -3196,20 +3343,14 @@ def calc_inheritance_share_1 (economy, id1):
             for x in l:
                 if x not in r:
                     r[x] = 0
-                if x is '':
-                    r[x] += 1/len(l)
-                else:
-                    r[x] = max([1/len(l), r[x]])
+                r[x] += 1/len(l)
             return r
         else:
             r[spouse] = 2/3
             for x in l:
                 if x not in r:
                     r[x] = 0
-                if x is '':
-                    r[x] += (1/3) * (1/len(l))
-                else:
-                    r[x] = max([(1/3) * (1/len(l)), r[x]])
+                r[x] += (1/3) * (1/len(l))
             return r
 
     l = []
@@ -3225,10 +3366,7 @@ def calc_inheritance_share_1 (economy, id1):
                 for x, y in q.items():
                     if x not in r:
                         r[x] = 0
-                    if x is '':
-                        r[x] += y / len(l)
-                    else:
-                        r[x] = max([y / len(l), r[x]])
+                    r[x] += y / len(l)
             return r
         else:
             r[spouse] = 3/4
@@ -3236,10 +3374,7 @@ def calc_inheritance_share_1 (economy, id1):
                 for x, y in q.items():
                     if x not in r:
                         r[x] = 0
-                    if x is '':
-                        r[x] += (1/4) * (y / len(l))
-                    else:
-                        r[x] = max([(1/4) * (y / len(l)), r[x]])
+                    r[x] += (1/4) * (y / len(l))
             return r
 
     if spouse is not None:
@@ -3249,11 +3384,8 @@ def calc_inheritance_share_1 (economy, id1):
 
 
 def calc_inheritance_share (economy, id1):
-    if id1 in economy.people and economy.people[id1].death is None:
-        p = economy.people[id1]
-    elif id1 in economy.tombs:
-        p = economy.tombs[id1].person
-    else:
+    p = economy.get_person(id1)
+    if p is None:
         return None
 
     spouse = None
@@ -3402,20 +3534,15 @@ def update_support_aged (economy):
             if not (random.random() < ARGS.support_aged_rate):
                 continue
         l = [c.id for c in p.children]
-        l2 = l[:]
-        for x in l2:
-            if x is not '' and economy.is_living(x):
-                q = economy.people[x]
-                for c in q.children:
-                    if c.id is not '' and economy.is_living(c.id):
-                        l.append(c.id)
-        l2 = [r.id for r in p.trash if isinstance(r, Child)]
-        for x in l2:
-            if x in economy.tombs:
-                q = economy.tombs[x].person
-                for c in q.children:
-                    if c.id is not '' and economy.is_living(c.id):
-                        l.append(c.id)
+        for c in p.children + p.trash:
+            if not isinstance(c, Child):
+                continue
+            q = economy.get_person(c.id)
+            if q is None:
+                continue
+            for c1 in q.children:
+                if c1.id is not '' and economy.is_living(c1.id):
+                    l.append(c1.id)
         l2 = []
         for x in l:
             if x is '' or not economy.is_living(x):
