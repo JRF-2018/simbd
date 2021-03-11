@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.1' # Time-stamp: <2021-03-10T13:27:20Z>
+__version__ = '0.0.2' # Time-stamp: <2021-03-11T12:14:19Z>
 ## Language: Japanese/UTF-8
 
 """近親婚のテスト"""
@@ -100,6 +100,11 @@ class Child (Serializable):
         self.relation = 'M'
         # 以下は id が不明('')のときのみ意味がある。
 
+class Dissolution (Serializable):
+    def __init__ (self):
+        self.id = ''
+        self.relation = '' # 'M'嫡出子, 'A'非嫡出子, 'O'養子, 'MO'母, 'FA'父
+
 class Death (Serializable):
     def __init__ (self):
         self.term = None
@@ -163,9 +168,14 @@ def check_consanguineous_marriage (economy, male, female):
         # 尊属のチェック
         s = set()
         ex = set()
-        for z in [x.initial_father, x.initial_mother, x.father, x.mother]:
+        for z in [x.father, x.mother, x.initial_father, x.initial_mother]:
             if z is not '':
                 s.add(z)
+        for r in x.trash:
+            if isinstance(r, Dissolution) \
+               and (r.relation == 'MO' or r.relation == 'FA') \
+               and r.id is not '':
+                s.add(r.id)
         if y in s:
             print("父母")
             return True
@@ -202,7 +212,10 @@ def check_consanguineous_marriage (economy, male, female):
         for c in x.children:
             s.add(c.id)
         for c in x.trash:
-            if isinstance(c, Child):
+            if isinstance(c, Child) \
+               or (isinstance(c, Dissolution)
+                   and (c.relation == 'M' or c.relation =='A'
+                        or c.relation == 'O')):
                 s.add(c.id)
         if y in s:
             return True
@@ -217,8 +230,11 @@ def check_consanguineous_marriage (economy, male, female):
                             s2.add(c.id)
                             ex.add(c.id)
                     for c in p.trash:
-                        if isinstance(c, Child) and c.relation != 'O' \
-                           and c.id not in ex:
+                        if ((isinstance(c, Child) and c.relation != 'O')
+                            or (isinstance(c, Dissolution)
+                                and (c.relation == 'M'
+                                     or c.relation =='A'))) \
+                                     and c.id not in ex:
                             s2.add(c.id)
                             ex.add(c.id)
                     if kinship_check:

@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.13' # Time-stamp: <2021-03-10T13:28:14Z>
+__version__ = '0.0.14' # Time-stamp: <2021-03-11T14:06:08Z>
 ## Language: Japanese/UTF-8
 
 """結婚・不倫・扶養・相続などのマッチングのシミュレーション"""
@@ -1173,6 +1173,17 @@ class PersonSUP (Person0):
             assert economy.is_living(gs)
             economy.people[gs].children.append(cm)
 
+        ds = Dissolution()
+        ds.id = p.father
+        ds.term = economy.term
+        ds.relation = 'FA'
+        p.trash.append(ds)
+        ds = Dissolution()
+        ds.id = p.mother
+        ds.term = economy.term
+        ds.relation = 'MO'
+        p.trash.append(ds)
+        
         pf = None
         if p.father is not '':
             pf = economy.get_person(p.father)
@@ -1184,6 +1195,11 @@ class PersonSUP (Person0):
                     break
             if ch is not None:
                 pf.children.remove(ch)
+                ds = Dissolution()
+                ds.id = p.id
+                ds.term = economy.term
+                ds.relation = ch.relation
+                pf.trash.append(ds)
 
         pm = None
         if p.mother is not '':
@@ -1196,6 +1212,12 @@ class PersonSUP (Person0):
                     break
             if ch is not None:
                 pm.children.remove(ch)
+                ds = Dissolution()
+                ds.id = p.id
+                ds.term = economy.term
+                ds.relation = ch.relation
+                pm.trash.append(ds)
+
         if g.sex == 'M':
             p.father = g.id
             if gs is not None:
@@ -1248,6 +1270,12 @@ class Child (Serializable):
         self.birth_term = None
         self.death_term = None
         self.sex = None
+
+class Dissolution (Serializable):
+    def __init__ (self):
+        self.id = ''
+        self.term = None
+        self.relation = '' # 'M'嫡出子, 'A'非嫡出子, 'O'養子, 'MO'母, 'FA'父
 
 class Wait (Serializable):
     def __init__ (self):
@@ -2786,14 +2814,16 @@ def remove_naturally_some_marriages (economy):
         if p.death is None and p.marriage is not None:
             ht = 0
             m = p.marriage
+            mag = math.sqrt(2)
             if m.spouse is not '' and economy.is_living(m.spouse):
+                mag = 1.0
                 s = economy.people[m.spouse]
                 if p.id in s.hating:
                     ht = s.hating[p.id]
             q = ((ARGS.with_hate_natural_divorce_rate
                   - ARGS.natural_divorce_rate) / (1 - 0)) * (ht - 0) \
                   + ARGS.natural_divorce_rate
-            if random.random() < q:
+            if random.random() < q * mag:
                 n_d += 1
                 if m.spouse is not '' and economy.is_living(m.spouse):
                     n_d += 1
@@ -2981,9 +3011,14 @@ def check_consanguineous_marriage (economy, male, female):
         # 尊属のチェック
         s = set()
         ex = set()
-        for z in [x.initial_father, x.initial_mother, x.father, x.mother]:
+        for z in [x.father, x.mother, x.initial_father, x.initial_mother]:
             if z is not '':
                 s.add(z)
+        for r in x.trash:
+            if isinstance(r, Dissolution) \
+               and (r.relation == 'MO' or r.relation == 'FA') \
+               and r.id is not '':
+                s.add(r.id)
         if y in s:
             # print("父母")
             return True
@@ -3020,7 +3055,10 @@ def check_consanguineous_marriage (economy, male, female):
         for c in x.children:
             s.add(c.id)
         for c in x.trash:
-            if isinstance(c, Child):
+            if isinstance(c, Child) \
+               or (isinstance(c, Dissolution)
+                   and (c.relation == 'M' or c.relation =='A'
+                        or c.relation == 'O')):
                 s.add(c.id)
         if y in s:
             return True
@@ -3035,8 +3073,11 @@ def check_consanguineous_marriage (economy, male, female):
                             s2.add(c.id)
                             ex.add(c.id)
                     for c in p.trash:
-                        if isinstance(c, Child) and c.relation != 'O' \
-                           and c.id not in ex:
+                        if ((isinstance(c, Child) and c.relation != 'O')
+                            or (isinstance(c, Dissolution)
+                                and (c.relation == 'M'
+                                     or c.relation =='A'))) \
+                                     and c.id not in ex:
                             s2.add(c.id)
                             ex.add(c.id)
                     if kinship_check:
@@ -3174,7 +3215,7 @@ def update_birth (economy):
     n_a = 0
     n_b = 0
     if q >= w:
-        if q > w:
+        if q > w + 0.5 * (len(l) - w):
             economy.want_child_mag += ARGS.want_child_mag_increase
             economy.want_child_mag = np_clip(economy.want_child_mag,
                                              0.5, 1.5)
