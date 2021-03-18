@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.14' # Time-stamp: <2021-03-11T14:06:08Z>
+__version__ = '0.0.15' # Time-stamp: <2021-03-18T12:59:38Z>
 ## Language: Japanese/UTF-8
 
 """結婚・不倫・扶養・相続などのマッチングのシミュレーション"""
@@ -3762,7 +3762,7 @@ def update_become_adult (economy):
            or p.married or p.age > 19 or p.age < 15:
             continue
         if p.age < 18:
-            x = np.clip(p.tmp_asset_rank, 0, 0.5)
+            x = np_clip(p.tmp_asset_rank, 0, 0.5)
             q = ((0 - 1) / (0.5 - 0)) * (x - 0) + 1
             if not (random.random() < q * ARGS.become_adult_rate):
                 continue
