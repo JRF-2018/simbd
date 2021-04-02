@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.1' # Time-stamp: <2021-03-18T13:25:48Z>
+__version__ = '0.0.2' # Time-stamp: <2021-04-02T20:09:24Z>
 ## Language: Japanese/UTF-8
 
 """Simulation Buddhism Prototype No.1 - Miscellaneous
@@ -34,6 +34,7 @@ import random
 from simbdp1_base import ARGS
 from simbdp1_common import np_clip
 
+
 def calc_with_support_asset_rank (economy):
     l = []
     for p in economy.people.values():
@@ -47,7 +48,7 @@ def calc_with_support_asset_rank (economy):
                 if p.supported is not None and p.age < 18 \
                    and p.supported == f.id:
                     sup = True
-                
+
             m = None
             if p.mother is not '' and economy.is_living(p.mother):
                 m = economy.people[p.mother]
@@ -86,6 +87,7 @@ def reduce_tombs (economy):
     if r >= len(l):
         n_t = len(l)
         for t in l:
+            t.person.economy = None
             del economy.tombs[t.person.id]
     elif r > 0:
         l = sorted(l,
@@ -93,6 +95,7 @@ def reduce_tombs (economy):
                         (0.98 ** (economy.term - t.death_term))))[0:r]
         n_t = len(l)
         for t in l:
+            t.person.economy = None
             del economy.tombs[t.person.id]
     print("Reduce Tombs:", n_t, flush=True)
 
@@ -110,5 +113,41 @@ def update_education (economy):
         if p.death is None:
             p.education += random.gauss(0, 0.1)
             p.education = np_clip(p.education, 0, 1)
+
+
+def update_labor (economy):
+    for p in economy.people.values():
+        if p.death is None:
+            if p.age < 10:
+                continue
+            elif p.age < 60:
+                if p.labor >= 1.0:
+                    continue
+                if random.random() < ARGS.a10_labor_raise_rate:
+                    p.labor = np_clip(p.labor + 0.1, 0, 1)
+            else:
+                if p.labor <= 0.2:
+                    continue
+                if random.random() < ARGS.a60_labor_lower_rate:
+                    p.labor = np_clip(p.labor - 0.01, 0.2, 1)
+
+
+def calc_tmp_labor (economy):
+    for p in economy.people.values():
+        if p.death is not None:
+            p.tmp_labor = 0
+            continue
+        if p.pregnancy is not None:
+            p.tmp_labor = p.labor * 0.2
+            continue
+        p.tmp_labor = p.labor
+
+
+def update_eagerness (economy):
+    for p in economy.people.values():
+        if p.death is not None:
+            p.eagerness = 0.5
+        else:
+            p.eagerness = random.random()
 
 

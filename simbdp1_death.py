@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.1' # Time-stamp: <2021-03-18T13:25:43Z>
+__version__ = '0.0.2' # Time-stamp: <2021-03-20T16:24:41Z>
 ## Language: Japanese/UTF-8
 
 """Simulation Buddhism Prototype No.1 - Death

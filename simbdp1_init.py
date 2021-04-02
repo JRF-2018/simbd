@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.1' # Time-stamp: <2021-03-18T13:26:26Z>
+__version__ = '0.0.2' # Time-stamp: <2021-03-20T16:24:47Z>
 ## Language: Japanese/UTF-8
 
 """Simulation Buddhism Prototype No.1 - Initialize
@@ -77,7 +77,20 @@ def initialize (economy):
                 p.fertility = random.random()
             if p.fertility < 0.1:
                 p.fertility = 0
-            
+
+            if p.age < 10:
+                p.labor = 0
+            elif p.age < 18:
+                x = np_clip(p.age, 10, 18)
+                p.labor = ((1 - 0)/(18 - 10)) * (x - 10) + 0
+            elif p.age < 60:
+                p.labor = 1
+            else:
+                x = np_clip(p.age, 60, 100)
+                p.labor = ((0.2 - 1) / (100 - 60)) * (x - 60) + 1
+            p.stock_exp = random.randint(0, 10)
+            p.land_exp = random.randint(0, 10)
+
             # 結婚判定
             if ((p.sex == 'M' and p.age < 15) 
                 or (p.sex == 'F' and p.age < 13)):

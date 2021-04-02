@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.1' # Time-stamp: <2021-03-18T13:25:36Z>
+__version__ = '0.0.2' # Time-stamp: <2021-03-20T16:24:32Z>
 ## Language: Japanese/UTF-8
 
 """Simulation Buddhism Prototype No.1 - Economy
@@ -28,6 +28,7 @@ __version__ = '0.0.1' # Time-stamp: <2021-03-18T13:25:36Z>
 ##   intention is legitimately fulfilled.
 ##
 
+from collections import OrderedDict
 import random
 
 import simbdp1_base as base
@@ -69,6 +70,11 @@ class EconomyPlotEC (EconomyPlot0):
             'prop': ('Prop', self.view_prop),
             'land': ('Land', self.view_land),
             'land-vs-prop': ('Land vs Prop', self.view_land_vs_prop),
+            'age-vs-labor': ('Age vs Labor', self.view_age_vs_labor),
+            'family': ('Family', self.view_family),
+            'family-asset': ('F Asset', self.view_family_asset),
+            'family-prop': ('F Prop', self.view_family_prop),
+            'family-land': ('F Land', self.view_family_land),
         })
 
     def view_asset (self, ax, economy):
@@ -87,6 +93,62 @@ class EconomyPlotEC (EconomyPlot0):
         ax.scatter(list(map(lambda x: x.land, economy.people.values())),
                    list(map(lambda x: x.prop, economy.people.values())),
                    c="pink", alpha=0.5)
+
+    def view_age_vs_labor (self, ax, economy):
+        ax.scatter([x.age for x in economy.people.values()
+                    if x.death is None],
+                   [x.tmp_labor for x in economy.people.values()
+                    if x.death is None],
+                   c="pink", alpha=0.5)
+        
+    def view_family (self, ax, economy):
+        od = OrderedDict()
+        for x in economy.people.values():
+            if x.supported is not None and x.supported is not '':
+                f = x.supported
+            else:
+                f = x.id
+            if f not in od:
+                od[f] = 0
+            od[f] += 1
+        ax.hist(list(od.values()), bins=ARGS.bins)
+        print("Families:", len(od))
+
+    def view_family_asset (self, ax, economy):
+        od = OrderedDict()
+        for x in economy.people.values():
+            if x.supported is not None and x.supported is not '':
+                f = x.supported
+            else:
+                f = x.id
+            if f not in od:
+                od[f] = 0
+            od[f] += x.asset_value()
+        ax.hist(list(od.values()), bins=ARGS.bins)
+
+    def view_family_prop (self, ax, economy):
+        od = OrderedDict()
+        for x in economy.people.values():
+            if x.supported is not None and x.supported is not '':
+                f = x.supported
+            else:
+                f = x.id
+            if f not in od:
+                od[f] = 0
+            od[f] += x.prop
+        ax.hist(list(od.values()), bins=ARGS.bins)
+
+    def view_family_land (self, ax, economy):
+        od = OrderedDict()
+        for x in economy.people.values():
+            if x.supported is not None and x.supported is not '':
+                f = x.supported
+            else:
+                f = x.id
+            if f not in od:
+                od[f] = 0
+            od[f] += x.land
+        ax.hist(list(od.values()), bins=ARGS.bins)
 
 
 def update_economy (economy):

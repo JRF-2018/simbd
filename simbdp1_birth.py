@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.1' # Time-stamp: <2021-03-18T13:25:55Z>
+__version__ = '0.0.2' # Time-stamp: <2021-04-02T19:35:00Z>
 ## Language: Japanese/UTF-8
 
 """Simulation Buddhism Prototype No.1 - Birth
@@ -95,6 +95,20 @@ class PersonBT (Person0):
             return w
         else:
             return 0
+
+    def is_acknowleged (self, parent_id):
+        p = self
+        qid = parent_id
+        economy = self.economy
+        if qid is '':
+            return True
+        q = economy.get_person(qid)
+        if q is None:
+            return True
+        for ch in q.children + q.trash:
+            if isinstance(ch, Child) and ch.id == p.id:
+                return True
+        return False
 
     def get_pregnant (self, relation):
         assert self.pregnancy is None
@@ -272,15 +286,19 @@ class PersonBT (Person0):
             ch.birth_term = economy.term
             ch.mother = m.id
             if foster_father == mf_id:
-                ch.father = father_mfather_thinks
-                chm.relation = 'M'
+                acknowledge = True
+                if father_mfather_thinks != mf_id:
+                    acknowledge = random.random() < 0.7
                 if foster_father is not '' \
                    and economy.is_living(foster_father):
                     f = economy.people[foster_father]
-                    f.children.append(ch)
+                    if acknowledge:
+                        ch.father = father_mfather_thinks
+                        ch.relation = 'M'
+                        chm.relation = 'M'
+                        f.children.append(ch)
                     assert f.marriage is not None \
                         and f.marriage.spouse == m.id
-                    ch.relation = 'M'
                     p.supported = f.id
                     f.supporting.append(p.id)
                     p.district = f.district
@@ -289,10 +307,17 @@ class PersonBT (Person0):
                     m.supporting.append(p.id)
                     p.district = m.district
             else:
-                ch.father = father_bfather_thinks
-                ch.relation = 'A'
-                f.children.append(ch)
+                supporting = False
                 if father_bfather_thinks == f.id:
+                    acknowledge = random.random() < 0.6
+                else:
+                    acknowledge = random.random() < 0.1
+                if acknowledge:
+                    ch.father = father_bfather_thinks
+                    ch.relation = 'A'
+                    f.children.append(ch)
+                    supporting = random.random() < 0.7
+                if supporting:
                     p.supported = f.id
                     f.supporting.append(p.id)
                     p.district = f.district

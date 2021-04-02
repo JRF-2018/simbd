@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.1' # Time-stamp: <2021-03-18T13:26:20Z>
+__version__ = '0.0.2' # Time-stamp: <2021-03-20T16:24:11Z>
 ## Language: Japanese/UTF-8
 
 """Simulation Buddhism Prototype No.1 - Base
@@ -122,6 +122,13 @@ class Person0 (Serializable):
         self.consumption = 0   # 消費額
         self.ambition = 0      # 上昇志向
         self.education = 0     # 教化レベル
+        self.labor = 1.0       # 労働力
+        self.tmp_labor = 0     # 阻害要因を加味した現時点の労働力
+        self.eagerness = 0     # 熱心さ
+        self.stock_exp = 0     # 株式経験: stock experience
+        self.land_exp = 0      # 農業経験: agricultural experience
+        self.merchant_hating = 0 # 商業的恨み
+        self.merchant_hated = 0  # 商業的恨まれ
 
         self.trash = []        # 終った関係
         self.adult_success = 0 # 不倫成功回数
@@ -153,6 +160,12 @@ class Person0 (Serializable):
         self.tmp_luck = None   # 幸運度
         self.tmp_score = None  # スコア
         self.tmp_asset_rank = None  # 資産順位 / 総人口
+
+        self.mlog = {}         # 月別経済指標ログ
+        for n in ['prop', 'land', 'education', 'ambition', 'tmp_labor',
+                  'eagerness']:
+            self.mlog[n] = []
+
 
     def __str__ (self, excluding=None):
         if excluding is None:

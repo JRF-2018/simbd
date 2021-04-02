@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.15' # Time-stamp: <2021-03-18T12:59:38Z>
+__version__ = '0.0.16' # Time-stamp: <2021-04-02T20:09:36Z>
 ## Language: Japanese/UTF-8
 
 """結婚・不倫・扶養・相続などのマッチングのシミュレーション"""
@@ -443,6 +443,20 @@ class PersonBT (Person0):
         else:
             return 0
 
+    def is_acknowleged (self, parent_id):
+        p = self
+        qid = parent_id
+        economy = self.economy
+        if qid is '':
+            return True
+        q = economy.get_person(qid)
+        if q is None:
+            return True
+        for ch in q.children + q.trash:
+            if isinstance(ch, Child) and ch.id == p.id:
+                return True
+        return False
+
     def get_pregnant (self, relation):
         assert self.pregnancy is None
         p = self
@@ -619,15 +633,19 @@ class PersonBT (Person0):
             ch.birth_term = economy.term
             ch.mother = m.id
             if foster_father == mf_id:
-                ch.father = father_mfather_thinks
-                chm.relation = 'M'
+                acknowledge = True
+                if father_mfather_thinks != mf_id:
+                    acknowledge = random.random() < 0.7
                 if foster_father is not '' \
                    and economy.is_living(foster_father):
                     f = economy.people[foster_father]
-                    f.children.append(ch)
+                    if acknowledge:
+                        ch.father = father_mfather_thinks
+                        ch.relation = 'M'
+                        chm.relation = 'M'
+                        f.children.append(ch)
                     assert f.marriage is not None \
                         and f.marriage.spouse == m.id
-                    ch.relation = 'M'
                     p.supported = f.id
                     f.supporting.append(p.id)
                     p.district = f.district
@@ -636,10 +654,17 @@ class PersonBT (Person0):
                     m.supporting.append(p.id)
                     p.district = m.district
             else:
-                ch.father = father_bfather_thinks
-                ch.relation = 'A'
-                f.children.append(ch)
+                supporting = False
                 if father_bfather_thinks == f.id:
+                    acknowledge = random.random() < 0.6
+                else:
+                    acknowledge = random.random() < 0.1
+                if acknowledge:
+                    ch.father = father_bfather_thinks
+                    ch.relation = 'A'
+                    f.children.append(ch)
+                    supporting = random.random() < 0.7
+                if supporting:
                     p.supported = f.id
                     f.supporting.append(p.id)
                     p.district = f.district
@@ -3284,6 +3309,7 @@ def update_birth (economy):
     economy.die(dying)
     print("Social Abortion:", n_a, n_b)
 
+
 def update_fertility (economy):
     print("\nFertility:...", flush=True)
 
@@ -3357,13 +3383,20 @@ def calc_inheritance_share_1 (economy, id1):
 
     l = []
 
-    if p.father is '' or economy.is_living(p.father):
+    ack_father = p.is_acknowleged(p.father)
+    ack_mother = p.is_acknowleged(p.mother)
+
+    if p.father is '' or (economy.is_living(p.father) and ack_father):
         l.append(p.father)
-    if p.mother is '' or economy.is_living(p.mother):
+    if p.mother is '' or (economy.is_living(p.mother) and ack_mother):
         l.append(p.mother)
 
     if not l:
-        s = [p.father, p.mother]
+        s = []
+        if p.father is '' or ack_father:
+            s.append(p.father)
+        if p.mother is '' or ack_mother:
+            s.append(p.mother)
         for i in range(4):
             s2 = []
             for x in s:
@@ -3372,8 +3405,10 @@ def calc_inheritance_share_1 (economy, id1):
                 else:
                     if x in economy.tombs:
                         q = economy.tombs[x].person
-                        s2.append(q.father)
-                        s2.append(q.mother)
+                        if q.is_acknowleged(q.father):
+                            s2.append(q.father)
+                        if q.is_acknowleged(q.mother):
+                            s2.append(q.mother)
             if l:
                 break
             else:
@@ -3395,12 +3430,14 @@ def calc_inheritance_share_1 (economy, id1):
             return r
 
     l = []
-    q = calc_descendant_inheritance_share(economy, p.father, excluding=id1)
-    if q is not None:
-        l.append(q)
-    q = calc_descendant_inheritance_share(economy, p.mother, excluding=id1)
-    if q is not None:
-        l.append(q)
+    if p.father is '' or ack_father:
+        q = calc_descendant_inheritance_share(economy, p.father, excluding=id1)
+        if q is not None:
+            l.append(q)
+    if p.mother is '' or ack_mother:
+        q = calc_descendant_inheritance_share(economy, p.mother, excluding=id1)
+        if q is not None:
+            l.append(q)
     if l:
         if spouse is None:
             for q in l:
@@ -3545,6 +3582,7 @@ def reduce_tombs (economy):
     if r >= len(l):
         n_t = len(l)
         for t in l:
+            t.person.economy = None
             del economy.tombs[t.person.id]
     elif r > 0:
         l = sorted(l,
@@ -3552,6 +3590,7 @@ def reduce_tombs (economy):
                         (0.98 ** (economy.term - t.death_term))))[0:r]
         n_t = len(l)
         for t in l:
+            t.person.economy = None
             del economy.tombs[t.person.id]
     print("Reduce Tombs:", n_t, flush=True)
 
@@ -3985,7 +4024,6 @@ def step (economy):
                 s = economy.people[p.supported]
                 s.supporting.remove(p.id)
                 p.supported = None
-            p.economy = None
 
     update_education(economy)
     update_fertility(economy)

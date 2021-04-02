@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.1' # Time-stamp: <2021-03-18T13:25:22Z>
+__version__ = '0.0.2' # Time-stamp: <2021-04-02T19:38:25Z>
 ## Language: Japanese/UTF-8
 
 """Simulation Buddhism Prototype No.1 - Main
@@ -45,7 +45,8 @@ from simbdp1_adultery import PersonAD, EconomyPlotAD, update_adulteries
 from simbdp1_marriage import PersonMA, EconomyMA, EconomyPlotMA,\
     update_marriages
 from simbdp1_support import PersonSUP, update_support
-from simbdp1_misc import update_education, update_tombs
+from simbdp1_misc import update_education, update_tombs, update_labor,\
+    update_eagerness, calc_tmp_labor
 from simbdp1_inherit import recalc_inheritance_share
 
 
@@ -193,6 +194,10 @@ ARGS.unsupport_unwanted_rate = calc_increase_rate(12 * 10, 50/100)
 # 子供の少ない家が養子をもらうのに手を上げる確率
 #ARGS.support_unwanted_rate = calc_increase_rate(12 * 10, 50/100)
 ARGS.support_unwanted_rate = 0.1
+# 10歳から18歳までに labor が0.1 上がる確率
+ARGS.a10_labor_raise_rate = 10 / (8 * 12)
+# 60歳から100歳までに labor が0.01 下がる確率
+ARGS.a60_labor_lower_rate = 100 / (40 * 12)
 
 
 SAVED_ECONOMY = None
@@ -281,14 +286,21 @@ def step (economy):
             if w is not None and w.end <= economy.term:
                 setattr(p, wait, None)
 
+    update_eagerness(economy)
     update_education(economy)
+    update_labor(economy)
     update_fertility(economy)
     update_death(economy)
     update_adulteries(economy)
     update_marriages(economy)
     update_birth(economy)
+    calc_tmp_labor(economy)
     update_support(economy)
     update_tombs(economy)
+
+    for p in economy.people.values():
+        for n in p.mlog:
+            p.mlog[n].append(getattr(p, n))
 
     if economy.term % ARGS.economy_period == 0:
         update_economy(economy)
@@ -306,8 +318,10 @@ def step (economy):
                 s = economy.people[p.supported]
                 s.supporting.remove(p.id)
                 p.supported = None
-            p.economy = None
 
+        for p in economy.people.values():
+            for n in p.mlog:
+                p.mlog[n] = []
 
 
 def main (eplot):

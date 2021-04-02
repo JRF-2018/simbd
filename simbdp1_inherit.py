@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.1' # Time-stamp: <2021-03-18T13:26:49Z>
+__version__ = '0.0.2' # Time-stamp: <2021-04-02T19:38:59Z>
 ## Language: Japanese/UTF-8
 
 """Simulation Buddhism Prototype No.1 - Inheritance
@@ -224,13 +224,20 @@ def calc_inheritance_share_1 (economy, id1):
 
     l = []
 
-    if p.father is '' or economy.is_living(p.father):
+    ack_father = p.is_acknowleged(p.father)
+    ack_mother = p.is_acknowleged(p.mother)
+
+    if p.father is '' or (economy.is_living(p.father) and ack_father):
         l.append(p.father)
-    if p.mother is '' or economy.is_living(p.mother):
+    if p.mother is '' or (economy.is_living(p.mother) and ack_mother):
         l.append(p.mother)
 
     if not l:
-        s = [p.father, p.mother]
+        s = []
+        if p.father is '' or ack_father:
+            s.append(p.father)
+        if p.mother is '' or ack_mother:
+            s.append(p.mother)
         for i in range(4):
             s2 = []
             for x in s:
@@ -239,8 +246,10 @@ def calc_inheritance_share_1 (economy, id1):
                 else:
                     if x in economy.tombs:
                         q = economy.tombs[x].person
-                        s2.append(q.father)
-                        s2.append(q.mother)
+                        if q.is_acknowleged(q.father):
+                            s2.append(q.father)
+                        if q.is_acknowleged(q.mother):
+                            s2.append(q.mother)
             if l:
                 break
             else:
@@ -262,12 +271,14 @@ def calc_inheritance_share_1 (economy, id1):
             return r
 
     l = []
-    q = calc_descendant_inheritance_share(economy, p.father, excluding=id1)
-    if q is not None:
-        l.append(q)
-    q = calc_descendant_inheritance_share(economy, p.mother, excluding=id1)
-    if q is not None:
-        l.append(q)
+    if p.father is '' or ack_father:
+        q = calc_descendant_inheritance_share(economy, p.father, excluding=id1)
+        if q is not None:
+            l.append(q)
+    if p.mother is '' or ack_mother:
+        q = calc_descendant_inheritance_share(economy, p.mother, excluding=id1)
+        if q is not None:
+            l.append(q)
     if l:
         if spouse is None:
             for q in l:
