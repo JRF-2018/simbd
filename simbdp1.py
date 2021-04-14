@@ -1,10 +1,10 @@
 #!/usr/bin/python3
-__version__ = '0.0.2' # Time-stamp: <2021-04-02T19:38:25Z>
+__version__ = '0.0.3' # Time-stamp: <2021-04-14T19:52:29Z>
 ## Language: Japanese/UTF-8
 
 """Simulation Buddhism Prototype No.1 - Main
 
-メインルーチン
+「シミュレーション仏教」プロトタイプ 1号 - メインルーチン
 """
 
 ##
@@ -44,7 +44,7 @@ from simbdp1_death import PersonDT, EconomyDT, update_death
 from simbdp1_adultery import PersonAD, EconomyPlotAD, update_adulteries
 from simbdp1_marriage import PersonMA, EconomyMA, EconomyPlotMA,\
     update_marriages
-from simbdp1_support import PersonSUP, update_support
+from simbdp1_support import PersonSUP, update_support, make_support_consistent
 from simbdp1_misc import update_education, update_tombs, update_labor,\
     update_eagerness, calc_tmp_labor
 from simbdp1_inherit import recalc_inheritance_share
@@ -199,6 +199,35 @@ ARGS.a10_labor_raise_rate = 10 / (8 * 12)
 # 60歳から100歳までに labor が0.01 下がる確率
 ARGS.a60_labor_lower_rate = 100 / (40 * 12)
 
+# normal_levy_1 で使う表
+ARGS.normal_levy_csv = "normal_levy_1.0.csv"
+# 成人の消費額
+ARGS.consumption = 3.0
+# 収入計算をゆがめるパラメータ
+ARGS.prop_theta_mag = 1.0
+ARGS.hated_mag = 1.0
+ARGS.stress_mag = 1.0
+# 寄付のパラメータ
+#ARGS.donation_rate = 0.7
+#ARGS.donation_limit = 300
+ARGS.donation_rate = 0.3
+ARGS.donation_limit = 1000
+# 寄付と教育に関するパラメータ
+#ARGS.donation_education = 0
+#ARGS.donation_education_2 = 0
+ARGS.donation_education = 0.3
+ARGS.donation_education_2 = 0.3
+# 消費と教育に関するパラメータ
+ARGS.consumption_education = 0.1
+ARGS.consumption_education_2 = 0.1
+ARGS.consumption_education_3 = 0.1
+# 「債券」の個人の最大値
+ARGS.bond_max = 1000
+# 「株式」の個人の最大値
+ARGS.stock_max = 300
+# 「大バクチ」の個人の最大値
+ARGS.gamble_max = 50
+
 
 SAVED_ECONOMY = None
 
@@ -322,6 +351,8 @@ def step (economy):
         for p in economy.people.values():
             for n in p.mlog:
                 p.mlog[n] = []
+        p.tmp_land_damage = 0
+        # make_support_consistent(economy)
 
 
 def main (eplot):

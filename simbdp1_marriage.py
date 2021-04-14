@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.1' # Time-stamp: <2021-03-18T13:26:03Z>
+__version__ = '0.0.3' # Time-stamp: <2021-04-14T04:11:22Z>
 ## Language: Japanese/UTF-8
 
 """Simulation Buddhism Prototype No.1 - Marriage
@@ -271,6 +271,7 @@ class EconomyMA (Economy0):
         m = male
         f = female
         assert m.marriage is None and f.marriage is None
+        assert m.sex == 'M' and f.sex == 'F'
 
         f.married = True
         m.married = True
@@ -323,6 +324,10 @@ class EconomyMA (Economy0):
                 ap = a1 - al * ARGS.prop_value_of_land
                 pf.land -= al
                 pf.prop -= ap
+                if al > 0:
+                    p.tmp_land_damage = (p.tmp_land_damage * p.land
+                                         + pf.tmp_land_damage * al) \
+                                         / (p.land + al)
                 p.land += al
                 p.prop += ap
 
@@ -343,6 +348,10 @@ class EconomyMA (Economy0):
                 ap = a1 - al * ARGS.prop_value_of_land
                 pm.land -= al
                 pm.prop -= ap
+                if al > 0:
+                    p.tmp_land_damage = (p.tmp_land_damage * p.land
+                                         + pm.tmp_land_damage * al) \
+                                         / (p.land + al)
                 p.land += al
                 p.prop += ap
 
@@ -397,7 +406,7 @@ class EconomyMA (Economy0):
                 s.supporting.remove(f.id)
         f.supported = m.id
         m.supporting.append(f.id)
-        m.change_district(f.district)
+        f.change_district(m.district)
 
 
 class EconomyPlotMA (EconomyPlot0):
@@ -595,7 +604,10 @@ def elevate_some_to_marriages (economy):
             if check_consanguineous_marriage(economy, p, s):
                 continue
             elevating += 1
-            economy.marry(p, s)
+            if p.sex == 'M':
+                economy.marry(p, s)
+            else:
+                economy.marry(s, p)
             a1t = []
             a2t = []
             for x in p.trash:

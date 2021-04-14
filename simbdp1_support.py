@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.1' # Time-stamp: <2021-03-18T13:25:31Z>
+__version__ = '0.0.3' # Time-stamp: <2021-04-13T18:28:40Z>
 ## Language: Japanese/UTF-8
 
 """Simulation Buddhism Prototype No.1 - Support
@@ -398,6 +398,10 @@ def update_become_adult (economy):
             ap = a1 - al * ARGS.prop_value_of_land
             pf.land -= al
             pf.prop -= ap
+            if al > 0:
+                p.tmp_land_damage = (p.tmp_land_damage * p.land
+                                     + pf.tmp_land_damage * al) \
+                                     / (p.land + al)
             p.land += al
             p.prop += ap
 
@@ -418,6 +422,10 @@ def update_become_adult (economy):
             ap = a1 - al * ARGS.prop_value_of_land
             pm.land -= al
             pm.prop -= ap
+            if al > 0:
+                p.tmp_land_damage = (p.tmp_land_damage * p.land
+                                     + pm.tmp_land_damage * al) \
+                                     / (p.land + al)
             p.land += al
             p.prop += ap
 

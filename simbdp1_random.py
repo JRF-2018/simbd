@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.1' # Time-stamp: <2021-03-18T13:26:42Z>
+__version__ = '0.0.3' # Time-stamp: <2021-04-14T01:05:05Z>
 ## Language: Japanese/UTF-8
 
 """Simulation Buddhism Prototype No.1 - Random
@@ -32,6 +32,11 @@ import math
 import random
 import numpy as np
 from scipy.special import gamma, factorial
+import csv
+import bisect
+import sys
+
+from simbdp1_base import ARGS
 
 
 def half_normal_rand (mu, sigma, size=None): # 半正規分布
@@ -60,3 +65,42 @@ def adultery_term_rand (has_child):
             if random.random() < q:
                 return (t + 1) / 12
     return 100
+
+
+def normal_levy_rand (mu, sigma, theta, cut, size=None):
+    if size is None:
+        z = random.random()
+        y = - mu/2 + theta * (1e100 if z == 0.0 else 1 / (z ** 2))
+        z2 = random.gauss(mu/2, sigma)
+        return z2 - y if z2 - y > cut else cut
+    z = np.random.normal(0, 1, size=size)
+    y = - mu/2 + theta * np.where(z == 0, 1e100, 1 / (z ** 2))
+    z2 = np.random.normal(mu/2, sigma, size=size)
+    return np.where(z2 - y > cut, z2 - y, cut)
+
+
+NORMAL_LEVY_1 = None
+def read_normal_levy_1 ():
+    global NORMAL_LEVY_1
+    try:
+        with open(ARGS.normal_levy_csv, 'r') as f:
+            x = [row for row in csv.reader(f, quoting=csv.QUOTE_NONNUMERIC)]
+    except FileNotFoundError as e:
+        print("You need run generate_normal_levy_csv.py before.")
+        sys.exit(1)
+    NORMAL_LEVY_1 = np.array(x).T.tolist()
+    
+def normal_levy_1 (cut):
+    if NORMAL_LEVY_1 is None:
+        read_normal_levy_1()
+    a = bisect.bisect_left(NORMAL_LEVY_1[0], cut)
+    if a >= len(NORMAL_LEVY_1[0]):
+        q = NORMAL_LEVY_1[0][len(NORMAL_LEVY_1[0]) - 1]
+        raise ValueError("%f would be less than %f" % (cut, q))
+    if a == 0:
+        a = 1
+    x0 = NORMAL_LEVY_1[0][a]
+    x1 = NORMAL_LEVY_1[0][a - 1]
+    y0 = NORMAL_LEVY_1[1][a]
+    y1 = NORMAL_LEVY_1[1][a - 1]
+    return ((y1 - y0) / (x1 - x0)) * (cut - x0) + y0

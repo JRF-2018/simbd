@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.2' # Time-stamp: <2021-03-20T16:24:11Z>
+__version__ = '0.0.3' # Time-stamp: <2021-04-13T18:23:45Z>
 ## Language: Japanese/UTF-8
 
 """Simulation Buddhism Prototype No.1 - Base
@@ -119,6 +119,7 @@ class Person0 (Serializable):
 
         self.prop = 0 	       # 商業財産: commercial property.
         self.land = 0	       # 農地: agricultural prpoerty.
+        self.tmp_land_damage = 0 # 災害等による年間のダメージ率
         self.consumption = 0   # 消費額
         self.ambition = 0      # 上昇志向
         self.education = 0     # 教化レベル
@@ -162,7 +163,7 @@ class Person0 (Serializable):
         self.tmp_asset_rank = None  # 資産順位 / 総人口
 
         self.mlog = {}         # 月別経済指標ログ
-        for n in ['prop', 'land', 'education', 'ambition', 'tmp_labor',
+        for n in ['prop', 'education', 'ambition', 'tmp_labor',
                   'eagerness']:
             self.mlog[n] = []
 
@@ -172,6 +173,8 @@ class Person0 (Serializable):
             excluding = set()
         if id(self.economy) not in excluding:
             excluding.add(id(self.economy))
+        if id(self.mlog) not in excluding:
+            excluding.add(id(self.mlog))
         return super().__str__(excluding=excluding)
 
 

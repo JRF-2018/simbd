@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.16' # Time-stamp: <2021-04-02T20:09:36Z>
+__version__ = '0.0.17' # Time-stamp: <2021-04-14T04:26:59Z>
 ## Language: Japanese/UTF-8
 
 """結婚・不倫・扶養・相続などのマッチングのシミュレーション"""
@@ -1445,6 +1445,7 @@ class EconomyMA (Economy0):
         m = male
         f = female
         assert m.marriage is None and f.marriage is None
+        assert m.sex == 'M' and f.sex == 'F'
 
         f.married = True
         m.married = True
@@ -1571,7 +1572,7 @@ class EconomyMA (Economy0):
                 s.supporting.remove(f.id)
         f.supported = m.id
         m.supporting.append(f.id)
-        m.change_district(f.district)
+        f.change_district(m.district)
 
 
 class Economy (EconomyDT, EconomyMA):
@@ -2691,7 +2692,10 @@ def elevate_some_to_marriages (economy):
             if check_consanguineous_marriage(economy, p, s):
                 continue
             elevating += 1
-            economy.marry(p, s)
+            if p.sex == 'M':
+                economy.marry(p, s)
+            else:
+                economy.marry(s, p)
             a1t = []
             a2t = []
             for x in p.trash:

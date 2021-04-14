@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.2' # Time-stamp: <2021-03-20T16:24:41Z>
+__version__ = '0.0.3' # Time-stamp: <2021-04-13T18:27:28Z>
 ## Language: Japanese/UTF-8
 
 """Simulation Buddhism Prototype No.1 - Death
@@ -106,15 +106,15 @@ class PersonDT (Person0):
         q = p.death.inheritance_share
 
         if q is None:
-            economy.cur_forfeit_prop += self.prop
-            economy.cur_forfeit_land += self.land
-            self.prop = 0
-            self.land = 0
+            economy.cur_forfeit_prop += p.prop
+            economy.cur_forfeit_land += p.land
+            p.prop = 0
+            p.land = 0
             return
         
-        a = self.prop + self.land * ARGS.prop_value_of_land
-        land = self.land
-        prop = self.prop
+        a = p.prop + p.land * ARGS.prop_value_of_land
+        land = p.land
+        prop = p.prop
         for x, y in sorted(q.items(), key=lambda x: x[1], reverse=True):
             a1 = a * y
             l = math.floor(a1 / ARGS.prop_value_of_land)
@@ -130,12 +130,16 @@ class PersonDT (Person0):
             else:
                 assert economy.is_living(x)
                 p1 = economy.people[x]
+                if l > 0:
+                    p1.tmp_land_damage = \
+                        (p1.tmp_land_damage * p1.land
+                         + p.tmp_land_damage * l) / (p1.land + l)
                 p1.land += l
                 p1.prop += a1 - l * ARGS.prop_value_of_land
                 prop -= a1 - l * ARGS.prop_value_of_land
 
-        self.land = 0
-        self.prop = 0
+        p.land = 0
+        p.prop = 0
 
 
 class EconomyDT (Economy0):

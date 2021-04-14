@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.1' # Time-stamp: <2021-03-18T13:26:33Z>
+__version__ = '0.0.3' # Time-stamp: <2021-04-14T02:16:16Z>
 ## Language: Japanese/UTF-8
 
 """Simulation Buddhism Prototype No.1 - Common
@@ -28,6 +28,7 @@ __version__ = '0.0.1' # Time-stamp: <2021-03-18T13:26:33Z>
 ##   intention is legitimately fulfilled.
 ##
 
+from collections import OrderedDict
 import numpy as np
 from simbdp1_base import Serializable
 

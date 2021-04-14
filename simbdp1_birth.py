@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.2' # Time-stamp: <2021-04-02T19:35:00Z>
+__version__ = '0.0.3' # Time-stamp: <2021-04-14T19:29:20Z>
 ## Language: Japanese/UTF-8
 
 """Simulation Buddhism Prototype No.1 - Birth
@@ -156,16 +156,9 @@ class PersonBT (Person0):
         economy.people[p.id] = p
         p.age = 0
         p.birth_term = economy.term
-        p.prop = half_normal_rand(0, ARGS.init_prop_sigma)
-        x = random.random()
-        if x < ARGS.peasant_ratio:
-            if ARGS.no_land:
-                p.land = 0
-            else:
-                p.land = negative_binominal_rand(ARGS.land_r,
-                                                     ARGS.land_theta) + 1
-        p.consumption = p.land * ARGS.prop_value_of_land * 0.025 \
-            + p.prop * 0.05
+        p.prop = 0
+        p.land = 0
+        p.consumption = ARGS.consumption * 0.1
         p.ambition = random.random()
         p.education = random.random()
         p.adult_success = np.random.geometric(0.5) - 1
