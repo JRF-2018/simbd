@@ -1,7 +1,7 @@
 
 
     仏教的哲学的社会シミュレーション
-    (Created: 2021-02-27, Time-stamp: <2021-03-18T13:13:15Z>)
+    (Created: 2021-02-27, Time-stamp: <2021-04-18T01:07:27Z>)
 
 
 ** このファイルについて
@@ -152,7 +152,7 @@ https://gist.github.com/JRF-2018/aace48ebc44229844b6f75a39a287578
   
 Simulation Buddhism Prototype No.1。test_of_matching2.py のファイルを
 分割し、test_of_merchant_peasant_ratio.py と test_of_income_1.py の成
-果を取り入れたものになる予定。
+果を取り入れたもの。
 
 
 

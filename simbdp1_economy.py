@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.3' # Time-stamp: <2021-04-14T19:36:18Z>
+__version__ = '0.0.4' # Time-stamp: <2021-04-18T01:06:44Z>
 ## Language: Japanese/UTF-8
 
 """Simulation Buddhism Prototype No.1 - Economy
@@ -35,7 +35,8 @@ import numpy as np
 import simbdp1_base as base
 from simbdp1_base import ARGS, Person0, EconomyPlot0, Serializable
 from simbdp1_common import np_clip, np_random_choice, Child
-from simbdp1_random import normal_levy_rand, normal_levy_1
+from simbdp1_random import normal_levy_rand, normal_levy_1,\
+    negative_binominal_distribution
 
 
 class EconomicalFamily (Serializable):
@@ -99,6 +100,23 @@ class PersonEC (Person0):
         #土地を売ったり買ったりする処理が必要かも。
         self.district = new_district
 
+    def tmp_asset_score (self):
+        u = np.random.uniform()
+        lv = ARGS.prop_value_of_land
+        prop = self.prop
+        tmp_land = self.tmp_land
+        land = self.land
+        if tmp_land > land:
+            prop += land_gate_func_1((prop / lv) + tmp_land) \
+                * (tmp_land - land)
+            prop -= (tmp_land - land) * lv
+        elif tmp_land < land:
+            prop += land_gate_func_1((prop / lv) + land) \
+                * (land - tmp_land)
+            prop += (land - tmp_land) * lv
+        prop += tmp_land * lv
+        return land_gate_func_2(prop) * u
+
 
 class EconomyPlotEC (EconomyPlot0):
     def __init__ (self):
@@ -126,6 +144,8 @@ class EconomyPlotEC (EconomyPlot0):
     def view_land (self, ax, economy):
         ax.hist(list(map(lambda x: x.land,
                          economy.people.values())), bins=ARGS.bins)
+        #print("No Land:", len([x for x in economy.people.values()
+        #                       if x.land == 0]))
 
     def view_land_vs_prop (self, ax, economy):
         ax.scatter(list(map(lambda x: x.land, economy.people.values())),
@@ -487,6 +507,191 @@ def calc_income (economy, families):
     print("Breakup of Family:", n_b, flush=True)
 
 
+def land_gate_func_1 (x):
+    if x < 5:
+        return 0
+    if x > 30:
+        return 5
+    return (5 / 25) * (x - 5)
+
+
+    if x > 10:
+        return x + np.log(np.exp(10) + 1) - 10 
+    else:
+        return np.log(np.exp(x) + 1)
+
+
+def land_gate_func_2 (x):
+    if x > 10:
+        return x + np.log(np.exp(10) + 1) - 10 
+    else:
+        return np.log(np.exp(x) + 1)
+
+
+def keep_merchant_peasant_ratio_1 (people):
+    peasant = []
+    merchant = []
+    for p in people:
+        p.tmp_land = p.land
+        if p.land == 0:
+            merchant.append(p)
+        else:
+            peasant.append(p)
+    ideal_num_peasant = int(len(people)
+                            * ARGS.peasant_ratio)
+
+    size_array = [[] for i in range(1 + max([p.tmp_land for p in peasant]))]
+    for p in peasant:
+        size_array[p.tmp_land].append(p)
+
+    # まず、各農地数において、その農地数である人数が一定の分布以下であ
+    # るようにする。端数処理をしながら…。
+    
+    acc_distr = ideal_num_peasant * (1 - sum([
+        negative_binominal_distribution(ARGS.land_r, ARGS.land_theta,
+                                       x - 1)
+        for x in range(1, len(size_array))
+    ]))
+    #print(acc_distr)
+
+    for land_size in range(len(size_array) - 1, 0, -1):
+        ideal_num = ideal_num_peasant \
+            * negative_binominal_distribution(ARGS.land_r, ARGS.land_theta,
+                                              land_size - 1)
+        ideal_num_int = int(ideal_num)
+        ideal_num_fraction = ideal_num - ideal_num_int
+        if int(acc_distr + ideal_num_fraction) >= 1:
+            ideal_num_int += int(acc_distr + ideal_num_fraction)
+            ideal_num_fraction = acc_distr + ideal_num_fraction \
+                - int(acc_distr + ideal_num_fraction)
+            acc_distr = 0
+        elif acc_distr <= 0 and acc_distr + ideal_num_fraction > 0:
+            ideal_num_fraction = acc_distr + ideal_num_fraction
+            acc_distr = 0
+        if acc_distr + ideal_num_fraction > 0:
+            if np.random.uniform() < ideal_num_fraction / (1 - acc_distr):
+                ideal_num_int += 1
+                acc_distr = (acc_distr + ideal_num_fraction) - 1
+            else:
+                acc_distr += ideal_num_fraction
+        else:
+            acc_distr += ideal_num_fraction
+
+        if len(size_array[land_size]) > ideal_num_int:
+            for p in size_array[land_size]:
+                p.tmp_score = p.tmp_asset_score()
+            l = sorted(size_array[land_size], key=lambda p: p.tmp_score,
+                       reverse=True)
+            r = l[ideal_num_int:]
+            l = l[:ideal_num_int]
+            for p in r:
+                p.tmp_land -= 1
+            size_array[land_size] = l
+            size_array[land_size - 1].extend(r)
+
+    merchant.extend(size_array[0])
+    size_array[0] = []
+    peasant = sum(size_array, [])
+
+    # 次に、商人から農民になる者を選ぶ。上の段階で農民の数は必ず理想的
+    # な農民の数より少ないので、必ず何人かは、商人から農民になるはず。
+    
+    if ideal_num_peasant > len(peasant):
+        for p in merchant:
+            p.tmp_score = np.random.uniform()
+        l = sorted(merchant, key=lambda p: p.tmp_score,
+                   reverse=True)
+        r = l[ideal_num_peasant - len(peasant):]
+        l = l[:ideal_num_peasant - len(peasant)]
+        for p in l:
+            p.tmp_land = 1
+        merchant = r
+        size_array[1].extend(l)
+        peasant = sum(size_array, [])
+    
+    # 次に、各農地数において、その農地数である人数が一定の分布になるよ
+    # うにする。端数処理をしながら…。
+
+    acc_distr = 0
+    lmax = max([p.land for p in peasant] + [p.tmp_land for p in peasant])
+    for land_size in range(1, lmax + ARGS.land_max_growth):
+        while len(size_array) <= land_size + 1:
+            size_array.append([])
+        ideal_num = ideal_num_peasant \
+            * negative_binominal_distribution(ARGS.land_r, ARGS.land_theta,
+                                              land_size - 1)
+        ideal_num_int = int(ideal_num)
+        ideal_num_fraction = ideal_num - ideal_num_int
+        if int(acc_distr + ideal_num_fraction) >= 1:
+            ideal_num_int += int(acc_distr + ideal_num_fraction)
+            ideal_num_fraction = acc_distr + ideal_num_fraction \
+                - int(acc_distr + ideal_num_fraction)
+            acc_distr = 0
+        elif acc_distr <= 0 and acc_distr + ideal_num_fraction > 0:
+            ideal_num_fraction = acc_distr + ideal_num_fraction
+            acc_distr = 0
+        if acc_distr + ideal_num_fraction > 0:
+            if np.random.uniform() < ideal_num_fraction / (1 - acc_distr):
+                ideal_num_int += 1
+                acc_distr = (acc_distr + ideal_num_fraction) - 1
+            else:
+                acc_distr += ideal_num_fraction
+        else:
+            acc_distr += ideal_num_fraction
+
+        if len(size_array[land_size]) > ideal_num_int:
+            for p in size_array[land_size]:
+                p.tmp_score = p.tmp_asset_score()
+            l = sorted(size_array[land_size], key=lambda p: p.tmp_score,
+                       reverse=False)
+            r = l[ideal_num_int:]
+            l = l[:ideal_num_int]
+            for p in r:
+                p.tmp_land += 1
+            size_array[land_size] = l
+            size_array[land_size + 1].extend(r)
+        elif len(size_array[land_size]) < ideal_num_int:
+            acc_distr += ideal_num_int - len(size_array[land_size])
+
+    #print(acc_distr, len(size_array) - 1, len(size_array[len(size_array) - 1]))
+
+    #print(len(peasant), ideal_num_peasant)
+
+    # 最後に、売買代金を清算する。
+
+    lv = ARGS.prop_value_of_land
+    for p in people:
+        prop = p.prop
+        tmp_land = p.tmp_land
+        land = p.land
+        if tmp_land > land:
+            prop += land_gate_func_1((prop / lv) + tmp_land) \
+                * (tmp_land - land)
+            prop -= (tmp_land - land) * lv
+        elif tmp_land < land:
+            prop += land_gate_func_1((prop / lv) + land) \
+                * (land - tmp_land)
+            prop += (land - tmp_land) * lv
+        p.prop = prop
+        p.land = tmp_land
+        p.tmp_land = None
+        p.tmp_score = None
+
+
+def keep_merchant_peasant_ratio (economy):
+    l = [[] for i in range(len(ARGS.population))]
+    for p in economy.people.values():
+        if p.death is not None:
+            continue
+        if p.age < 18 and not p.married and p.supported is not None:
+            continue
+        l[p.district].append(p)
+    for i in range(len(ARGS.population)):
+        #print(len(l[i]))
+        print("...", flush=True)
+        keep_merchant_peasant_ratio_1(l[i])
+
+
 def update_economy (economy):
     print("\nEconomy:...", flush=True)
 
@@ -494,3 +699,5 @@ def update_economy (economy):
     families = make_families(economy)
     print("Calc Incomes:...", flush=True)
     calc_income (economy, families)
+    print("Keep Merchant Peasant Ratio:...", flush=True)
+    keep_merchant_peasant_ratio(economy)

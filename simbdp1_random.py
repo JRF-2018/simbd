@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.3' # Time-stamp: <2021-04-14T01:05:05Z>
+__version__ = '0.0.4' # Time-stamp: <2021-04-17T23:17:57Z>
 ## Language: Japanese/UTF-8
 
 """Simulation Buddhism Prototype No.1 - Random
@@ -46,6 +46,11 @@ def half_normal_rand (mu, sigma, size=None): # 半正規分布
 def negative_binominal_rand (r, theta, size=None): # 負の二項分布
     y = np.random.gamma(r, 1/theta - 1, size=size)
     return np.random.poisson(y, size=size)
+
+def negative_binominal_distribution (r, theta, x): # 負の二項分布
+    y = (gamma(r + x) / (gamma(r) * factorial(x))) * \
+        (theta ** r) * ((1 - theta)  ** x)
+    return y
 
 def right_triangular_rand (a, b, size=None):
     u1 = np.random.uniform(0, 1, size=size)
