@@ -1,0 +1,2469 @@
+#!/usr/bin/python3
+__version__ = '0.0.1' # Time-stamp: <2021-06-28T09:39:33Z>
+## Language: Japanese/UTF-8
+
+"""支配と災害のシミュレーション"""
+
+##
+## License:
+##
+##   Public Domain
+##   (Since this small code is close to be mathematically trivial.)
+##
+## Author:
+##
+##   JRF
+##   http://jrf.cocolog-nifty.com/software/
+##   (The page is written in Japanese.)
+##
+
+#import timeit
+from collections import OrderedDict
+import itertools
+import math
+import random
+import numpy as np
+import bisect
+from scipy.special import gamma, factorial
+import matplotlib.pyplot as plt
+import pickle
+
+import argparse
+ARGS = argparse.Namespace()
+base = argparse.Namespace() # Pseudo Module
+
+def calc_increase_rate (terms, intended):
+    return 1 - math.exp(math.log(1 - intended) / terms)
+
+def calc_pregnant_mag (r, rworst):
+    return math.log(rworst / r) / math.log(0.1)
+
+ARGS.load = False
+ARGS.save = False
+# セーブするファイル名
+ARGS.pickle = 'test_of_domination_2.pickle'
+# 途中エラーなどがある場合に備えてセーブする間隔
+ARGS.save_period = 120
+# 試行数
+ARGS.trials = 50
+# ID のランダムに決める部分の長さ
+ARGS.id_random_length = 10
+# ID のランダムに決めるときのトライ数上限
+ARGS.id_try = 1000
+
+# View を表示しない場合 True
+ARGS.no_view = False
+# View のヒストグラムの bins
+ARGS.bins = 100
+# View
+ARGS.view_1 = 'population'
+ARGS.view_2 = 'asset'
+ARGS.view_3 = 'land'
+ARGS.view_4 = 'prop'
+
+# 各地域の人口
+#ARGS.population = [10, 10, 5]
+ARGS.population = [10000, 10000, 5000]
+# 新生児誕生の最小値
+ARGS.min_birth = None
+# 経済の更新間隔
+ARGS.economy_period = 12
+# 農民割合 = 農民 / (農民 + 商人)
+ARGS.peasant_ratio = 68.0/(68.0 + 20.0)
+# 地価
+ARGS.prop_value_of_land = 10.0
+# 初期商業財産を決める sigma
+ARGS.init_prop_sigma = 100.0
+# 初期土地所有を決める r と theta
+ARGS.land_r = 1.5
+ARGS.land_theta = 0.2
+# 土地の最大保有者の一年の最大増分
+ARGS.land_max_growth = 5
+# 初期化の際、土地を持ちはいないことにする
+ARGS.no_land = False
+# 初期化の際、商業財産は 0 にする。
+ARGS.init_zero = False
+# 初期化の際の最大の年齢。
+ARGS.init_max_age = 100.0
+# 一般死亡率
+ARGS.general_death_rate = calc_increase_rate(12, 0.5/100)
+# 60歳から80歳までの老人死亡率
+ARGS.a60_death_rate = calc_increase_rate((80 - 60) * 12, 70/100)
+# 80歳から110歳までの老人死亡率
+ARGS.a80_death_rate = calc_increase_rate((110 - 80) * 12, 99/100)
+# 0歳から3歳までの幼児死亡率
+ARGS.infant_death_rate = calc_increase_rate(3 * 12, 5/100)
+# 家系を辿った距離の最大値
+ARGS.max_family_distance = 6
+# 誕生率
+ARGS.birth_rate = 0.003
+# 一人当たりの初期予算参考値
+ARGS.initial_budget_per_person = 0.5
+# 国力が教育で強くなる最大値
+ARGS.nation_education_power_threshold = 0.6
+# 信仰理解で戦闘が強くなる最大値
+ARGS.faith_realization_power_threshold = 0.6
+# 慰撫が必要な忠誠の最小値
+ARGS.soothe_threshold = 0.7
+# 支配者の同時仕事量
+ARGS.works_per_dominator = 5
+# 災害対応する最小値
+#ARGS.calamity_damage_threshold = 100.0
+ARGS.calamity_damage_threshold = 0
+# 災害対応しないことによる成長機会の拡大率
+ARGS.challengeable_mag = 10.0
+# 寺院を立てる確率
+ARGS.construct_temple_rate = 0.001
+# 成長機会があるときのベータ関数のパラメータ
+ARGS.challenging_beta = 0.5
+# 成長機会がないときのベータ関数のパラメータ
+ARGS.not_challenging_beta = 1.0
+# 成長するときの増分
+ARGS.challenging_growth = 0.01
+
+
+SAVED_ECONOMY = None
+
+
+def parse_args (view_options=['none']):
+    global SAVED_ECONOMY
+
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument("-L", "--load", action="store_true")
+    parser.add_argument("-S", "--save", action="store_true")
+    parser.add_argument("-t", "--trials", type=int)
+    parser.add_argument("-p", "--population", type=str)
+    parser.add_argument("--min-birth", type=float)
+    parser.add_argument("--view-1", choices=view_options)
+    parser.add_argument("--view-2", choices=view_options)
+    parser.add_argument("--view-3", choices=view_options)
+    parser.add_argument("--view-4", choices=view_options)
+
+    specials = set(['load', 'save', 'trials', 'population', 'min_birth',
+                    'view_1', 'view_2', 'view_3', 'view_4'])
+    for p, v in vars(ARGS).items():
+        if p not in specials:
+            p2 = '--' + p.replace('_', '-')
+            if v is False:
+                parser.add_argument(p2, action="store_true")
+            elif v is None:
+                parser.add_argument(p2, type=float)
+            else:
+                parser.add_argument(p2, type=type(v))
+    
+    parser.parse_args(namespace=ARGS)
+
+    if ARGS.load:
+        print("Loading...\n", flush=True)
+        with open(ARGS.pickle, 'rb') as f:
+            args, SAVED_ECONOMY = pickle.load(f)
+            vars(ARGS).update(vars(args))
+            ARGS.save = False
+        parser.parse_args(namespace=ARGS)
+    
+    if type(ARGS.population) is str:
+        ARGS.population = list(map(int, ARGS.population.split(',')))
+    if ARGS.min_birth is None:
+        ARGS.min_birth = sum([x / (12 * ARGS.init_max_age) for x in ARGS.population])
+
+
+## class 'Frozen' from:
+## 《How to freeze Python classes « Python recipes « ActiveState Code》  
+## https://code.activestate.com/recipes/252158-how-to-freeze-python-classes/
+def frozen (set):
+    """Raise an error when trying to set an undeclared name, or when calling
+       from a method other than Frozen.__init__ or the __init__ method of
+       a class derived from Frozen"""
+    def set_attr (self,name,value):
+        import sys
+        if hasattr(self,name):
+            #If attribute already exists, simply set it
+            set(self,name,value)
+            return
+        elif sys._getframe(1).f_code.co_name is '__init__':
+            #Allow __setattr__ calls in __init__ calls of proper object types
+            for k,v in sys._getframe(1).f_locals.items():
+                if k=="self" and isinstance(v, self.__class__):
+                    set(self,name,value)
+                    return
+        raise AttributeError("You cannot add an attribute '%s' to %s"
+                             % (name, self))
+    return set_attr
+
+class Frozen (object):
+    """Subclasses of Frozen are frozen, i.e. it is impossibile to add
+     new attributes to them and their instances."""
+    __setattr__=frozen(object.__setattr__)
+    class __metaclass__ (type):
+        __setattr__=frozen(type.__setattr__)
+
+
+class Serializable (Frozen):
+    def __str__ (self, excluding=None):
+        r = []
+        def f (self, excluding):
+            if id(self) in excluding:
+                return "..."
+            elif isinstance(self, Serializable):
+                return self.__str__(excluding=excluding)
+            else:
+                return str(self)
+
+        for p, v in self.__dict__.items():
+            if excluding is None:
+                excluding = set()
+            excluding.add(id(self))
+            if isinstance(v, list):
+                r.append(str(p) + ": ["
+                         + ', '.join(map(lambda x: f(x, excluding), v))
+                         + "]")
+            else:
+                r.append(str(p) + ": " + f(v, excluding))
+        return '(' + ', '.join(r) + ')'
+
+
+class IDGenerator (Frozen):
+    def __init__ (self):
+        self.pool = {}
+
+    def generate (self, prefix):
+        for i in range(ARGS.id_try):
+            n = prefix + \
+                format(random.randrange(0, 16 ** ARGS.id_random_length),
+                       '0' + str(ARGS.id_random_length) + 'x')
+            if n not in self.pool:
+                self.pool[n] = True
+                return n
+        raise ValueError('Too many tries of ID generation.')
+
+
+class SerializableExEconomy (Serializable):
+    def __str__ (self, excluding=None):
+        if excluding is None:
+            excluding = set()
+        if id(self.economy) not in excluding:
+            excluding.add(id(self.economy))
+        return super().__str__(excluding=excluding)
+
+
+class Person0 (SerializableExEconomy):
+    def __init__ (self):
+        self.id = None         # ID または 名前
+        self.economy = None    # 所属した経済への逆参照
+        self.sex = None        # 'M'ale or 'F'emale
+        self.birth_term = None # 誕生した期
+        self.age = None        # 年齢
+        self.district = None   # 居住区
+        self.death = None      # 死
+
+        self.dominator_position = None  # 支配における役職
+
+        self.prop = 0 	       # 商業財産: commercial property.
+        self.land = 0	       # 農地: agricultural prpoerty.
+        self.consumption = 0   # 消費額
+        self.ambition = 0      # 上昇志向
+        self.education = 0     # 教化レベル
+
+        self.trash = []        # 終った関係
+        self.adult_success = 0 # 不倫成功回数
+        self.marriage = None   # 結婚
+        self.married = False   # 結婚経験ありの場合 True
+        self.a60_spouse_death = False # 60歳を超えて配偶者が死んだ場合 True
+        self.adulteries = []   # 不倫
+        self.fertility = 0     # 妊娠しやすさ or 生殖能力
+        self.pregnancy = None  # 妊娠 (妊娠してないか男性であれば None)
+        self.pregnancy_wait = None  # 妊娠猶予
+        self.marriage_wait = None   # 結婚猶予
+        self.children = []     # 子供 (養子含む)
+        self.father = ''       # 養夫
+        self.mother = ''       # 養母
+        self.initial_father = '' # 実夫とされるもの
+        self.initial_mother = '' # 実母とされるもの
+        self.biological_father = '' # 実夫
+        self.biological_mother = '' # 実母
+        self.want_child_base = 2    # 欲しい子供の数の基準額
+        self.supporting = []   # 被扶養者の家族の ID
+        self.supported = None  # 扶養してくれてる者の ID
+
+        self.cum_donation = 0  # 欲しい子供の数の基準額
+
+        self.hating = {}       # 恨み
+        self.hating_unknown = 0     # 対象が確定できない恨み
+        self.political_hating = 0   # 政治的な恨み
+        
+        self.tmp_luck = None   # 幸運度
+        self.tmp_score = None  # スコア
+        self.tmp_asset_rank = None  # 資産順位 / 総人口
+
+
+class PersonEC (Person0):
+    def asset_value (self):
+        return self.prop + self.land * ARGS.prop_value_of_land
+
+    def trained_ambition (self):
+        if self.ambition > 0.5:
+            return (1 - 0.2 * self.education) * self.ambition
+        else:
+            return 1 - (1 - 0.2 * self.education) * (1 - self.ambition)
+
+    def change_district (self, new_district):
+        #土地を売ったり買ったりする処理が必要かも。
+        self.district = new_district
+
+
+class PersonBT (Person0):
+    def is_acknowleged (self, parent_id):
+        p = self
+        qid = parent_id
+        economy = self.economy
+        if qid is '':
+            return True
+        q = economy.get_person(qid)
+        if q is None:
+            return True
+        for ch in q.children + q.trash:
+            if isinstance(ch, Child) and ch.id == p.id:
+                return True
+        return False
+
+class PersonDT (Person0):
+    def die_relation (self, relation):
+        p = self
+        rel = relation
+        economy = self.economy
+
+        if p.age > 60:
+            p.a60_spouse_death = True
+
+        rel.end = economy.term
+        if rel.spouse is not '' and economy.is_living(rel.spouse):
+            s = economy.people[rel.spouse]
+            if s.marriage is not None and s.marriage.spouse == p.id:
+                s.marriage.end = economy.term
+                s.trash.append(s.marriage)
+                s.marriage = None
+            for a in s.adulteries:
+                if a.spouse == p.id:
+                    a.end = economy.term
+                    s.trash.append(a)
+                    s.adulteries.remove(a)
+
+    def die_child (self, child_id):
+        p = self
+        economy = self.economy
+        ch = None
+        for x in p.children:
+            if x.id == child_id:
+                ch = x
+        if ch is None:
+            return
+        ch.death_term = economy.term
+        p.children.remove(ch)
+        p.trash.append(ch)
+
+    def die_supporting (self, new_supporter):
+        p = self
+        economy = self.economy
+        ns = None
+        if new_supporter is not None \
+           and new_supporter is not '' and economy.is_living(new_supporter):
+            ns = economy.people[new_supporter]
+        assert new_supporter is None or new_supporter is ''\
+            or (ns is not None and ns.supported is None)
+        for x in p.supporting:
+            if x is not '' and x in economy.people \
+               and x != new_supporter:
+                s = economy.people[x]
+                assert s.supported == p.id
+                s.supported = new_supporter
+                if ns is not None:
+                    ns.supporting.append(s.id)
+                    s.change_district(ns.district)
+        p.supporting = []
+
+    def die_supported (self):
+        p = self
+        economy = self.economy
+        if p.supported is not '' and p.supported in economy.people:
+            s = economy.people[p.supported]
+            s.supporting.remove(p.id)
+        
+
+
+class PersonSUP (Person0):
+    def family_hating (self, person_or_id, threshold=0.2):
+        p = self
+        economy = self.economy
+        id1 = person_or_id.id if isinstance(person_or_id, base.Person) \
+            else person_or_id
+        assert p.supported is None
+
+        if id1 is '':
+            return False
+        if id1 in p.hating and p.hating[id1] >= threshold:
+            return True
+        for x in p.supporting:
+            if x is not '' and economy.is_living(x):
+                q = economy.people[x]
+                if id1 in q.hating and q.hating[id1] >= threshold:
+                    return True
+        return False
+
+
+class PersonDM (Person0):
+    def get_dominator (self):
+        p = self
+        economy = self.economy
+        nation = economy.nation
+        pos = p.dominator_position
+        if pos is None:
+            return None
+        elif pos is 'king':
+            return nation.king
+        elif pos is 'governor':
+            return nation.districts[p.district].governor
+        elif pos is 'vassal':
+            for d in nation.vassals:
+                if d.id == p.id:
+                    return d
+        elif pos is 'cavalier':
+            for d in nation.districts[p.district].cavaliers:
+                if d.id == p.id:
+                    return d
+        raise ValueError('Person.dominator_position is inconsistent.')
+
+class Person (PersonEC, PersonBT, PersonDT, PersonSUP, PersonDM):
+    pass
+
+base.Person = Person
+
+
+class Marriage (Serializable):
+    def __init__ (self):
+        self.begin = None      # 計算便宜上の begin
+        self.true_begin = None # 統計用 begin。None ならば begin が真の begin。
+        self.end = None
+        self.spouse = '' # 配偶者: 不明の場合は ''
+        self.init_favor = None
+        self.children = []
+        self.tmp_relative_spouse_asset = None
+
+class Adultery (Serializable):
+    def __init__ (self):
+        self.begin = None      # 計算便宜上の begin
+        self.true_begin = None # 統計用 begin。None ならば begin が真の begin。
+        self.end = None
+        self.spouse = '' # 配偶者: 不明の場合は ''
+        self.init_favor = None
+        self.children = []
+        self.tmp_relative_spouse_asset = None
+
+class Pregnancy (Serializable):
+    def __init__ (self):
+        self.begin = None
+        self.end = None
+        self.relation = None # Marriage または Adultery が入る。
+
+class Child (Serializable):
+    def __init__ (self):
+        self.id = ''
+        self.father = '' # 実夫と親が思ってる者
+        self.mother = '' # 実母と親が思っている者
+        # 以下は id が不明('')のときのみ意味がある。
+        self.relation = '' # 'M': 嫡出子, 'A': 非嫡出子, 'O': 養子, '': 不明
+        self.birth_term = None
+        self.death_term = None
+        self.sex = None
+
+class Dissolution (Serializable):
+    def __init__ (self):
+        self.id = ''
+        self.term = None
+        self.relation = '' # 'M'嫡出子, 'A'非嫡出子, 'O'養子, 'MO'母, 'FA'父
+
+class Wait (Serializable):
+    def __init__ (self):
+        self.begin = None
+        self.end = None
+
+class Death (Serializable):
+    def __init__ (self):
+        self.term = None
+        self.inheritance_share = None
+    
+class Tomb (Serializable):
+    def __init__ (self):
+        self.death_term = None
+        self.person = None
+
+
+class Dominator (SerializableExEconomy):
+    def __init__ (self):
+        self.id = None
+        self.economy = None
+        self.district = None       # 地域
+        self.position = None       # 役職
+        self.people_trust = 0      # 人望
+        self.faith_realization = 0 # 信仰理解
+        self.disaster_prophecy = 0 # 災害予知
+        self.disaster_strategy = 0 # 災害戦略
+        self.disaster_tactics = 0  # 災害戦術
+        self.combat_prophecy = 0   # 戦闘予知
+        # self.combat_strategy = 0   # 戦闘戦略
+        self.combat_tactics = 0    # 戦闘戦術
+        self.hating_to_king = 0    # 王への家系的恨み
+        self.hating_to_governor = 0   # 知事への家系的恨み
+        self.soothing_by_king = 0  # 王からの慰撫 (マイナス可)
+        self.soothing_by_governor = 0 # 知事からの慰撫 (マイナス可)
+
+    def calc_combat_strategy (self, delta=None):
+        return (2 * self.disaster_strategy
+                + self.combat_tactics) / 3
+
+    def update_hating (self):
+        # 家系を辿って家系的恨みを設定する。「王・知事」に恨みがある者
+        # と「王・知事」のどちらに家系的距離が近いかを測る。
+        d0 = self
+        economy = self.economy
+        p = economy.get_person(d0.id)
+        s = set([p.id])
+        checked = set([p.id])
+        distance = 1
+        r = OrderedDict()
+        r[p.id] = 0
+        while distance <= ARGS.max_family_distance and s:
+            s2 = set([])
+            for qid in s:
+                q = economy.get_person(qid)
+                if q is None:
+                    continue
+                for x in [q.father, q.mother]:
+                    if x is '' or x in checked:
+                        continue
+                    s2.add(x)
+                    r[x] = distance
+                for ch in q.children + q.trash:
+                    if isinstance(ch, Child):
+                        x = ch.id
+                        if x is '' or x in checked:
+                            continue
+                        s2.add(x)
+                        r[x] = distance
+                for m in [q.marriage] + q.trash:
+                    if m is not None and isinstance(m, Marriage):
+                        x = m.spouse
+                        if x is '' or x in checked:
+                            continue
+                        s2.add(x)
+                        r[x] = distance
+            checked.update(s2)
+            distance += 1
+            s = s2
+        k_id = economy.nation.king.id
+        k_distance = ARGS.max_family_distance + 1
+        if k_id in r:
+            k_distance = r[k_id]
+        g_id = economy.nation.districts[p.district].governor.id
+        g_distance = ARGS.max_family_distance + 1
+        if g_id in r:
+            g_distance = r[g_id]
+
+        hk = 0
+        hg = 0
+        for q_id, d in r.items():
+            if d < k_distance:
+                q = economy.get_person(q_id)
+                if k_id in q.hating and q.hating[k_id] > hk:
+                    hk = q.hating[k_id]
+            if d < g_distance:
+                q =  economy.get_person(q_id)
+                if g_id in q.hating and q.hating[g_id] > hg:
+                    hg = q.hating[g_id]
+
+        d0.hating_to_king = hk
+        d0.hating_to_governor = hg
+
+    def soothe_district (self):
+        d = self
+        economy = self.economy
+        
+        p = economy.calc_dominator_work(d, lambda x: x.soothe_ability())
+
+        q = ((1/2) - (1/4)) * p + (1/4)
+        for p in economy.people.values():
+            if p.death is None and p.age >= 18 \
+               and p.district == d.district \
+               and random.random() < q:
+                p.political_hating *= 0.5
+
+    def construct (self, p_or_t, calamity_name, idx, challenging=False):
+        d = self
+        economy = self.economy
+        nation = economy.nation
+        dist = nation.districts[d.district]
+        cn = calamity_name
+        cinfo = base.calamity_info[cn]
+
+        if p_or_t == 'protection' and cn == 'invasion':
+            f = lambda x: x.invasion_protection_ability()
+            ccoeff = cinfo.protection_construct_coeff
+            cmax = cinfo.protection_max
+            setting = dist.protection_units[cn]
+            scoeff = {'disaster_strategy': (2/3) * 0.75,
+                      'combat_tactics': (1/3) * 0.75,
+                      'people_trust': 0.25}
+        elif p_or_t == 'training' and cn == 'invasion':
+            f = lambda x: x.invasion_training_ability()
+            ccoeff = cinfo.training_construct_coeff
+            cmax = cinfo.training_max
+            setting = dist.training_units[cn]
+            scoeff = {'combat_tactics': 0.70,
+                      'people_trust': 0.15,
+                      'faith_realization': 0.15}
+        elif p_or_t == 'protection':
+            f = lambda x: x.disaster_protection_ability()
+            ccoeff = cinfo.protection_construct_coeff
+            cmax = cinfo.protection_max
+            setting = dist.protection_units[cn]
+            scoeff = {'disaster_strategy': 0.75,
+                      'people_trust': 0.25}
+        elif p_or_t == 'training':
+            f = lambda x: x.disaster_training_ability()
+            ccoeff = cinfo.training_construct_coeff
+            cmax = cinfo.training_max
+            setting = dist.training_units[cn]
+            scoeff = {'disaster_tactics': 0.75,
+                      'people_trust': 0.25}
+
+        p = economy.calc_dominator_work(d, f)
+        beta = ARGS.challenging_beta if challenging \
+            else ARGS.not_challenging_beta
+        p *= np.random.beta(beta, beta)
+
+        x = np_clip(math.sqrt((p + ccoeff * (setting[idx] ** 2)) / ccoeff),
+                    0, cmax)
+        setting[idx] = x
+        if not challenging:
+            return x
+        k = sum(list(scoeff.values()))
+        for n, v in scoeff.items():
+            setattr(d, n,
+                    np_clip(
+                        getattr(d, n) + (ARGS.challenging_growth * v / k),
+                        0, 1))
+        return x
+
+    def soothe_ability (self):
+        d = self
+        return 0.5 * d.people_trust + 0.5 * d.faith_realization
+
+    def disaster_prophecy_ability (self):
+        d = self
+        return 0.70 * d.disaster_prophecy + 0.30 * d.faith_realization
+
+    def disaster_protection_ability (self):
+        d = self
+        return 0.75 * d.disaster_strategy + 0.25 * d.people_trust
+
+    def disaster_training_ability (self):
+        d = self
+        return 0.75 * d.disaster_tactics + 0.25 * d.people_trust
+
+    def invasion_prophecy_ability (self):
+        d = self
+        return 0.60 * d.combat_prophecy + 0.40 * d.faith_realization
+
+    def invasion_protection_ability (self):
+        d = self
+        return 0.75 * d.calc_combat_strategy() + 0.25 * d.people_trust
+
+    def invasion_training_ability (self):
+        d = self
+        fr = d.faith_realization
+        if fr > ARGS.faith_realization_power_threshold:
+            fr = ARGS.faith_realization_power_threshold
+        if fr < 0.5:
+            p = 0.8 * (fr / 0.5)
+        else:
+            p = 0.8 + ((fr - 0.5) / 0.5)
+        return 0.70 * d.combat_tactics + 0.15 * d.people_trust \
+            + 0.15 * p
+
+class District (Serializable):
+    def __init__ (self):
+        self.governor = None
+        self.cavaliers = []
+        self.tmp_hated = 0         # 民の political_hated を反映した値
+        self.protection_units = {}  # 防御レベルのユニット
+        self.training_units = {}	   # 訓練レベルのユニット
+        for n in ['invasion', 'flood', 'bigfire', 'earthquake',
+                  'famine', 'cropfailure', 'plague']:
+            self.protection_units[n] = []
+            self.training_units[n] = []
+
+        self.tmp_disaster_brain = None # 天災の参謀
+        self.tmp_invasion_brain = None # 戦争の参謀
+        self.tmp_education = 1.0  # 18才以上の教育平均
+        self.tmp_fidelity = 1.0   # 忠誠 (1 - 18才以上の political_hating 平均)
+        self.tmp_population = 0   # 人口
+        self.tmp_budget = 0       # 予算 (寄付金総額 / 12)
+        self.prev_budget = []     # 過去10年の予算平均
+        self.tmp_power = 1.0      # 国力
+
+
+class Nation (Serializable):
+    def __init__ (self):
+        self.districts = []
+        self.king = None
+        self.vassals = []
+
+        self.tmp_population = 0   # 人口
+        self.tmp_budget = 0       # 予算 (寄付金総額 / 12)
+        self.prev_budget = []     # 過去10年の予算平均
+
+    def dominators (self):
+        nation = self
+        return [nation.king] + nation.vassals \
+            + sum([[ds.governor] + ds.cavaliers
+                   for ds in self.districts], [])
+
+
+class CalamityInfo (Serializable):
+    def __init__ (self):
+        self.kind = 'calamity'
+        self.generating_class = Calamity
+        self.protection_units_base = 1.0 # 人口千人あたりのユニット数
+        self.training_units_base = 1.0 # 人口千人あたりのユニット数
+        self.protection_max = 0  # 最大レベル
+        self.training_max = 0  # 最大レベル
+        self.protection_construct_coeff = 1.0  # 建設時の二次関数の係数
+        self.training_construct_coeff = 1.0  # 建設時の二次関数の係数
+        self.protection_decay_unit = 0.05   # ユニットの一期の経年劣化
+        self.training_decay_unit = 0.05 # ユニットの一期の経年劣化
+        self.protection_decay_coeff = 1.0  # 経年劣化時の二次関数の係数
+        self.training_decay_coeff = 1.0  # 経年劣化時の二次関数の係数
+        self.damage_max_level = 6 # 災害を make するときの基準１
+        self.damage_unit = 30     # 災害を make するときの基準２
+        self.protected_damage_rate = 1/3 # 災害を make するときの基準３
+
+    def make_some (self, economy):
+        pass
+
+    def protection_decay (self, x):
+        ci = self
+        mag = 1.0
+        if x > ci.protection_max - 1:
+            mag = 3.0
+        exp = ci.protection_decay_coeff * (x ** 2)
+        exp -= ci.protection_decay_unit * mag
+        if exp < 0:
+            exp = 0
+        return math.sqrt(exp / ci.protection_decay_coeff)
+
+    def training_decay (self, x):
+        ci = self
+        mag = 1.0
+        if x > ci.training_max - 1:
+            mag = 3.0
+        exp = ci.training_decay_coeff * (x ** 2)
+        exp -= ci.training_decay_unit * mag
+        if exp < 0:
+            exp = 0
+        return math.sqrt(exp / ci.training_decay_coeff)
+
+    def make (self, economy, level, term, dnum, unit_num):
+        ci = self
+        c = ci.generating_class()
+        c.economy = economy
+        c.district = dnum
+        c.unit_num = unit_num
+        c.term = term
+        dist = economy.nation.districts[dnum]
+        max_level = ci.damage_max_level
+        damage_unit = ci.damage_unit
+        drate = ci.protected_damage_rate
+        damage_standard = sum(list(c.damage_coeff.values())) * damage_unit
+        pdamage_standard = sum(list(c.protected_damage_coeff.values())) \
+            * damage_unit
+        for n, v in c.damage_coeff.items():
+            c.damage_coeff[n] = (1 + random.uniform(-0.2, 0.2)) * v
+        for n, v in c.protected_damage_coeff.items():
+            c.protected_damage_coeff[n] = (1 + random.uniform(-0.2, 0.2)) * v
+        c.anti_protection = level
+        if ci.kind == 'invasion':
+            brain = dist.tmp_invasion_brain
+            f = lambda d: d.invasion_prophecy_ability()
+        else:
+            brain = dist.tmp_disaster_brain
+            f = lambda d: d.disaster_prophecy_ability()
+        p = economy.calc_dominator_work(brain, f)
+        c.prophecy_error = pow(2, random.uniform(-p, p))
+
+        c.damage_max = (math.exp(level) - 1) * (damage_standard
+                                                / (math.exp(max_level) - 1))
+        c.damage_min = (math.exp(level - 1) - 1) * (damage_standard
+                                                    / (math.exp(max_level) - 1))
+        c.damage_protected_max = drate * (pdamage_standard / damage_standard) \
+            * (math.exp(level) - 1) * (damage_standard
+                                       / (math.exp(max_level) - 1))
+        c.damage_protected_min = drate * (pdamage_standard / damage_standard)\
+            * (math.exp(level - 2) - 1) * (damage_standard
+                                           / (math.exp(max_level) - 1))
+
+        return c
+
+
+base.calamity_info = {}
+
+class Calamity (SerializableExEconomy):        # 「災害」＝「惨禍」
+    def __init__ (self):
+        self.kind = 'calamity'
+        self.info = None
+        self.economy = None
+        self.district = 0             # 襲う地域の番号
+        self.unit_num = 0             # 襲うユニットの番号
+        self.term = None	      # 襲う期
+        self.dominators = set()       # 担当者の ID
+        self.counter_prophecy = 0     # 予言対応度
+        self.counter_prophecy_coeff = {
+            'faith_realization': 0.0, 'people_trust': 0.0,
+            'disaster_prophecy': 0.0, 'combat_prophecy': 0.0,
+            'disaster_strategy': 0.0, # 'combat_strategy': 0.0,
+            'disaster_tactics': 0.0, 'combat_tactics': 0.0
+        }
+        self.prophecy_error = 1.0 # (対防御レベルと)対訓練レベルの予言の間違い。
+        		          # 倍数。1.0 で間違いがない。
+        self.prophecy_protection = 1.0 # 予言で増やせる防御レベル
+        self.prophecy_training = 1.0   # 予言で増やせる訓練レベル
+        self.anti_protection = 0  # 対防御レベル
+        self.damage_max = 0       # 規模の概要値の最大
+        self.damage_min = 0       # 規模の概要値の最小
+        self.damage_protected_max = 0 # 防御成功時の規模の概要値
+        self.damage_protected_min = 0 # 予言で減らせる
+                                           # 防御成功時の規模の概要値
+
+        self.damage_coeff = {}   # ダメージの計算係数
+        self.protected_damage_coeff = {}   # 防御成功時のダメージの計算係数
+
+
+    def occur (self):
+        c = self
+        print("Occur:", c)
+        economy = self.economy
+        nation = economy.nation
+        dist = nation.districts[c.district]
+        th = np_clip(ARGS.nation_education_power_threshold, 0.5, 1.0)
+        q1 = (0.8 - 1.0) * ((th - 0.5) / (1.0 - 0.5)) + 1.0
+        th = np_clip(ARGS.faith_realization_power_threshold, 0.5, 1.0)
+        q2 = (0.8 - 1.0) * ((th - 0.5) / (1.0 - 0.5)) + 1.0
+        counter_prophecy = c.counter_prophecy * (q1 + q2) / 2
+        protect = dist.protection_units[c.kind][c.unit_num] \
+            + c.prophecy_protection * counter_prophecy
+        if protect > c.info.protection_max:
+            protect = c.info.protection_max
+        if protect > c.anti_protection:
+            damage = c.damage_protected_min \
+                + (c.damage_protected_max - c.damage_protected_min) \
+                * (1 - counter_prophecy)
+            sum_c = sum([k for k in c.protected_damage_coeff.values()])
+            if sum_c > 0:
+                for n, k in c.protected_damage_coeff.items():
+                    getattr(c, 'damage_' + n)(damage * k / sum_c)
+            print("Protected:", damage)
+            return
+
+        len_t = len(dist.training_units[c.kind])
+        len_p = len(dist.protection_units[c.kind])
+        tb = math.floor(c.unit_num * (len_t / len_p))
+        tn = math.ceil(len_t / len_p)
+
+        damage = [0] * tn
+        for i in range(tn):
+            j = tb + i
+            if j > len_t:
+                j = j - len_t
+            training = dist.training_units[c.kind][j] \
+                + c.prophecy_training * counter_prophecy
+            if training > c.info.training_max:
+                training = c.info.training_max
+            damage[i] = c.damage_min + (c.damage_max - c.damage_min) \
+                * (c.info.training_max - training) / c.info.training_max
+
+        damage = sum(damage) / tn
+        sum_c = sum([k for k in c.damage_coeff.values()])
+        if sum_c > 0:
+            for n, k in c.damage_coeff.items():
+                getattr(c, 'damage_' + n)(damage * k / sum_c)
+        print("Damage:", damage)
+
+    def _prophecied_damage (self, counter_prophecy):
+        c = self
+        economy = self.economy
+        nation = economy.nation
+        dist = nation.districts[c.district]
+        th = np_clip(ARGS.nation_education_power_threshold, 0.5, 1.0)
+        q1 = (0.8 - 1.0) * ((th - 0.5) / (1.0 - 0.5)) + 1.0
+        th = np_clip(ARGS.faith_realization_power_threshold, 0.5, 1.0)
+        q2 = (0.8 - 1.0) * ((th - 0.5) / (1.0 - 0.5)) + 1.0
+        counter_prophecy = counter_prophecy * (q1 + q2) / 2
+        protect = dist.protection_units[c.kind][c.unit_num] \
+            + c.prophecy_protection * counter_prophecy
+        if protect > c.info.protection_max:
+            protect = c.info.protection_max
+        if protect > c.anti_protection:
+            damage = c.damage_protected_min \
+                + (c.damage_protected_max - c.damage_protected_min) \
+                * (1 - counter_prophecy)
+            return damage * c.prophecy_error
+        len_t = len(dist.training_units[c.kind])
+        len_p = len(dist.protection_units[c.kind])
+        tb = math.floor(c.unit_num * (len_t / len_p))
+        tn = math.ceil(len_t / len_p)
+
+        damage = [0] * tn
+        for i in range(tn):
+            j = tb + i
+            if j > len_t:
+                j = j - len_t
+            training = dist.training_units[c.kind][j] \
+                + c.prophecy_training * counter_prophecy
+            if training > c.info.training_max:
+                training = c.info.training_max
+            damage[i] = c.damage_min + (c.damage_max - c.damage_min) \
+                * (c.info.training_max - training) / c.info.training_max
+
+        damage = sum(damage) / tn
+        return damage * c.prophecy_error
+        
+    def prophecied_damage (self):
+        return self._prophecied_damage(0.0), self._prophecied_damage(1.0)
+
+    def prophecy_prepare (self, dominator1, challenging=False):
+        c = self
+        d = dominator1
+        economy = self.economy
+        f = lambda x: c.dominator_ability(x)
+        c.dominators.add(d.id)
+
+        p = economy.calc_dominator_work(d, lambda x: c.dominator_ability(x))
+        beta = ARGS.challenging_beta if challenging \
+            else ARGS.not_challenging_beta
+        p *= np.random.beta(beta, beta)
+        c.counter_prophecy = np_clip(c.counter_prophecy + p, 0, 1)
+        print("Counter:", c.counter_prophecy)
+        if not challenging:
+            return
+        k = sum(list(c.counter_prophecy_coeff.values()))
+        for n, v in c.counter_prophecy_coeff.items():
+            setattr(d, n,
+                    np_clip(
+                        getattr(d, n) + (ARGS.challenging_growth * v / k),
+                        0, 1))
+
+    def dominator_ability (self, dominator1):
+        c = self
+        d = dominator1
+        r = 0
+        for n, q in c.counter_prophecy_coeff.items():
+            r += getattr(d, n) * q
+        return r
+
+    def damage_death (self, scale):
+        c = self
+        economy = self.economy
+        dnum = c.district
+        people = []
+        for p in economy.people.values():
+            if p.death is None and p.district == dnum:
+                people.append(p)
+        damage = math.floor(scale * (1000 / 1000) * (len(people) / 10000))
+        if damage > len(people):
+            damage = len(people)
+        people = random.sample(people, damage)
+        economy.die(people)
+
+    def damage_injury (self, scale):
+        pass
+
+    def damage_property (self, scale):
+        c = self
+        economy = self.economy
+        dnum = c.district
+        people = []
+        for p in economy.people.values():
+            if p.death is None and p.district == dnum:
+                people.append(p)
+        damage = math.floor(scale * (4000 / 100) * (len(people) / 10000))
+        if damage > len(people):
+            damage = len(people)
+        people = random.sample(people, damage)
+        for p in people:
+            p.prop *= random.random()
+
+    def damage_crop (self, scale):
+        c = self
+        economy = self.economy
+        dnum = c.district
+        people = []
+        for p in economy.people.values():
+            if p.death is None and p.district == dnum:
+                people.append(p)
+        damage = math.floor(scale * (5000 / 100) * (len(people) / 10000))
+        if damage > len(people):
+            damage = len(people)
+        people = random.sample(people, damage)
+#        for p in people:
+#            if p.land > 0:
+#                p.tmp_land_damage \
+#                    = np_clip(p.tmp_land_damage + random.random(), 0, 1)
+
+    def damage_protection (self, scale):
+        c = self
+        economy = self.economy
+        dnum = c.district
+        damage = scale * (1.5 / 100)
+        dist = economy.nation.districts[dnum]
+        dist.protection_units[c.kind][c.unit_num] -= damage
+        if dist.protection_units[c.kind][c.unit_num] < 0:
+            dist.protection_units[c.kind][c.unit_num] = 0
+
+    def damage_soldier (self, scale):
+        c = self
+        economy = self.economy
+        dnum = c.district
+        people = []
+        dpeople_len = 0
+        l2 = []
+        for p in economy.people.values():
+            if p.death is None and p.age >= 18 and p.age < 50 \
+               and p.sex == 'M':
+                people.append(p)
+                if p.district == dnum:
+                    dpeople_len += 1
+                    l2.append(3.0)
+                else:
+                    l2.append(1.0)
+
+        damage = math.floor(scale * (300 / 450) * (dpeople_len / 10000))
+        if damage > len(people):
+            damage = len(people)
+        l2 = np.array(l2).astype(np.longdouble)
+        l3 = np_random_choice(people, size=damage, replace=False,
+                              p=l2/np.sum(l2))
+        economy.die(l3)
+
+    def damage_rape (self, scale):
+        pass
+
+    def damage_dominator (self, scale):
+        c = self
+        economy = self.economy
+        nation = economy.nation
+        dnum = c.district
+        dist = economy.nation.districts[dnum]
+        r = 0.1 * (1 + len(nation.vassals) + 1)
+        for d in dist.cavaliers:
+            if d.id in c.dominators:
+                r += 2
+            else:
+                r += 1
+        damage = scale * (1.2 / 30) * len(dist.cavaliers) / 10
+        p = damage / r
+        l = []
+        for d in [nation.king, dist.governor] + nation.vassals:
+            if random.random() < 0.1 * p:
+                l.append(d.id)
+        for d in dist.cavaliers:
+            p2 = p
+            if d.id in c.dominators:
+                p2 = 2 * p
+            if random.random() < p2:
+                l.append(d.id)
+        print("Dominator Die:", len(l))
+        economy.die([economy.people[did] for did in l])
+                
+
+class DisasterInfo (CalamityInfo):
+    pass
+
+
+class Disaster (Calamity):        # 天災
+    pass
+
+
+class FloodInfo (DisasterInfo):
+    def __init__ (self):
+        super().__init__()
+        self.kind = 'flood'
+        self.generating_class = Flood
+        self.protection_units_base = 1.0 # 人口千人あたりのユニット数
+        self.training_units_base = 0.2 # 人口千人あたりのユニット数
+        self.protection_max = 6  # 最大レベル
+        self.training_max = 3  # 最大レベル
+
+        self.damage_max_level = 7
+        self.damage_unit = 100
+        self.protected_damage_rate = 1/3
+
+    def make_some (self, economy):
+        ci = self
+        month_prob = [0.5/30, 0.5/30, 0.5/30, 0.5/30,
+                      0.5/30, 4/30, 3/30, 3/30,
+                      4/30, 4/30, 0.5/30, 0.5/30]
+        prophecy_month = economy.month + 3
+        prob = month_prob[(prophecy_month - 1) % 12]
+        for i in range(30):
+            for dnum in range(len(ARGS.population)):
+                dist = economy.nation.districts[dnum]
+                prob2 = ARGS.population[dnum] / 10000
+                if random.random() < prob * prob2:
+                    level = random.uniform(3.0, 7.0)
+                    unit_num = random.randrange(
+                        len(dist.protection_units[ci.kind]))
+                    c = ci.make(economy, level, economy.term + 3,
+                                dnum, unit_num)
+                    economy.calamities.append(c)
+
+
+class Flood (Disaster):           # 「洪水」＝「水害」
+    def __init__ (self):
+        super().__init__()
+        self.kind = 'flood'
+        self.info = base.calamity_info[self.kind]
+        self.counter_prophecy_coeff = {
+            'faith_realization': 0.05, 'people_trust': 0.10,
+            'disaster_prophecy': 0.25, 'combat_prophecy': 0.0,
+            'disaster_strategy': 0.3, # 'combat_strategy': 0.0,
+            'disaster_tactics': 0.3, 'combat_tactics': 0.0
+        }
+        self.prophecy_protection = 1.5
+        self.prophecy_training = 1.0
+
+        self.damage_coeff = {
+            'death': 10.0,
+            'injury': 0.1,
+            'property': 1.0,
+            'crop': 1.0,
+            'protection': 1.0
+        }
+        self.protected_damage_coeff = {
+            'protection': 1.0
+        }
+
+info = FloodInfo()
+base.calamity_info[info.kind] = info
+
+
+class InvasionInfo (CalamityInfo):
+    def __init__ (self):
+        super().__init__()
+        self.kind = 'invasion'
+        self.generating_class = Invasion
+        self.protection_units_base = 0.5 # 人口千人あたりのユニット数
+        self.training_units_base = 0.5 # 人口千人あたりのユニット数
+        self.protection_max = 4  # 最大レベル
+        self.training_max = 4  # 最大レベル
+
+        self.damage_max_level = 6
+        self.damage_unit = 30
+        self.protected_damage_rate = 1/3
+
+    def make_some (self, economy):
+        ci = self
+        if [c for c in economy.calamities if c.kind == 'invasion']:
+            return
+        if not (random.random() < 1 / (5 * 12)):
+            return
+        terms = random.uniform(1, 2 * 12)
+        dnum = random.randrange(len(ARGS.population))
+        dist = economy.nation.districts[dnum]
+        i = 0
+        while i <= terms:
+            level = random.uniform(3.5, 6.0)
+            unit_num = random.randrange(
+                len(dist.protection_units[ci.kind]))
+            c = ci.make(economy, level, economy.term + 3 + i,
+                        dnum, unit_num)
+            economy.calamities.append(c)
+            c.terms = terms
+            c.raid = int(i / 3)
+            i = i + 3
+
+
+class Invasion (Calamity):        # 蛮族の侵入
+    def __init__ (self):
+        super().__init__()
+        self.kind = 'invasion'
+        self.info = base.calamity_info[self.kind]
+        self.counter_prophecy_coeff = {
+            'faith_realization': 0.10, 'people_trust': 0.10,
+            'disaster_prophecy': 0.0, 'combat_prophecy': 0.25,
+            'disaster_strategy': 0.30, # 'combat_strategy': 0.0,
+            'disaster_tactics': 0.0, 'combat_tactics': 0.25
+        }
+
+        self.prophecy_protection = 1.0
+        self.prophecy_training = 1.5
+
+        self.damage_coeff = {
+            'soldier': 7.5,
+            'dominator': 1.0,
+            'death': 5.0,
+            'injury': 2.0,
+            'property': 1.0,
+            'rape': 1.0,
+            'protection': 1.0
+        }
+        self.protected_damage_coeff = {
+            'soldier': 7.5,
+            'protection': 1.0
+        }
+
+        self.terms = 0
+        self.raid = 0
+
+info = InvasionInfo()
+base.calamity_info[info.kind] = info
+
+
+class Economy0 (Frozen):
+    def __init__ (self):
+        self.term = 0
+        self.year = 0
+        self.month = 12
+        self.people = OrderedDict()
+        self.id_generator = IDGenerator()
+        self.tombs = OrderedDict()
+
+        self.nation = None
+        self.calamities = []
+
+        self.want_child_mag = 1.0
+        self.prev_birth = ARGS.min_birth
+
+        self.cur_forfeit_prop = 0
+        self.cur_forfeit_land = 0
+
+
+class EconomyBT (Economy0):
+    def give_birth (self, district=0):
+        economy = self
+
+        p = base.Person()
+        p.economy = economy
+        p.district = district
+        p.sex = ['M', 'F'][random.randint(0, 1)]
+        p.id = economy.id_generator.generate(str(p.district) + p.sex)
+        economy.people[p.id] = p
+        p.age = 0
+        p.birth_term = economy.term
+        p.prop = half_normal_rand(0, ARGS.init_prop_sigma)
+        x = random.random()
+        if x < ARGS.peasant_ratio:
+            if ARGS.no_land:
+                p.land = 0
+            else:
+                p.land = negative_binominal_rand(ARGS.land_r,
+                                                     ARGS.land_theta) + 1
+        p.consumption = p.land * ARGS.prop_value_of_land * 0.025 \
+            + p.prop * 0.05
+        p.ambition = random.random()
+        p.education = random.random()
+        p.adult_success = np.random.geometric(0.5) - 1
+        p.want_child_base = random.uniform(2, 12)
+        p.cum_donation = 0
+        p.fertility = math.sqrt(random.random())
+        if p.fertility < 0.1:
+            p.fertility = 0
+
+        p.biological_mother = ''
+        p.biological_father = ''
+        p.mother = ''
+        p.father = ''
+        p.supporting = []
+        p.supported = None
+        p.initial_father = p.father
+        p.initial_mother = p.mother
+        economy.people[p.id] = p
+
+
+class EconomyDT (Economy0):
+    def is_living (self, id_or_person):
+        s = id_or_person
+        if type(id_or_person) is not str:
+            s = id_or_person.id
+        return s in self.people and self.people[s].death is None
+
+    def get_person (self, id1):
+        economy = self
+        if id1 in economy.people:
+            return economy.people[id1]
+        elif id1 in economy.tombs:
+            return economy.tombs[id1].person
+        return None
+
+    def die (self, persons):
+        economy = self
+        if isinstance(persons, base.Person):
+            persons = [persons]
+        for p in persons:
+            assert p.death is None
+            dt = Death()
+            dt.term = economy.term
+            p.death = dt
+            tomb = Tomb()
+            tomb.death_term = economy.term
+            tomb.person = p
+            economy.tombs[p.id] = tomb
+
+        pp = []
+        for p in economy.people.values():
+            if p.death is None and p.age >= 18 and p.age <= 50:
+                pp.append(p)
+
+        for p in persons:
+            if p.dominator_position is None:
+                continue
+            pos = p.dominator_position
+            q = None
+            while q is None:
+                q = random.choice(pp)
+                if q.dominator_position is not None \
+                   or q.district != p.district:
+                    q = None
+            economy.delete_dominator(p)
+            economy.new_dominator(pos, q)
+
+        for p in persons:
+            spouse = None
+            if p.marriage is not None \
+               and (p.marriage.spouse is ''
+                    or economy.is_living(p.marriage.spouse)):
+                spouse = p.marriage.spouse
+                                           
+            if p.marriage is not None:
+                p.die_relation(p.marriage)
+            for a in p.adulteries:
+                p.die_relation(a)
+
+            # father mother は死んでも情報の更新はないが、child は欲し
+            # い子供の数に影響するため、更新が必要。
+            if p.father is not '' and economy.is_living(p.father):
+                economy.people[p.father].die_child(p.id)
+            if p.mother is not '' and economy.is_living(p.mother):
+                economy.people[p.mother].die_child(p.id)
+
+            fst_heir = None
+            if p.supporting:
+                if p.supported is not None \
+                   and economy.is_living(p.supported):
+                    p.die_supporting(p.supported)
+                elif fst_heir is None or p.death.inheritance_share is None:
+                    p.die_supporting(None)
+                else:
+                    p.die_supporting(fst_heir)
+                p.supporting = []
+
+            if p.supported:
+                p.die_supported()
+                p.supported = None
+
+            p.supported = fst_heir
+
+
+class EconomyDM (Economy0):
+    def new_person (self, district_num, male_rate=0.5,
+                    age_min=18, age_max=50):
+        economy = self
+        p = Person()
+        p.economy = economy
+        p.sex = 'M' if random.random() < male_rate else 'F'
+        p.district = district_num
+        p.id = economy.id_generator.generate(str(p.district) + p.sex)
+        economy.people[p.id] = p
+
+        p.age = random.uniform(age_min, age_max)
+        p.birth_term = economy.term - int(p.age * 12)
+
+        if ARGS.init_zero:
+            p.prop = 0
+        else:
+            p.prop = half_normal_rand(0, ARGS.init_prop_sigma)
+        x = random.random()
+        if x < ARGS.peasant_ratio:
+            if ARGS.no_land:
+                p.land = 0
+            else:
+                p.land = negative_binominal_rand(ARGS.land_r,
+                                                 ARGS.land_theta) + 1
+        p.consumption = p.land * ARGS.prop_value_of_land * 0.025 \
+            + p.prop * 0.05
+        p.ambition = random.random()
+        p.education = random.random()
+        p.adult_success = np.random.geometric(0.5) - 1
+        p.want_child_base = random.uniform(2, 12)
+        p.cum_donation = (p.prop + p.land * ARGS.prop_value_of_land) \
+            * random.random() * p.age
+        if p.age < 40:
+            p.fertility = math.sqrt(random.random())
+        else:
+            p.fertility = random.random()
+        if p.fertility < 0.1:
+            p.fertility = 0
+        return p
+
+
+    def new_dominator (self, position, person):
+        economy = self
+        d = Dominator()
+        p = person
+        d.id = p.id
+        d.economy = economy
+        d.district = p.district
+        d.position = position
+        p.dominator_position = position
+        d.people_trust = random.random()
+        d.faith_realization = random.random()
+        d.disaster_prophecy = random.random()
+        d.disaster_strategy = random.random()
+        d.disaster_tactics = random.random()
+        d.combat_prophecy = random.random()
+        #d.combat_strategy = random.random()
+        d.combat_tactics = random.random()
+        if position == 'king':
+            economy.nation.king = d
+        elif position == 'governor':
+            economy.nation.districts[p.district].governor = d
+        elif position == 'vassal':
+            economy.nation.vassals.append(d)
+        elif position == 'cavalier':
+            economy.nation.districts[p.district].cavaliers.append(d)
+
+        return d
+
+    def delete_dominator (self, person):
+        economy = self
+        p = person
+        position = p.dominator_position
+        if position is None:
+            return
+        if position == 'king':
+            economy.nation.king = None
+        elif position == 'governor':
+            economy.nation.districts[p.district].governor = None
+        elif position == 'vassal':
+            economy.nation.vassals = [d for d in economy.nation.vassals
+                                      if d.id != p.id]
+        elif position == 'cavalier':
+            economy.nation.districts[p.district].cavaliers \
+                = [d for d in economy.nation.districts[p.district].cavaliers
+                   if d.id != p.id]
+        p.dominator_position = None
+
+    def calc_dominator_work (self, dominator1, work_func):
+        economy = self
+        d = dominator1
+        nation = economy.nation
+        dist = nation.districts[d.district]
+        f = work_func
+
+        a_king = f(nation.king)
+        vab = [f(d) for d in nation.vassals]
+        vht = np.mean([d.hating_to_king for d in nation.vassals])
+        a_vassals = (0.5 + 0.5 * (1 - vht)) \
+            * ((1/3) * max(vab) + (2/3) * np.mean(vab))
+        a_governor = (0.75 + 0.25 * (1 - dist.governor.hating_to_king)) \
+            * f(dist.governor)
+        a_cavalier = f(d)
+        r_king = 0.5 + 0.5 * (1 - d.hating_to_king)
+        r_vassals = 3
+        r_governor = 0.5 + 0.5 * (1 - d.hating_to_governor)
+        r_cavalier = 5
+        p = (r_king * a_king + r_vassals * a_vassals \
+            + r_governor * a_governor + r_cavalier * a_cavalier) \
+            / (r_king + r_vassals + r_governor + r_cavalier)
+        p *= 0.75 + 0.25 \
+            * (1 - max([d.hating_to_king, d.hating_to_governor]))
+        p *= dist.tmp_power
+
+        return p
+
+
+class Economy (EconomyBT, EconomyDT, EconomyDM):
+    pass
+
+
+class EconomyPlot0 (Frozen):
+    def __init__ (self):
+	#plt.style.use('bmh')
+        fig = plt.figure(figsize=(6, 4))
+        #plt.tight_layout()
+        self.ax1 = fig.add_subplot(2, 2, 1)
+        self.ax2 = fig.add_subplot(2, 2, 2)
+        self.ax3 = fig.add_subplot(2, 2, 3)
+        self.ax4 = fig.add_subplot(2, 2, 4)
+        self.options = {}
+
+    def plot (self, economy):
+        ax = self.ax1
+        ax.clear()
+        view = ARGS.view_1
+        if view is not None and view != 'none':
+            t, f = self.options[view]
+            ax.set_title('%s: %s' % (term_to_year_month(economy.term), t))
+            f(ax, economy)
+
+        ax = self.ax2
+        ax.clear()
+        view = ARGS.view_2
+        if view is not None and view != 'none':
+            t, f = self.options[view]
+            ax.set_title(t)
+            f(ax, economy)
+
+        ax = self.ax3
+        ax.clear()
+        view = ARGS.view_3
+        if view is not None and view != 'none':
+            t, f = self.options[view]
+            ax.set_xlabel(t)
+            f(ax, economy)
+
+        ax = self.ax4
+        ax.clear()
+        view = ARGS.view_4
+        if view is not None and view != 'none':
+            t, f = self.options[view]
+            ax.set_xlabel(t)
+            f(ax, economy)
+
+
+class EconomyPlotEC (EconomyPlot0):
+    def __init__ (self):
+        super().__init__()
+        self.options.update({
+            'asset': ('Asset', self.view_asset),
+            'prop': ('Prop', self.view_prop),
+            'land': ('Land', self.view_land),
+            'land-vs-prop': ('Land vs Prop', self.view_land_vs_prop),
+        })
+
+    def view_asset (self, ax, economy):
+        ax.hist(list(map(lambda x: x.asset_value(),
+                         economy.people.values())), bins=ARGS.bins)
+        
+    def view_prop (self, ax, economy):
+        ax.hist(list(map(lambda x: x.prop,
+                         economy.people.values())), bins=ARGS.bins)
+
+    def view_land (self, ax, economy):
+        ax.hist(list(map(lambda x: x.land,
+                         economy.people.values())), bins=ARGS.bins)
+
+    def view_land_vs_prop (self, ax, economy):
+        ax.scatter(list(map(lambda x: x.land, economy.people.values())),
+                   list(map(lambda x: x.prop, economy.people.values())),
+                   c="pink", alpha=0.5)
+
+
+class EconomyPlotBT (EconomyPlot0):
+    def __init__ (self):
+        super().__init__()
+        self.options.update({
+            'population': ('Population', self.view_population),
+            'children': ('Children', self.view_children),
+            'children_wanting': ('Ch Want', self.view_children_wanting),
+            'male-fertility': ('M Fertility', self.view_male_fertility),
+            'female-fertility': ('F Fertility', self.view_female_fertility)
+        })
+
+    def view_population (self, ax, economy):
+        ax.hist([x.age for x in economy.people.values() if x.death is None],
+                bins=ARGS.bins)
+        mb = 0
+        md = 0
+        dp = [0] * len(ARGS.population)
+        for p in economy.people.values():
+            if p.death is not None and p.death.term == economy.term:
+                md += 1
+            if p.birth_term == economy.term:
+                mb += 1
+            if p.death is None:
+                dp[p.district] += 1
+        print("New Birth:", mb, "New Death:", md,
+              "WantChildMag:", economy.want_child_mag)
+        print("District Population:", dp)
+
+    def view_children (self, ax, economy):
+        x = []
+        y = []
+        for p in economy.people.values():
+            if p.age < 12 or p.death is not None:
+                continue
+            x.append(p.age)
+            y.append(len(p.children))
+        ax.scatter(x, y, c="pink", alpha=0.5)
+
+    def view_children_wanting (self, ax, economy):
+        x = []
+        y = []
+        for p in economy.people.values():
+            if p.age < 12 or p.death is not None:
+                continue
+            x.append(p.age)
+            y.append(p.children_wanting())
+        ax.hist(y, bins=ARGS.bins)
+        #ax.scatter(x, y, c="pink", alpha=0.5)
+
+    def view_male_fertility (self, ax, economy):
+        l = [x.fertility for x in economy.people.values()
+             if x.sex == 'M' and x.death is None]
+        n0 = len([True for x in l if x == 0])
+        l2 = [x for x in l if x != 0]
+        ax.hist(l2, bins=ARGS.bins)
+        print("Fertility 0:", n0, "/", len(l), "Other Mean:", np.mean(l2))
+
+    def view_female_fertility (self, ax, economy):
+        l = [x.fertility for x in economy.people.values()
+             if x.sex == 'F' and x.death is None]
+        n0 = len([True for x in l if x == 0])
+        l2 = [x for x in l if x != 0]
+        ax.hist(l2, bins=ARGS.bins)
+        print("Fertility 0:", n0, "/", len(l), "Other Mean:", np.mean(l2))
+
+
+class EconomyPlotAD (EconomyPlot0):
+    def __init__ (self):
+        super().__init__()
+        self.options.update({
+            'adulteries': ('Adulteries', self.view_adulteries),
+            'adultery-separability':
+            ('Ad Separability', self.view_adultery_separability),
+            'adultery-age-vs-years':
+            ('Adultery age vs years', self.view_adultery_age_vs_years)
+        })
+
+    def view_adultery_age_vs_years (self, ax, economy):
+        m1 = []
+        m2 = []
+        for p in economy.people.values():
+            for a in p.adulteries:
+                m1.append(p.age - ((economy.term
+                                    - (a.true_begin or a.begin)) / 12))
+                m2.append((economy.term - (a.true_begin or a.begin)) / 12)
+        ax.scatter(m1, m2, c="pink", alpha=0.5)
+
+    def view_adulteries (self, ax, economy):
+        m = []
+        f = []
+        for p in economy.people.values():
+            if p.adulteries:
+                m.append(len(p.adulteries))
+                if p.sex == 'F':
+                    f.append(len(p.adulteries))
+        ax.hist(m, bins=ARGS.bins)
+        print("Adulteries: %d %d" % (len(m), sum(m)))
+        #print("Female Adulteries: %d %d" % (len(f), sum(f)))
+        
+    def view_adultery_separability (self, ax, economy):
+        x = []
+        l = []
+        for p in economy.people.values():
+            for a in p.adulteries:
+                x.append((economy.term - (a.true_begin or a.begin)) / 12)
+                l.append(p.adultery_separability(a))
+        ax.scatter(x, l, c="pink", alpha=0.5)
+
+
+class EconomyPlotMA (EconomyPlot0):
+    def __init__ (self):
+        super().__init__()
+        self.options.update({
+            'pregnancy': ('Pregnancy', self.view_pregnancy),
+            'married': ('Married', self.view_married),
+            'marriage-separability':
+            ('Ma Separability', self.view_marriage_separability),
+            'marriage-age-vs-years':
+            ('Marriage age vs years', self.view_marriage_age_vs_years)
+        })
+
+    def view_pregnancy (self, ax, economy):
+        m = []
+        mm = 0
+        ma = 0
+        m0 = 0
+        m0a = 0
+        m0m = 0
+        m10 = 0
+        for p in economy.people.values():
+            if p.pregnancy is not None \
+               and economy.term - p.pregnancy.begin <= 10:
+                terms = economy.term - p.pregnancy.begin
+                m.append(terms)
+                if isinstance(p.pregnancy.relation, Marriage):
+                    mm += 1
+                    if terms == 0:
+                        m0m += 1
+                elif isinstance(p.pregnancy.relation, Adultery):
+                    ma += 1
+                    if terms == 0:
+                        m0a += 1
+                if terms == 0:
+                    m0 += 1
+                elif terms == 10:
+                    m10 += 1
+        ax.hist(m, bins=ARGS.bins)
+        print("Pregnancy:", len(m), "0mon:", m0, "10mon:", m10)
+        print("Pregnancy Marriage:", mm, "0mon:", m0m)
+        print("Pregnancy Adultery:", ma, "0mon:", m0a)
+
+    def view_married (self, ax, economy):
+        m = []
+        m2 = []
+        for p in economy.people.values():
+            if p.death is None and p.marriage is not None:
+                x = p.marriage
+                m.append(p.age - ((economy.term - x.begin) / 12))
+                m2.append(p.age)
+        ax.hist(m, bins=ARGS.bins, alpha=0.6)
+        ax.hist(m2, bins=ARGS.bins, alpha=0.6)
+        print("Marriages:", len(m))
+
+    def view_marriage_age_vs_years (self, ax, economy):
+        m1 = []
+        m2 = []
+        for p in economy.people.values():
+            if p.marriage is not None:
+                a = p.marriage
+                m1.append(p.age - ((economy.term
+                                    - (a.true_begin or a.begin)) / 12))
+                m2.append((economy.term - (a.true_begin or a.begin)) / 12)
+        ax.scatter(m1, m2, c="pink", alpha=0.5)
+
+    def view_marriage_separability (self, ax, economy):
+        x = []
+        l = []
+        for p in economy.people.values():
+            if p.marriage is not None:
+                a = p.marriage
+                x.append((economy.term - (a.true_begin or a.begin)) / 12)
+                l.append(p.adultery_separability(a))
+        ax.scatter(x, l, c="pink", alpha=0.5)
+
+
+class EconomyPlot (EconomyPlotEC, EconomyPlotBT,
+                   EconomyPlotAD, EconomyPlotMA):
+    pass
+
+
+def np_clip (x, a, b): # faster than np.clip
+    if x < a:
+        return a
+    elif x > b:
+        return b
+    else:
+        return x
+
+def np_random_choice (a, size=None, replace=True, p=None):
+    if not a and size == 0:
+        return []
+    return np.random.choice(a, size, replace=replace, p=p)
+    # assert replace is False
+    # if not a and size == 0:
+    #     return []
+    # #p2 = p * np.random.uniform(size=len(p))
+    # p2 = p + ((np.max(p) - np.min(p)) / 2) * np.random.normal(size=len(p))
+    # l = sorted(list(zip(a, p2)), key=lambda x: x[1], reverse=True)[0:size]
+    # return [x for x, q in l]
+
+def half_normal_rand (mu, sigma, size=None): # 半正規分布
+    z = np.random.normal(0, sigma, size=size)
+    return mu + np.abs(z)
+
+def negative_binominal_rand (r, theta, size=None): # 負の二項分布
+    y = np.random.gamma(r, 1/theta - 1, size=size)
+    return np.random.poisson(y, size=size)
+
+def right_triangular_rand (a, b, size=None):
+    u1 = np.random.uniform(0, 1, size=size)
+    u2 = np.random.uniform(0, 1, size=size)
+    y = np.where(u1 > u2, u1, u2)
+    return a + (b - a) * y
+
+def adultery_term_rand (has_child):
+    q = 0.12328761242990718
+    if has_child:
+        q = 0.5 * q
+    for t in range(1200):
+        if t == 0:
+            if random.random() < 0.5:
+                return (t + 1) / 12
+        else:
+            if random.random() < q:
+                return (t + 1) / 12
+    return 100
+
+def term_to_year_month (term):
+    return "%d-%02d" % (math.floor((term - 1) / 12) + 1,
+                        (term - 1) % 12 + 1)
+
+
+
+
+def initialize_nation (economy):
+    global K, Q, G, H, A, B, C
+    
+    economy.nation = Nation()
+    nation = economy.nation
+    for d_num in range(len(ARGS.population)):
+        district = District()
+        nation.districts.append(district)
+        # district.disaster_stock = random.random()
+        # district.disaster_handling = random.random()
+        # district.combat_stock = random.random()
+        # district.combat_handling = random.random()
+    p = economy.new_person(0, 3/4)
+    d = economy.new_dominator('king', p)
+    for i in range(10):
+        p = economy.new_person(0, 3/4)
+        d = economy.new_dominator('vassal', p)
+    for d_num in range(len(ARGS.population)):
+        p = economy.new_person(d_num, 3/4)
+        d = economy.new_dominator('governor', p)
+        for i in range(math.ceil(ARGS.population[d_num] / 1000)):
+            p = economy.new_person(d_num, 3/4)
+            d = economy.new_dominator('cavalier', p)
+
+    K = economy.people[nation.king.id]
+    Q = economy.new_person(0, 0)
+    G = economy.people[nation.districts[0].governor.id]
+    H = economy.new_person(0, 1)
+    A = economy.people[nation.vassals[0].id]
+    B = economy.people[nation.districts[0].cavaliers[0].id]
+    C = economy.people[nation.districts[0].cavaliers[1].id]
+    K.marriage = Marriage()
+    K.marriage.spouse = Q.id
+    Q.marriage = Marriage()
+    Q.marriage.spouse = K.id
+    ch = Child()
+    ch.id = A.id
+    A.father = K.id
+    A.mother = Q.id
+    K.children.append(ch)
+    Q.children.append(ch)
+    ch = Child()
+    ch.id = B.id
+    B.mother = Q.id
+    Q.children.append(ch)
+    ch = Child()
+    ch.id = C.id
+    C.father = K.id
+    K.children.append(ch)
+    ch = Child()
+    ch.id = Q.id
+    Q.father = H.id
+    H.children.append(ch)
+    ch = Child()
+    ch.id = G.id
+    G.father = H.id
+    H.children.append(ch)
+
+    #A.hating[G.id] = 0.5
+    B.hating[K.id] = 0.5
+    C.hating[G.id] = 0.3
+
+    for d in nation.dominators():
+        d.update_hating()
+
+
+    nation.tmp_budget = ARGS.initial_budget_per_person \
+        * sum(ARGS.population)
+    for dnum in range(len(ARGS.population)):
+        nation.districts[dnum].tmp_budget = ARGS.initial_budget_per_person \
+            * ARGS.population[dnum]
+
+    for cn, ci in base.calamity_info.items():
+        for dnum in range(len(ARGS.population)):
+            dist = nation.districts[dnum]
+            units = math.ceil(ci.protection_units_base
+                              * (ARGS.population[dnum] / 1000))
+            dist.protection_units[cn] = [ci.protection_max - 1] * units
+            units = math.ceil(ci.training_units_base
+                              * (ARGS.population[dnum] / 1000))
+            dist.training_units[cn] = [ci.training_max - 1] * units
+
+
+def initialize (economy):
+    initialize_nation(economy)
+
+    pp = [0] * len(ARGS.population)
+    for p in economy.people.values():
+        if p.death is None:
+            pp[p.district] += 1
+
+    people = []
+    for district in range(len(ARGS.population)):
+        for i in range(ARGS.population[district] - pp[district]):
+            p = base.Person()
+            p.economy = economy
+            p.district = district
+            p.sex = ['M', 'F'][random.randint(0, 1)]
+            p.id = economy.id_generator.generate(str(p.district) + p.sex)
+            p.age = random.uniform(0, ARGS.init_max_age)
+            p.birth_term = - int(p.age * 12)
+            if ARGS.init_zero:
+                p.prop = 0
+            else:
+                p.prop = half_normal_rand(0, ARGS.init_prop_sigma)
+            x = random.random()
+            if x < ARGS.peasant_ratio:
+                if ARGS.no_land:
+                    p.land = 0
+                else:
+                    p.land = negative_binominal_rand(ARGS.land_r,
+                                                     ARGS.land_theta) + 1
+            p.consumption = p.land * ARGS.prop_value_of_land * 0.025 \
+                + p.prop * 0.05
+            p.ambition = random.random()
+            p.education = random.random()
+            p.adult_success = np.random.geometric(0.5) - 1
+            p.want_child_base = random.uniform(2, 12)
+            p.cum_donation = (p.prop + p.land * ARGS.prop_value_of_land) \
+                * random.random() * p.age
+            if p.age < 40:
+                p.fertility = math.sqrt(random.random())
+            else:
+                p.fertility = random.random()
+            if p.fertility < 0.1:
+                p.fertility = 0
+            
+            people.append((p.id, p))
+    economy.people.update(people)
+
+    l = sorted(economy.people.values(), key=lambda p: p.asset_value(),
+               reverse=True)
+    s = len(l)
+    for i in range(len(l)):
+        l[i].tmp_asset_rank = (s - i) / s
+
+
+def update_birth (economy):
+    print("\nBirth:...", flush=True)
+
+    pp = [0] * len(ARGS.population)
+    for p in economy.people.values():
+        if p.death is not None:
+            continue
+        pp[p.district] += 1
+    for district in range(len(ARGS.population)):
+        n = math.ceil(pp[district] * ARGS.birth_rate)
+        if n + pp[district] >= ARGS.population[district]:
+            n = ARGS.population[district] - pp[district]
+            if n < 0:
+                n = 0
+        for i in range(n):
+            economy.give_birth(district=district)
+
+
+def update_death (economy):
+    print("\nDeath:...", flush=True)
+
+    l = []
+    for p in economy.people.values():
+        if p.death is None:
+            if random.random() < ARGS.general_death_rate:
+                l.append(p)
+            else:
+                if p.age > 110:
+                    l.append(p)
+                elif p.age > 80 and p.age <= 100:
+                    if random.random() < ARGS.a80_death_rate:
+                        l.append(p)
+                elif p.age > 60 and p.age <= 80:
+                    if random.random() < ARGS.a60_death_rate:
+                        l.append(p)
+                elif p.age >= 0 and p.age <= 3:
+                    if random.random() < ARGS.infant_death_rate:
+                        l.append(p)
+    economy.die(l)
+
+
+def reduce_tombs (economy):
+    n_t = 0
+    l = [t for t in economy.tombs.values()
+         if (economy.term - t.death_term) > 30 * 12]
+
+    r = len(economy.tombs) - sum(ARGS.population)
+    if r >= len(l):
+        n_t = len(l)
+        for t in l:
+            t.person.economy = None
+            del economy.tombs[t.person.id]
+    elif r > 0:
+        l = sorted(l,
+                   key=(lambda t: t.person.cum_donation *
+                        (0.98 ** (economy.term - t.death_term))))[0:r]
+        n_t = len(l)
+        for t in l:
+            t.person.economy = None
+            del economy.tombs[t.person.id]
+    print("Reduce Tombs:", n_t, flush=True)
+
+
+def update_tombs (economy):
+    print("\nTombs:...", flush=True)
+
+    reduce_tombs(economy)
+
+
+def make_support_consistent (economy):
+    for p in economy.people.values():
+        if p.supporting and p.supported is not None:
+            s = p.supported
+            check = set([s])
+            while s is not '':
+                assert economy.is_living(s)
+                s1 = economy.people[s].supported
+                if s1 is None:
+                    break
+                if s1 in check:
+                    raise ValueError("A supporting tree loops.")
+                check.add(s1)
+                s = s1
+            supported = s
+            ns = None
+            if s is not '':
+                ns = economy.people[s]
+            for id1 in p.supporting:
+                if id1 is not '':
+                    # if id1 not in economy.people:
+                    #     print("id1", id1)
+                    #     print(economy.tombs[id1])
+                    assert id1 in economy.people
+                    p1 = economy.people[id1]
+                    p1.supported = supported
+                    if ns is not None:
+                        p1.change_district(ns.district)
+                        ns.supporting.append(id1)
+            p.supporting = []
+
+    supportings = OrderedDict()
+    for p in economy.people.values():
+        if p.supported not in supportings:
+            supportings[p.supported] = []
+        supportings[p.supported].append(p.id)
+
+    for p in economy.people.values():
+        if p.supporting:
+            if not [True for x in p.supporting if x is not '']:
+                continue
+            if p.id not in supportings:
+                # print("p.id", p.id)
+                # for q in economy.people.values():
+                #     if q.supported == p.id:
+                #         print(q)
+                raise ValueError("A supporting tree is inconsistent.")
+            l1 = supportings[p.id]
+            l2 = p.supporting
+            for x in l2:
+                if x is not '':
+                    try:
+                        l1.remove(x)
+                    except:
+                        raise ValueError("A supporting tree is inconsistent.")
+
+
+def update_support (economy):
+    print("\nSupport:...", flush=True)
+
+    make_support_consistent(economy)
+
+
+def update_economy (economy):
+    print("\nEconomy:...", flush=True)
+
+    budget = [0] * len(ARGS.population)
+
+    for p in economy.people.values():
+        if p.death is None:
+            p.land += round(random.gauss(0, 1))
+            p.land = np_clip(p.land, 0, 50)
+            p.prop += random.gauss(0, p.prop * 0.1)
+            if p.land > 0:
+                if p.land * ARGS.prop_value_of_land < - p.prop:
+                    p.prop = 0
+                    p.land = 0
+            else:
+                if p.prop < 0:
+                    p.prop = 0
+            p.consumption = p.land * ARGS.prop_value_of_land * 0.025 \
+                + p.prop * 0.05
+            dom = (p.prop + p.land * ARGS.prop_value_of_land) * 0.05
+            p.cum_donation += dom
+            budget[p.district] += dom
+
+    budget = [b / ARGS.economy_period for b in budget]
+    print("Budget:", budget)
+
+    for dist in range(len(ARGS.population)):
+        d = economy.nation.districts[dist]
+        d.prev_budget.append(d.tmp_budget)
+        if len(d.prev_budget) > 10:
+            d.prev_budget = d.prev_budget[-10:]
+        d.tmp_budget = budget[dist]
+    n = economy.nation
+    n.prev_budget.append(n.tmp_budget)
+    if len(n.prev_budget) > 10:
+        n.prev_budget = n.prev_budget[-10:]
+    n.tmp_budget = sum(budget)
+    
+
+def update_education (economy):
+    print("\nEducation:...", flush=True)
+
+    for p in economy.people.values():
+        if p.death is None:
+            p.education += random.gauss(0, 0.1)
+            p.education = np_clip(p.education, 0, 1)
+
+
+def calc_nation_parameters (economy):
+    nation = economy.nation
+    pp = [0] * len(ARGS.population)
+    pp2 = [0] * len(ARGS.population)
+    edu = [0] * len(ARGS.population)
+    ph = [0] * len(ARGS.population)
+    for p in economy.people.values():
+        if p.death is not None:
+            continue
+        pp[p.district] += 1
+        if p.age < 18:
+            continue
+        pp2[p.district] += 1
+        edu[p.district] += p.education
+        ph[p.district] += p.political_hating
+
+    nation.tmp_population = sum(pp)
+    pow1n = 1 - (abs(sum(ARGS.population) - sum(pp))
+                 / sum(ARGS.population))
+    if nation.prev_budget:
+        pbm = np.mean(nation.prev_budget)
+    else:
+        pbm = ARGS.initial_budget_per_person * sum(pp)
+    pow2n = nation.tmp_budget / pbm
+    if pow2n > 1.0:
+        pow2n = 1.0
+        
+    for dnum in range(len(ARGS.population)):
+        dist = nation.districts[dnum]
+        dist.tmp_disaster_brain \
+            = max(dist.cavaliers, 
+                  key=lambda d: d.disaster_prophecy_ability())
+        dist.tmp_invasion_brain \
+            = max(dist.cavaliers, 
+                  key=lambda d: d.invasion_prophecy_ability())
+        dist.tmp_education = edu[dnum] / pp2[dnum]
+        dist.tmp_fidelity = 1.0 - (ph[dnum] / pp2[dnum])
+        dist.tmp_population = pp[dnum]
+        
+        pow1 = 1 - (abs(ARGS.population[dnum] - pp[dnum])
+                    / ARGS.population[dnum])
+        pow1 = (pow1 + pow1n) / 2
+        if dist.prev_budget:
+            pbm = np.mean(dist.prev_budget)
+        else:
+            pbm = ARGS.initial_budget_per_person * pp[dnum]
+        pow2 = dist.tmp_budget / pbm
+        if pow2 > 1.0:
+            pow2 = 1.0
+        pow2 = (pow2 + pow2n) / 2
+        pow3 = dist.tmp_fidelity
+        ed = dist.tmp_education
+        if ed > ARGS.nation_education_power_threshold:
+            ed = ARGS.nation_education_power_threshold
+        if ed < 0.5:
+            pow4 = 0.8 * (ed / 0.5)
+        else:
+            pow4 = 0.8 + ((ed - 0.5) / 0.5)
+        dist.tmp_power = (pow1 + pow2 + pow3 + pow4) / 4
+
+    print("National Power:", [dist.tmp_power for dist in nation.districts])
+
+
+def occur_calamities (economy):
+    l = [c for c in economy.calamities if c.term == economy.term]
+    l2 = [c for c in economy.calamities if c.term <= economy.term]
+    economy.calamities \
+        = [c for c in economy.calamities if c.term > economy.term]
+    for c in l:
+        c.occur()
+    for c in l2:
+        c.economy = None
+
+
+def make_calamities (economy):
+    for k, ci in base.calamity_info.items():
+        ci.make_some(economy)
+
+
+def prepare_for_calamities (economy):
+    nation = economy.nation
+    
+    cavaliers = dict([(d.id, d) for dist in nation.districts
+                      for d in dist.cavaliers])
+    work = dict([(d.id, {}) for dist in nation.districts
+                 for d in dist.cavaliers])
+
+    # 慰撫する。
+    for dnum, dist in enumerate(nation.districts):
+        soother = [d.id for d in
+                    sorted(dist.cavaliers, reverse=True,
+                           key=lambda d: d.soothe_ability())]
+        for d in soother:
+            ph = np.mean([p.political_hating for p in economy.people.values()
+                          if p.death is None and p.age >= 18
+                          and p.district == dnum])
+            if 1 - ph > ARGS.soothe_threshold:
+                break
+            work[d.id]['soothe'] = True
+            d.soothe_district()
+
+    calc_nation_parameters(economy)
+
+    # 予言に基づいてどの災害に備えるか決定する。
+    calamities = [[] for i in ARGS.population]
+    for c in economy.calamities:
+        if c.term < economy.term + 3:
+            d_max, d_min = c.prophecied_damage()
+            if d_max - d_min > ARGS.calamity_damage_threshold:
+                calamities[c.district].append((d_max - d_min, c))
+    for l in calamities:
+        l.sort(reverse=True, key=lambda x: x[0])
+
+    rem = []
+    for dnum, dist in enumerate(nation.districts):
+        remnant = dict([(d.id, d) for d in dist.cavaliers])
+        for k, c in calamities[dnum]:
+            if not remnant:
+                break
+            if c.counter_prophecy >= 1.0:
+                continue
+            l = sorted(remnant.values(), key=c.dominator_ability,
+                       reverse=True)
+            for d in l:
+                if len(work[d.id]) >= ARGS.works_per_dominator:
+                    del remnant[d.id]
+                else:
+                    del remnant[d.id]
+                    work[d.id]['prophecy'] = c
+                    break
+        rem.append(remnant)
+    
+    # 災害対応をしない分、成長機会が増えるとする。
+    # 成長機会はランダムに割り当てる。
+    challengeable = [len(rem[dnum]) * ARGS.challengeable_mag
+                     / (ARGS.works_per_dominator *
+                        len(nation.districts[dnum].cavaliers))
+                     for dnum in range(len(ARGS.population))]
+
+    for did in work.keys():
+        if 'prophecy' in work[did]:
+            c = work[did]['prophecy']
+            c.prophecy_prepare(cavaliers[did], random.random() < 
+                               challengeable[cavaliers[did].district])
+
+    # 寺院の建立。
+    for did in work.keys():
+        d = cavaliers[did]
+        x = np_clip(d.faith_realization, 0, 0.5)
+        if len(work[did]) < ARGS.works_per_dominator \
+           and random.random() < (x / 0.5) * ARGS.construct_temple_rate:
+            work[did]['temple'] = True
+
+    # 災害のための建設。
+    for dnum, dist in enumerate(nation.districts):
+        dprotect = [d.id for d in
+                    sorted(dist.cavaliers, reverse=True,
+                           key=lambda d: d.disaster_protection_ability())]
+        dtraining = [d.id for d in
+                     sorted(dist.cavaliers, reverse=True,
+                            key=lambda d: d.disaster_training_ability())]
+        iprotect = [d.id for d in
+                    sorted(dist.cavaliers, reverse=True,
+                           key=lambda d: d.invasion_protection_ability())]
+        itraining = [d.id for d in
+                     sorted(dist.cavaliers, reverse=True,
+                            key=lambda d: d.invasion_training_ability())]
+
+        l1 = []
+        for cn, l in dist.protection_units.items():
+            for i, x in enumerate(l):
+                l1.append((abs(base.calamity_info[cn].protection_max - x),
+                           cn, 'protection', i, x))
+        for cn, l in dist.training_units.items():
+            for i, x in enumerate(l):
+                l1.append((abs(base.calamity_info[cn].training_max - x),
+                           cn, 'training', i, x))
+        l1 = sorted(l1, key=lambda q: q[0], reverse=True)
+        while l1:
+            top = l1[0]
+            l1 = l1[1:]
+            di, cn, p_or_t, i, x = top
+            if p_or_t == 'protection' and cn == 'invasion':
+                l = iprotect
+            elif p_or_t == 'training' and cn == 'invasion':
+                l = itraining
+            elif p_or_t == 'protection':
+                l = dprotect
+            elif p_or_t == 'training':
+                l = dtraining
+            done = False
+            for did in l:
+                d = cavaliers[did]
+                if (cn, p_or_t) not in work[d.id] \
+                   and len(work[d.id]) < ARGS.works_per_dominator:
+                    new_x = d.construct(p_or_t, cn, i, random.random() < 
+                                        challengeable[dnum])
+                    work[did][(cn, p_or_t)] = True
+                    if p_or_t == 'protection':
+                        top = (abs(base.calamity_info[cn].protection_max
+                                   - new_x),
+                               cn, p_or_t, i, new_x)
+                    else:
+                        top = (abs(base.calamity_info[cn].training_max
+                                   - new_x),
+                               cn, p_or_t, i, new_x)
+                    l1.insert(bisect.bisect_right([q[0] for q in l1], top[0]),
+                              top)
+                    done = True
+                    break
+            if not done:
+                l1 = [(di1, cn1, p_or_t1, i1, x1)
+                      for di1, cn1, p_or_t1, i1, x1 in l1
+                      if not (cn == cn1 and p_or_t == p_or_t1)]
+            done = True
+            for did in l:
+                if len(work[d.id]) < ARGS.works_per_dominator:
+                    done = False
+                    break
+            if done:
+                break
+
+    print("Protection&Training:")
+    for dnum, dist in enumerate(nation.districts):
+        for n, v in dist.protection_units.items():
+            if v:
+                print(str(dnum) + ":p:" + n + ":", v)
+        for n, v in dist.training_units.items():
+            if v:
+                print(str(dnum) + ":t:" + n + ":", v)
+            
+
+def decay_calamities (economy):
+    for dist in economy.nation.districts:
+        for cn in dist.protection_units.keys():
+            dist.protection_units[cn] = \
+                [base.calamity_info[cn].protection_decay(x)
+                 for x in dist.protection_units[cn]]
+        for cn in dist.training_units.keys():
+            dist.training_units[cn] = \
+                [base.calamity_info[cn].training_decay(x)
+                 for x in dist.training_units[cn]]
+
+
+def update_calamities (economy):
+    print("\nCalamities:...", flush=True)
+
+    calc_nation_parameters(economy)
+    make_calamities(economy)
+    decay_calamities(economy)
+    prepare_for_calamities(economy)
+    occur_calamities(economy)
+
+
+def step (economy):
+    economy.term += 1
+    print("\nTerm %d (%s):"
+          % (economy.term, term_to_year_month(economy.term)),
+          flush=True)
+    economy.year = math.floor((economy.term - 1) / 12) + 1
+    economy.month = (economy.term - 1) % 12 + 1
+
+    for p in economy.people.values():
+        p.age = (economy.term - p.birth_term) / 12
+
+    if economy.term % ARGS.economy_period == 0:
+        update_economy(economy)
+
+        l = []
+        for p in economy.people.values():
+            if p.death is not None:
+                l.append((p, None))
+        for p, q in l:
+            p.death.inheritance_share = q
+            del economy.people[p.id]
+            if p.supported is not None and p.supported is not '' \
+               and p.supported in economy.people:
+                s = economy.people[p.supported]
+                s.supporting.remove(p.id)
+                p.supported = None
+
+    update_education(economy)
+    update_calamities(economy)
+    update_death(economy)
+    update_birth(economy)
+    update_support(economy)
+    update_tombs(economy)
+
+
+def main (eplot):
+    print("Start", flush=True)
+    if SAVED_ECONOMY is None:
+        economy = Economy()
+        print("Initializing...", flush=True)
+        initialize(economy)
+    else:
+        economy = SAVED_ECONOMY
+    eplot.plot(economy)
+    if not ARGS.no_view:
+        plt.pause(1.0)
+
+    # hating のテスト。
+    for x in ['K', 'Q', 'G', 'H', 'A', 'B', 'C']:
+        p = globals()[x]
+        d = p.get_dominator()
+        if d is not None:
+            d.update_hating()
+            print(x, d.hating_to_king, d.hating_to_governor)
+    # 支配者の死のテスト。
+    economy.die([H, B])
+
+    saved_last = False
+    for trial in range(ARGS.trials):
+        saved_last = False
+        step(economy)
+        print("\nPlotting...", flush=True)
+        eplot.plot(economy)
+        if not ARGS.no_view:
+            plt.pause(0.5)
+        if ARGS.save and (trial % ARGS.save_period) == ARGS.save_period - 1:
+            print("\nSaving...", flush=True)
+            with open(ARGS.pickle, 'wb') as f:
+                pickle.dump((ARGS, economy), f)
+            saved_last = True
+
+    if ARGS.save and not saved_last:
+        print("\nSaving...", flush=True)
+        with open(ARGS.pickle, 'wb') as f:
+            pickle.dump((ARGS, economy), f)
+
+    print("\nFinish", flush=True)
+    if not ARGS.no_view:
+        plt.show()
+
+
+if __name__ == '__main__':
+    eplot = EconomyPlot()
+    parse_args(view_options=['none'] + list(eplot.options.keys()))
+    main(eplot)

@@ -1,7 +1,7 @@
 
 
     仏教的哲学的社会シミュレーション
-    (Created: 2021-02-27, Time-stamp: <2021-04-18T01:07:27Z>)
+    (Created: 2021-02-27, Time-stamp: <2021-06-28T09:16:14Z>)
 
 
 ** このファイルについて
@@ -143,6 +143,10 @@ https://gist.github.com/JRF-2018/aace48ebc44229844b6f75a39a287578
 
 近親婚のテスト。
 
+  * test_of_domination_2.py
+
+支配と災害のテスト。
+
 
 
 ** 「プロトタイプ」プロジェクト
@@ -153,6 +157,14 @@ https://gist.github.com/JRF-2018/aace48ebc44229844b6f75a39a287578
 Simulation Buddhism Prototype No.1。test_of_matching2.py のファイルを
 分割し、test_of_merchant_peasant_ratio.py と test_of_income_1.py の成
 果を取り入れたもの。
+
+
+  * simbdp2.py
+  * simbdp2/*.py
+  
+Simulation Buddhism Prototype No.2。simbdp1.py に支配と災害のモデルを
+足したもの。test_of_domination_2.py の成果を取り入れている。…となる予
+定。
 
 
 
