@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.1' # Time-stamp: <2021-06-28T09:39:33Z>
+__version__ = '0.0.2' # Time-stamp: <2021-07-09T11:22:38Z>
 ## Language: Japanese/UTF-8
 
 """支配と災害のシミュレーション"""
@@ -109,7 +109,7 @@ ARGS.soothe_threshold = 0.7
 ARGS.works_per_dominator = 5
 # 災害対応する最小値
 #ARGS.calamity_damage_threshold = 100.0
-ARGS.calamity_damage_threshold = 0
+ARGS.calamity_damage_threshold = 10.0
 # 災害対応しないことによる成長機会の拡大率
 ARGS.challengeable_mag = 10.0
 # 寺院を立てる確率
@@ -120,9 +120,30 @@ ARGS.challenging_beta = 0.5
 ARGS.not_challenging_beta = 1.0
 # 成長するときの増分
 ARGS.challenging_growth = 0.01
-
+# 次の蛮族の侵入までの平均期。
+ARGS.invasion_average_term = 15.0 * 12
+#ARGS.invasion_average_term = 5.0 * 12
+# 洪水の頻度の目安
+#ARGS.flood_rate = 1.0 / 7
+ARGS.flood_rate = 1.0 / 14
+# 作物の病気の頻度の目安
+ARGS.cropfailure_rate = (1/8) / 3
+# 大火事の頻度の目安
+#ARGS.bigfire_rate = (1 / (5 * 12)) * (12/15)
+ARGS.bigfire_rate = (1 / (10 * 12)) * (12/15)
+# 地震の頻度の目安
+ARGS.earthquake_rate = 1 / (5 * 12)
+# 次の疫病までの平均期。
+ARGS.plague_average_term = 50.0 * 12
+# 規模の概要値の評価を換える。
+# 例えば、↓の場合、死亡の評価を 1/2 に、財産の評価を 2倍にする。
+#ARGS.damage_scale_filter = {'death': 0.5, 'property': 2}
+ARGS.damage_scale_filter = {}
 
 SAVED_ECONOMY = None
+
+N_calamity = {}
+D_calamity = {}
 
 
 def parse_args (view_options=['none']):
@@ -139,9 +160,11 @@ def parse_args (view_options=['none']):
     parser.add_argument("--view-2", choices=view_options)
     parser.add_argument("--view-3", choices=view_options)
     parser.add_argument("--view-4", choices=view_options)
+    parser.add_argument("--damage-scale-filter", type=str)
 
     specials = set(['load', 'save', 'trials', 'population', 'min_birth',
-                    'view_1', 'view_2', 'view_3', 'view_4'])
+                    'view_1', 'view_2', 'view_3', 'view_4',
+                    'damage_scale_filter'])
     for p, v in vars(ARGS).items():
         if p not in specials:
             p2 = '--' + p.replace('_', '-')
@@ -166,7 +189,13 @@ def parse_args (view_options=['none']):
         ARGS.population = list(map(int, ARGS.population.split(',')))
     if ARGS.min_birth is None:
         ARGS.min_birth = sum([x / (12 * ARGS.init_max_age) for x in ARGS.population])
-
+    if type(ARGS.damage_scale_filter) is str:
+        r = {}
+        for x in ARGS.damage_scale_filter.split(','):
+            if x:
+                y, z = x.split(':')
+                r[y] = float(z)
+        ARGS.damage_scale_filter = r
 
 ## class 'Frozen' from:
 ## 《How to freeze Python classes « Python recipes « ActiveState Code》  
@@ -261,6 +290,7 @@ class Person0 (SerializableExEconomy):
 
         self.prop = 0 	       # 商業財産: commercial property.
         self.land = 0	       # 農地: agricultural prpoerty.
+        self.tmp_land_damage = 0 # 災害等による年間のダメージ率
         self.consumption = 0   # 消費額
         self.ambition = 0      # 上昇志向
         self.education = 0     # 教化レベル
@@ -608,7 +638,7 @@ class Dominator (SerializableExEconomy):
         if p_or_t == 'protection' and cn == 'invasion':
             f = lambda x: x.invasion_protection_ability()
             ccoeff = cinfo.protection_construct_coeff
-            cmax = cinfo.protection_max
+            cmax = cinfo.protection_max - 0.5
             setting = dist.protection_units[cn]
             scoeff = {'disaster_strategy': (2/3) * 0.75,
                       'combat_tactics': (1/3) * 0.75,
@@ -616,7 +646,7 @@ class Dominator (SerializableExEconomy):
         elif p_or_t == 'training' and cn == 'invasion':
             f = lambda x: x.invasion_training_ability()
             ccoeff = cinfo.training_construct_coeff
-            cmax = cinfo.training_max
+            cmax = cinfo.training_max - 0.5
             setting = dist.training_units[cn]
             scoeff = {'combat_tactics': 0.70,
                       'people_trust': 0.15,
@@ -624,14 +654,14 @@ class Dominator (SerializableExEconomy):
         elif p_or_t == 'protection':
             f = lambda x: x.disaster_protection_ability()
             ccoeff = cinfo.protection_construct_coeff
-            cmax = cinfo.protection_max
+            cmax = cinfo.protection_max - 0.5
             setting = dist.protection_units[cn]
             scoeff = {'disaster_strategy': 0.75,
                       'people_trust': 0.25}
         elif p_or_t == 'training':
             f = lambda x: x.disaster_training_ability()
             ccoeff = cinfo.training_construct_coeff
-            cmax = cinfo.training_max
+            cmax = cinfo.training_max - 0.5
             setting = dist.training_units[cn]
             scoeff = {'disaster_tactics': 0.75,
                       'people_trust': 0.25}
@@ -729,97 +759,32 @@ class Nation (Serializable):
                    for ds in self.districts], [])
 
 
-class CalamityInfo (Serializable):
-    def __init__ (self):
-        self.kind = 'calamity'
-        self.generating_class = Calamity
-        self.protection_units_base = 1.0 # 人口千人あたりのユニット数
-        self.training_units_base = 1.0 # 人口千人あたりのユニット数
-        self.protection_max = 0  # 最大レベル
-        self.training_max = 0  # 最大レベル
-        self.protection_construct_coeff = 1.0  # 建設時の二次関数の係数
-        self.training_construct_coeff = 1.0  # 建設時の二次関数の係数
-        self.protection_decay_unit = 0.05   # ユニットの一期の経年劣化
-        self.training_decay_unit = 0.05 # ユニットの一期の経年劣化
-        self.protection_decay_coeff = 1.0  # 経年劣化時の二次関数の係数
-        self.training_decay_coeff = 1.0  # 経年劣化時の二次関数の係数
-        self.damage_max_level = 6 # 災害を make するときの基準１
-        self.damage_unit = 30     # 災害を make するときの基準２
-        self.protected_damage_rate = 1/3 # 災害を make するときの基準３
-
-    def make_some (self, economy):
-        pass
-
-    def protection_decay (self, x):
-        ci = self
-        mag = 1.0
-        if x > ci.protection_max - 1:
-            mag = 3.0
-        exp = ci.protection_decay_coeff * (x ** 2)
-        exp -= ci.protection_decay_unit * mag
-        if exp < 0:
-            exp = 0
-        return math.sqrt(exp / ci.protection_decay_coeff)
-
-    def training_decay (self, x):
-        ci = self
-        mag = 1.0
-        if x > ci.training_max - 1:
-            mag = 3.0
-        exp = ci.training_decay_coeff * (x ** 2)
-        exp -= ci.training_decay_unit * mag
-        if exp < 0:
-            exp = 0
-        return math.sqrt(exp / ci.training_decay_coeff)
-
-    def make (self, economy, level, term, dnum, unit_num):
-        ci = self
-        c = ci.generating_class()
-        c.economy = economy
-        c.district = dnum
-        c.unit_num = unit_num
-        c.term = term
-        dist = economy.nation.districts[dnum]
-        max_level = ci.damage_max_level
-        damage_unit = ci.damage_unit
-        drate = ci.protected_damage_rate
-        damage_standard = sum(list(c.damage_coeff.values())) * damage_unit
-        pdamage_standard = sum(list(c.protected_damage_coeff.values())) \
-            * damage_unit
-        for n, v in c.damage_coeff.items():
-            c.damage_coeff[n] = (1 + random.uniform(-0.2, 0.2)) * v
-        for n, v in c.protected_damage_coeff.items():
-            c.protected_damage_coeff[n] = (1 + random.uniform(-0.2, 0.2)) * v
-        c.anti_protection = level
-        if ci.kind == 'invasion':
-            brain = dist.tmp_invasion_brain
-            f = lambda d: d.invasion_prophecy_ability()
-        else:
-            brain = dist.tmp_disaster_brain
-            f = lambda d: d.disaster_prophecy_ability()
-        p = economy.calc_dominator_work(brain, f)
-        c.prophecy_error = pow(2, random.uniform(-p, p))
-
-        c.damage_max = (math.exp(level) - 1) * (damage_standard
-                                                / (math.exp(max_level) - 1))
-        c.damage_min = (math.exp(level - 1) - 1) * (damage_standard
-                                                    / (math.exp(max_level) - 1))
-        c.damage_protected_max = drate * (pdamage_standard / damage_standard) \
-            * (math.exp(level) - 1) * (damage_standard
-                                       / (math.exp(max_level) - 1))
-        c.damage_protected_min = drate * (pdamage_standard / damage_standard)\
-            * (math.exp(level - 2) - 1) * (damage_standard
-                                           / (math.exp(max_level) - 1))
-
-        return c
-
-
 base.calamity_info = {}
 
 class Calamity (SerializableExEconomy):        # 「災害」＝「惨禍」
+    kind = 'calamity'
+    protection_units_base = 1.0 # 人口千人あたりのユニット数
+    training_units_base = 1.0 # 人口千人あたりのユニット数
+    protection_max = 0  # 最大レベル
+    training_max = 0  # 最大レベル
+    protection_construct_max = 0  # 最大レベル
+    training_construct_max = 0  # 最大レベル
+    protection_construct_coeff = 1.0  # 建設時の二次関数の係数
+    training_construct_coeff = 1.0  # 建設時の二次関数の係数
+    protection_decay_unit = 0.05   # ユニットの一期の経年劣化
+    training_decay_unit = 0.05 # ユニットの一期の経年劣化
+    protection_decay_coeff = 1.0  # 経年劣化時の二次関数の係数
+    training_decay_coeff = 1.0  # 経年劣化時の二次関数の係数
+    damage_coeff_proto = {}           # ダメージの計算係数
+    protected_damage_coeff_proto = {} # 防御成功時のダメージの計算係数
+    damage_max_level = 6 # 災害を make するときの基準その１
+    damage_unit = 30                  # その２
+    protected_damage_rate = 1/3       # その３
+    training_anti_level = 1           # その４
+    protected_prophecy_anti_level = 1 # その５
+
     def __init__ (self):
-        self.kind = 'calamity'
-        self.info = None
+        self.kind = type(self).kind
         self.economy = None
         self.district = 0             # 襲う地域の番号
         self.unit_num = 0             # 襲うユニットの番号
@@ -847,9 +812,90 @@ class Calamity (SerializableExEconomy):        # 「災害」＝「惨禍」
         self.protected_damage_coeff = {}   # 防御成功時のダメージの計算係数
 
 
+    @classmethod
+    def make_some (cls, economy):
+        pass
+
+    @classmethod
+    def protection_decay (cls, x):
+        ci = cls
+        mag = 1.0
+        if x > ci.protection_construct_max - 1:
+            mag = 3.0
+        exp = ci.protection_decay_coeff * (x ** 2)
+        exp -= ci.protection_decay_unit * mag
+        if exp < 0:
+            exp = 0
+        return math.sqrt(exp / ci.protection_decay_coeff)
+
+    @classmethod
+    def training_decay (cls, x):
+        ci = cls
+        mag = 1.0
+        if x > ci.training_construct_max - 1:
+            mag = 3.0
+        exp = ci.training_decay_coeff * (x ** 2)
+        exp -= ci.training_decay_unit * mag
+        if exp < 0:
+            exp = 0
+        return math.sqrt(exp / ci.training_decay_coeff)
+
+    @classmethod
+    def make (cls, economy, level, term, dnum, unit_num):
+        ci = cls
+        c = cls()
+        c.economy = economy
+        c.district = dnum
+        c.unit_num = unit_num
+        c.term = term
+        dist = economy.nation.districts[dnum]
+        max_level = ci.damage_max_level
+        damage_unit = ci.damage_unit
+        drate = ci.protected_damage_rate
+        damage_standard = sum(list(ci.damage_coeff_proto
+                                   .values())) * damage_unit
+        pdamage_standard = sum(list(ci.protected_damage_coeff_proto
+                                    .values())) \
+            * damage_unit
+        tal = ci.training_anti_level
+        pal = ci.protected_prophecy_anti_level
+        for n, v in ci.damage_coeff_proto.items():
+            c.damage_coeff[n] = (1 + random.uniform(-0.2, 0.2)) * v
+        for n, v in ci.protected_damage_coeff_proto.items():
+            c.protected_damage_coeff[n] = (1 + random.uniform(-0.2, 0.2)) * v
+        c.anti_protection = level
+        if ci.kind == 'invasion':
+            brain = dist.tmp_invasion_brain
+            f = lambda d: d.invasion_prophecy_ability()
+        else:
+            brain = dist.tmp_disaster_brain
+            f = lambda d: d.disaster_prophecy_ability()
+        p = economy.calc_dominator_work(brain, f)
+        c.prophecy_error = pow(2, random.uniform(-p, p))
+
+        c.damage_max = (math.exp(level) - 1) * (damage_standard
+                                                / (math.exp(max_level) - 1))
+        c.damage_min = (math.exp(level - tal) - 1) * (damage_standard
+                                                    / (math.exp(max_level) - 1))
+        c.damage_protected_max = drate * (pdamage_standard / damage_standard) \
+            * (math.exp(level) - 1) * (damage_standard
+                                       / (math.exp(max_level) - 1))
+        c.damage_protected_min = drate * (pdamage_standard / damage_standard)\
+            * (math.exp(level - pal) - 1) * (damage_standard
+                                           / (math.exp(max_level) - 1))
+
+        return c
+
+
     def occur (self):
         c = self
         print("Occur:", c)
+        if c.kind not in N_calamity:
+            N_calamity[c.kind] = 0
+        if c.kind not in D_calamity:
+            D_calamity[c.kind] = 0
+        N_calamity[c.kind] += 1
+        ci = type(self)
         economy = self.economy
         nation = economy.nation
         dist = nation.districts[c.district]
@@ -860,8 +906,8 @@ class Calamity (SerializableExEconomy):        # 「災害」＝「惨禍」
         counter_prophecy = c.counter_prophecy * (q1 + q2) / 2
         protect = dist.protection_units[c.kind][c.unit_num] \
             + c.prophecy_protection * counter_prophecy
-        if protect > c.info.protection_max:
-            protect = c.info.protection_max
+        if protect > ci.protection_max:
+            protect = ci.protection_max
         if protect > c.anti_protection:
             damage = c.damage_protected_min \
                 + (c.damage_protected_max - c.damage_protected_min) \
@@ -870,7 +916,9 @@ class Calamity (SerializableExEconomy):        # 「災害」＝「惨禍」
             if sum_c > 0:
                 for n, k in c.protected_damage_coeff.items():
                     getattr(c, 'damage_' + n)(damage * k / sum_c)
-            print("Protected:", damage)
+            print("Protected:", damage,
+                  c.filtered_protected_damage_scale(damage))
+            D_calamity[c.kind] += damage
             return
 
         len_t = len(dist.training_units[c.kind])
@@ -885,20 +933,23 @@ class Calamity (SerializableExEconomy):        # 「災害」＝「惨禍」
                 j = j - len_t
             training = dist.training_units[c.kind][j] \
                 + c.prophecy_training * counter_prophecy
-            if training > c.info.training_max:
-                training = c.info.training_max
+            if training > ci.training_max:
+                training = ci.training_max
             damage[i] = c.damage_min + (c.damage_max - c.damage_min) \
-                * (c.info.training_max - training) / c.info.training_max
+                * (ci.training_max - training) / ci.training_max
 
         damage = sum(damage) / tn
         sum_c = sum([k for k in c.damage_coeff.values()])
         if sum_c > 0:
             for n, k in c.damage_coeff.items():
                 getattr(c, 'damage_' + n)(damage * k / sum_c)
-        print("Damage:", damage)
+        print("Damage:", damage,
+              c.filtered_damage_scale(damage))
+        D_calamity[c.kind] += damage
 
     def _prophecied_damage (self, counter_prophecy):
         c = self
+        ci = type(self)
         economy = self.economy
         nation = economy.nation
         dist = nation.districts[c.district]
@@ -909,12 +960,13 @@ class Calamity (SerializableExEconomy):        # 「災害」＝「惨禍」
         counter_prophecy = counter_prophecy * (q1 + q2) / 2
         protect = dist.protection_units[c.kind][c.unit_num] \
             + c.prophecy_protection * counter_prophecy
-        if protect > c.info.protection_max:
-            protect = c.info.protection_max
+        if protect > ci.protection_max:
+            protect = ci.protection_max
         if protect > c.anti_protection:
             damage = c.damage_protected_min \
                 + (c.damage_protected_max - c.damage_protected_min) \
                 * (1 - counter_prophecy)
+            damage = c.filtered_protected_damage_scale(damage)
             return damage * c.prophecy_error
         len_t = len(dist.training_units[c.kind])
         len_p = len(dist.protection_units[c.kind])
@@ -928,12 +980,13 @@ class Calamity (SerializableExEconomy):        # 「災害」＝「惨禍」
                 j = j - len_t
             training = dist.training_units[c.kind][j] \
                 + c.prophecy_training * counter_prophecy
-            if training > c.info.training_max:
-                training = c.info.training_max
+            if training > ci.training_max:
+                training = ci.training_max
             damage[i] = c.damage_min + (c.damage_max - c.damage_min) \
-                * (c.info.training_max - training) / c.info.training_max
+                * (ci.training_max - training) / ci.training_max
 
         damage = sum(damage) / tn
+        damage = c.filtered_damage_scale(damage)
         return damage * c.prophecy_error
         
     def prophecied_damage (self):
@@ -961,6 +1014,32 @@ class Calamity (SerializableExEconomy):        # 「災害」＝「惨禍」
                         getattr(d, n) + (ARGS.challenging_growth * v / k),
                         0, 1))
 
+    def filtered_damage_scale(self, scale, filter1=None):
+        c = self
+        f = filter1
+        if f is None:
+            f = ARGS.damage_scale_filter
+        coeff = c.damage_coeff
+        sc = sum(list(coeff.values()))
+        if sc == 0:
+            return scale
+        r = dict([((x, y * f[x]) if x in f else (x, y))
+                  for x, y in coeff.items()])
+        return (sum(list(r.values())) / sc) * scale
+        
+    def filtered_protected_damage_scale(self, scale, filter1=None):
+        c = self
+        f = filter1
+        if f is None:
+            f = ARGS.damage_scale_filter
+        coeff = c.protected_damage_coeff
+        sc = sum(list(coeff.values()))
+        if sc == 0:
+            return scale
+        r = dict([((x, y * f[x]) if x in f else (x, y))
+                  for x, y in coeff.items()])
+        return (sum(list(r.values())) / sc) * scale
+
     def dominator_ability (self, dominator1):
         c = self
         d = dominator1
@@ -981,10 +1060,52 @@ class Calamity (SerializableExEconomy):        # 「災害」＝「惨禍」
         if damage > len(people):
             damage = len(people)
         people = random.sample(people, damage)
+        print("People Die:", len(people))
+        economy.add_family_political_hating(people, 1.0)
         economy.die(people)
 
     def damage_injury (self, scale):
-        pass
+        c = self
+        economy = self.economy
+        dnum = c.district
+        people = []
+        for p in economy.people.values():
+            if p.death is None and p.district == dnum:
+                people.append(p)
+        damage = math.floor(scale * (150 / 30) * (len(people) / 10000))
+        if damage > len(people):
+            damage = len(people)
+        people = random.sample(people, damage)
+        print("People Injure:", len(people))
+        economy.add_family_political_hating(people, 0.5)
+        # economy.injure(people)
+
+    def damage_soldier_injury (self, scale):
+        c = self
+        economy = self.economy
+        dnum = c.district
+        people = []
+        dpeople_len = 0
+        l2 = []
+        for p in economy.people.values():
+            if p.death is None and p.age >= 18 and p.age < 50 \
+               and p.sex == 'M':
+                people.append(p)
+                if p.district == dnum:
+                    dpeople_len += 1
+                    l2.append(3.0)
+                else:
+                    l2.append(1.0)
+
+        damage = math.floor(scale * (150 / 45) * (dpeople_len / 10000))
+        if damage > len(people):
+            damage = len(people)
+        l2 = np.array(l2).astype(np.longdouble)
+        l3 = np_random_choice(people, size=damage, replace=False,
+                              p=l2/np.sum(l2))
+        print("Soldiers Injure:", len(l3))
+        economy.add_family_political_hating(l3, 0.5)
+        # economy.injure(l3)
 
     def damage_property (self, scale):
         c = self
@@ -998,6 +1119,8 @@ class Calamity (SerializableExEconomy):        # 「災害」＝「惨禍」
         if damage > len(people):
             damage = len(people)
         people = random.sample(people, damage)
+        print("Property Damage:", len(people))
+        economy.add_political_hating(people, 0.5)
         for p in people:
             p.prop *= random.random()
 
@@ -1005,6 +1128,11 @@ class Calamity (SerializableExEconomy):        # 「災害」＝「惨禍」
         c = self
         economy = self.economy
         dnum = c.district
+        mon = [False, False, False, False,
+               True, True, True, True,
+               True, True, False, False]
+        if not mon[economy.month - 1]:
+            return
         people = []
         for p in economy.people.values():
             if p.death is None and p.district == dnum:
@@ -1013,10 +1141,14 @@ class Calamity (SerializableExEconomy):        # 「災害」＝「惨禍」
         if damage > len(people):
             damage = len(people)
         people = random.sample(people, damage)
-#        for p in people:
-#            if p.land > 0:
-#                p.tmp_land_damage \
-#                    = np_clip(p.tmp_land_damage + random.random(), 0, 1)
+        l = []
+        for p in people:
+            if p.land >= 1:
+                l.append(p)
+                p.tmp_land_damage \
+                    = np_clip(p.tmp_land_damage + random.random(), 0, 1)
+        economy.add_political_hating(l, 0.5)
+        print("Crop Damage:", len(l), len(people))
 
     def damage_protection (self, scale):
         c = self
@@ -1027,6 +1159,26 @@ class Calamity (SerializableExEconomy):        # 「災害」＝「惨禍」
         dist.protection_units[c.kind][c.unit_num] -= damage
         if dist.protection_units[c.kind][c.unit_num] < 0:
             dist.protection_units[c.kind][c.unit_num] = 0
+        print("Protection Damage:", damage)
+
+    def damage_infrastructure (self, scale):
+        c = self
+        economy = self.economy
+        dnum = c.district
+        damage = scale * ((9/10) / 1000)
+        dist = economy.nation.districts[dnum]
+        dam = 0
+        for n, l in dist.protection_units.items():
+            if not l:
+                continue
+            p = damage * (10 / len(l))
+            for i in range(len(l)):
+                if random.random() < p:
+                    dam += 1
+                    l[i] -= 1
+                    if l[i] < 0:
+                        l[i] = 0
+        print("Infrastructure Damage:", dam)
 
     def damage_soldier (self, scale):
         c = self
@@ -1051,10 +1203,26 @@ class Calamity (SerializableExEconomy):        # 「災害」＝「惨禍」
         l2 = np.array(l2).astype(np.longdouble)
         l3 = np_random_choice(people, size=damage, replace=False,
                               p=l2/np.sum(l2))
+        print("Soldiers Die:", len(l3))
+        economy.add_family_political_hating(l3, 1.0)
         economy.die(l3)
 
     def damage_rape (self, scale):
-        pass
+        c = self
+        economy = self.economy
+        dnum = c.district
+        people = []
+        for p in economy.people.values():
+            if p.death is None and p.district == dnum \
+               and p.sex == 'F' and p.age >= 12 and p.age < 35:
+                people.append(p)
+        damage = math.floor(scale * (300 / 30) * (len(people) / 10000))
+        if damage > len(people):
+            damage = len(people)
+        people = random.sample(people, damage)
+        print("Rape:", len(people))
+        economy.add_family_political_hating(people, 0.5)
+        # economy.rape(people)
 
     def damage_dominator (self, scale):
         c = self
@@ -1082,37 +1250,102 @@ class Calamity (SerializableExEconomy):        # 「災害」＝「惨禍」
                 l.append(d.id)
         print("Dominator Die:", len(l))
         economy.die([economy.people[did] for did in l])
-                
 
-class DisasterInfo (CalamityInfo):
-    pass
+    def damage_poor (self, scale):
+        c = self
+        economy = self.economy
+        dnum = c.district
+        people = []
+        dpeople_len = 0
+        l2 = []
+        for p in economy.people.values():
+            if p.death is None and p.district == dnum:
+                people.append(p)
+                l2.append(math.ceil(4 * (1 - p.tmp_asset_rank)))
+
+        damage = math.floor(scale * (1000 / 1000) * (len(people) / 10000))
+        if damage > len(people):
+            damage = len(people)
+        l2 = np.array(l2).astype(np.longdouble)
+        l3 = np_random_choice(people, size=damage, replace=False,
+                              p=l2/np.sum(l2))
+        print("Poor Die:", len(l3))
+        economy.add_family_political_hating(people, 1.0)
+        economy.die(l3)
+
+    def damage_poor_property (self, scale):
+        c = self
+        economy = self.economy
+        dnum = c.district
+        people = []
+        dpeople_len = 0
+        l2 = []
+        for p in economy.people.values():
+            if p.death is None and p.district == dnum:
+                people.append(p)
+                l2.append(math.ceil(4 * (1 - p.tmp_asset_rank)))
+
+        damage = math.floor(scale * (2000 / 100) * (len(people) / 10000))
+        if damage > len(people):
+            damage = len(people)
+        l2 = np.array(l2).astype(np.longdouble)
+        l3 = np_random_choice(people, size=damage, replace=False,
+                              p=l2/np.sum(l2))
+        print("Poor Property Damage:", len(l3))
+        economy.add_political_hating(l3, 0.5)
+        for p in l3:
+            p.prop *= random.random()
 
 
 class Disaster (Calamity):        # 天災
     pass
 
 
-class FloodInfo (DisasterInfo):
+class Flood (Disaster):           # 「洪水」＝「水害」
+    kind = 'flood'
+    protection_units_base = 1.0 # 人口千人あたりのユニット数
+    training_units_base = 0.2 # 人口千人あたりのユニット数
+    protection_max = 6  # 最大レベル
+    training_max = 3  # 最大レベル
+    protection_construct_max = 5.5  # 最大レベル
+    training_construct_max = 2.5  # 最大レベル
+
+    damage_coeff_proto = {
+        'death': 10.0,
+        'injury': 0.1,
+        'property': 1.0,
+        'crop': 1.0,
+        'protection': 1.0
+    }
+    protected_damage_coeff_proto = {
+        'protection': 1.0
+    }
+
+    damage_max_level = 7
+    damage_unit = 100
+    protected_damage_rate = 1/3
+    training_anti_level = 1
+    protected_prophecy_anti_level = 1
+
     def __init__ (self):
         super().__init__()
-        self.kind = 'flood'
-        self.generating_class = Flood
-        self.protection_units_base = 1.0 # 人口千人あたりのユニット数
-        self.training_units_base = 0.2 # 人口千人あたりのユニット数
-        self.protection_max = 6  # 最大レベル
-        self.training_max = 3  # 最大レベル
+        self.counter_prophecy_coeff = {
+            'faith_realization': 0.05, 'people_trust': 0.10,
+            'disaster_prophecy': 0.25, 'combat_prophecy': 0.0,
+            'disaster_strategy': 0.3, # 'combat_strategy': 0.0,
+            'disaster_tactics': 0.3, 'combat_tactics': 0.0
+        }
+        self.prophecy_protection = 1.5
+        self.prophecy_training = 1.0
 
-        self.damage_max_level = 7
-        self.damage_unit = 100
-        self.protected_damage_rate = 1/3
-
-    def make_some (self, economy):
-        ci = self
+    @classmethod
+    def make_some (cls, economy):
+        ci = cls
         month_prob = [0.5/30, 0.5/30, 0.5/30, 0.5/30,
                       0.5/30, 4/30, 3/30, 3/30,
                       4/30, 4/30, 0.5/30, 0.5/30]
         prophecy_month = economy.month + 3
-        prob = month_prob[(prophecy_month - 1) % 12]
+        prob = month_prob[(prophecy_month - 1) % 12] * ARGS.flood_rate
         for i in range(30):
             for dnum in range(len(ARGS.population)):
                 dist = economy.nation.districts[dnum]
@@ -1125,58 +1358,379 @@ class FloodInfo (DisasterInfo):
                                 dnum, unit_num)
                     economy.calamities.append(c)
 
+info = Flood
+base.calamity_info[info.kind] = info
 
-class Flood (Disaster):           # 「洪水」＝「水害」
+
+class BigFire (Disaster):           # (都市の)「大火事」
+    kind = 'bigfire'
+    protection_units_base = 0.2 # 人口千人あたりのユニット数
+    training_units_base = 0.2 # 人口千人あたりのユニット数
+    protection_max = 3  # 最大レベル
+    training_max = 5  # 最大レベル
+    protection_construct_max = 2.5  # 最大レベル
+    training_construct_max = 4.5  # 最大レベル
+
+    damage_coeff_proto = {
+        'death': 10.0,
+        'injury': 0.5,
+        'property': 0.25,
+        'protection': 0.5
+    }
+    protected_damage_coeff_proto = {
+        'protection': 0.5
+    }
+
+    damage_max_level = 4
+    damage_unit = 100
+    protected_damage_rate = 1/3
+    training_anti_level = 1
+    protected_prophecy_anti_level = 1
+
     def __init__ (self):
         super().__init__()
-        self.kind = 'flood'
-        self.info = base.calamity_info[self.kind]
         self.counter_prophecy_coeff = {
             'faith_realization': 0.05, 'people_trust': 0.10,
             'disaster_prophecy': 0.25, 'combat_prophecy': 0.0,
             'disaster_strategy': 0.3, # 'combat_strategy': 0.0,
             'disaster_tactics': 0.3, 'combat_tactics': 0.0
         }
-        self.prophecy_protection = 1.5
-        self.prophecy_training = 1.0
+        self.prophecy_protection = 1.0
+        self.prophecy_training = 1.5
 
-        self.damage_coeff = {
-            'death': 10.0,
-            'injury': 0.1,
-            'property': 1.0,
-            'crop': 1.0,
-            'protection': 1.0
-        }
-        self.protected_damage_coeff = {
-            'protection': 1.0
-        }
+    @classmethod
+    def make_some (cls, economy):
+        ci = cls
+        month_prob = [2, 2, 1, 1,
+                      1, 1, 1, 1,
+                      1, 1, 1, 2]
+        prophecy_month = economy.month + 3
+        prob = month_prob[(prophecy_month - 1) % 12] * ARGS.bigfire_rate
+        for dnum in range(len(ARGS.population)):
+            dist = economy.nation.districts[dnum]
+            prob2 = ARGS.population[dnum] / 10000
+            if random.random() < prob * prob2:
+                level = random.uniform(2.5, 4.0)
+                unit_num = random.randrange(
+                    len(dist.protection_units[ci.kind]))
+                c = ci.make(economy, level, economy.term + 3,
+                            dnum, unit_num)
+                economy.calamities.append(c)
 
-info = FloodInfo()
+info = BigFire
 base.calamity_info[info.kind] = info
 
 
-class InvasionInfo (CalamityInfo):
+class Earthquake (Disaster):           # 「大地震」
+    kind = 'earthquake'
+    protection_units_base = 0.4 # 人口千人あたりのユニット数
+    training_units_base = 0.2 # 人口千人あたりのユニット数
+    protection_max = 1  # 最大レベル
+    training_max = 3  # 最大レベル
+    protection_construct_max = 1  # 最大レベル
+    training_construct_max = 3  # 最大レベル
+
+    damage_coeff_proto = {
+        'death': 10.0,
+        'injury': 0.5,
+        'property': 0.25,
+        'infrastructure': 10.0
+    }
+    protected_damage_coeff_proto = {
+        'infrastructure': 10.0
+    }
+
+    damage_max_level = 7
+    damage_unit = 100
+    protected_damage_rate = 1/3
+    training_anti_level = 1
+    protected_prophecy_anti_level = 1
+
     def __init__ (self):
         super().__init__()
-        self.kind = 'invasion'
-        self.generating_class = Invasion
-        self.protection_units_base = 0.5 # 人口千人あたりのユニット数
-        self.training_units_base = 0.5 # 人口千人あたりのユニット数
-        self.protection_max = 4  # 最大レベル
-        self.training_max = 4  # 最大レベル
+        self.counter_prophecy_coeff = {
+            'faith_realization': 0.05, 'people_trust': 0.10,
+            'disaster_prophecy': 0.25, 'combat_prophecy': 0.0,
+            'disaster_strategy': 0.3, # 'combat_strategy': 0.0,
+            'disaster_tactics': 0.3, 'combat_tactics': 0.0
+        }
+        self.prophecy_protection = 0.0
+        self.prophecy_training = 0.0
 
-        self.damage_max_level = 6
-        self.damage_unit = 30
-        self.protected_damage_rate = 1/3
+    @classmethod
+    def make_some (cls, economy):
+        ci = cls
+        month_prob = [1, 1, 1, 1,
+                      1, 1, 1, 1,
+                      1, 1, 1, 1]
+        prophecy_month = economy.month + 3
+        prob = month_prob[(prophecy_month - 1) % 12] * ARGS.earthquake_rate
+        for dnum in range(len(ARGS.population)):
+            dist = economy.nation.districts[dnum]
+            prob2 = ARGS.population[dnum] / 10000
+            if random.random() < prob * prob2:
+                level = random.uniform(3.0, 7.0)
+                unit_num = random.randrange(
+                    len(dist.protection_units[ci.kind]))
+                c = ci.make(economy, level, economy.term + 3,
+                            dnum, unit_num)
+                economy.calamities.append(c)
 
-    def make_some (self, economy):
-        ci = self
-        if [c for c in economy.calamities if c.kind == 'invasion']:
+info = Earthquake
+base.calamity_info[info.kind] = info
+
+
+class CropFailure (Disaster):           # 「作物の病気」または「日照り」
+    kind = 'cropfailure'
+    protection_units_base = 1.0 # 人口千人あたりのユニット数
+    training_units_base = 1.0 # 人口千人あたりのユニット数
+    protection_max = 3  # 最大レベル
+    training_max = 3  # 最大レベル
+    protection_construct_max = 2.5  # 最大レベル
+    training_construct_max = 2.5  # 最大レベル
+
+    damage_coeff_proto = {
+        'crop': 2.0,
+    }
+    protected_damage_coeff_proto = {
+    }
+
+    damage_max_level = 5
+    damage_unit = 100
+    protected_damage_rate = 0
+    training_anti_level = 1
+    protected_prophecy_anti_level = 1
+
+    def __init__ (self):
+        super().__init__()
+        self.counter_prophecy_coeff = {
+            'faith_realization': 0.05, 'people_trust': 0.10,
+            'disaster_prophecy': 0.25, 'combat_prophecy': 0.0,
+            'disaster_strategy': 0.3, # 'combat_strategy': 0.0,
+            'disaster_tactics': 0.3, 'combat_tactics': 0.0
+        }
+        self.prophecy_protection = 0.5
+        self.prophecy_training = 0.5
+
+    @classmethod
+    def make_some (cls, economy):
+        ci = cls
+        month_prob = [0, 0, 0, 0,
+                      1, 1, 2, 2,
+                      1, 1, 0, 0]
+        prophecy_month = economy.month + 3
+        prob = month_prob[(prophecy_month - 1) % 12] * ARGS.cropfailure_rate
+        for dnum in range(len(ARGS.population)):
+            dist = economy.nation.districts[dnum]
+            prob2 = ARGS.population[dnum] / 10000
+            if random.random() < prob * prob2:
+                level = random.uniform(2.5, 5.0)
+                unit_num = random.randrange(
+                    len(dist.protection_units[ci.kind]))
+                c = ci.make(economy, level, economy.term + 3,
+                            dnum, unit_num)
+                economy.calamities.append(c)
+
+info = CropFailure
+base.calamity_info[info.kind] = info
+
+
+class Famine (Disaster):           # 「作物の病気」または「日照り」
+    kind = 'famine'
+    protection_units_base = 0.2 # 人口千人あたりのユニット数
+    training_units_base = 0.2 # 人口千人あたりのユニット数
+    protection_max = 3  # 最大レベル
+    training_max = 5  # 最大レベル
+    protection_construct_max = 2 # 最大レベル
+    training_construct_max = 3  # 最大レベル
+
+    damage_coeff_proto = {
+        'poor': 10.0,
+        'poor_property': 1.0,
+        'protection': 1.5,
+    }
+    protected_damage_coeff_proto = {
+        'protection': 1.5,
+    }
+
+    damage_max_level = 7
+    damage_unit = 100
+    protected_damage_rate = 1.0
+    training_anti_level = 2.0
+    protected_prophecy_anti_level = 0
+
+    def __init__ (self):
+        super().__init__()
+        self.counter_prophecy_coeff = {
+            'faith_realization': 0.05, 'people_trust': 0.10,
+            'disaster_prophecy': 0.25, 'combat_prophecy': 0.0,
+            'disaster_strategy': 0.3, # 'combat_strategy': 0.0,
+            'disaster_tactics': 0.3, 'combat_tactics': 0.0
+        }
+        self.prophecy_protection = 1.0
+        self.prophecy_training = 2.5
+
+    @classmethod
+    def make_some (cls, economy):
+        ci = cls
+        if economy.month != 11:
             return
-        if not (random.random() < 1 / (5 * 12)):
+        nd = [0] * len(ARGS.population)
+        nn = 0
+        dd = [0] * len(ARGS.population)
+        dn = 0
+        for p in economy.people.values():
+            if p.death is not None:
+                continue
+            nd[p.district] += 1
+            nn += 1
+            dd[p.district] += 1 - p.tmp_land_damage
+            dn += 1 - p.tmp_land_damage
+        dn = dn / nn
+        if dn >= 0.95:
+            return
+
+        x1 = 0.55
+        x2 = 0.90
+        for dnum, dist in enumerate(economy.nation.districts):
+            x = np_clip(dd[dnum] / nd[dnum], x1, x2)
+            level = ((7 - 3) / (x1 - x2)) * (x - x2) + 3
+            unit_num = random.randrange(
+                len(dist.protection_units[ci.kind]))
+            c = ci.make(economy, level, economy.term + 3,
+                        dnum, unit_num)
+            economy.calamities.append(c)
+
+info = Famine
+base.calamity_info[info.kind] = info
+
+
+class Plague (Disaster):           # 「疫病」
+    kind = 'plague'
+    protection_units_base = 0.2 # 人口千人あたりのユニット数
+    training_units_base = 0.2 # 人口千人あたりのユニット数
+    protection_max = 1  # 最大レベル
+    training_max = 3  # 最大レベル
+    protection_construct_max = 1  # 最大レベル
+    training_construct_max = 2.5  # 最大レベル
+
+    damage_coeff_proto = {
+        'death': 10.0,
+    }
+    protected_damage_coeff_proto = {
+    }
+
+    damage_max_level = 3
+    damage_unit = 30
+    protected_damage_rate = 0
+    training_anti_level = 1
+    protected_prophecy_anti_level = 1
+
+    def __init__ (self):
+        super().__init__()
+        self.counter_prophecy_coeff = {
+            'faith_realization': 0.05, 'people_trust': 0.10,
+            'disaster_prophecy': 0.25, 'combat_prophecy': 0.0,
+            'disaster_strategy': 0.3, # 'combat_strategy': 0.0,
+            'disaster_tactics': 0.3, 'combat_tactics': 0.0
+        }
+        self.prophecy_protection = 0.0
+        self.prophecy_training = 1.0
+
+        self.terms = 0
+        self.raid = 0
+
+    @classmethod
+    def make_some (cls, economy):
+        ci = cls
+        if [c for c in economy.calamities if c.kind == 'plague']:
+            return
+        if not (random.random() < 1 / ARGS.plague_average_term):
             return
         terms = random.uniform(1, 2 * 12)
-        dnum = random.randrange(len(ARGS.population))
+        l1 = list(range(len(ARGS.population)))
+        l2 = ARGS.population
+        l2 = np.array(l2).astype(np.longdouble)
+        l3 = np_random_choice(l1, size=1, replace=False,
+                              p=l2/np.sum(l2))
+        dnum = l3[0]
+        dist = economy.nation.districts[dnum]
+        i = 0
+        while i <= terms:
+            level = random.uniform(1.0, 3.0)
+            unit_num = random.randrange(
+                len(dist.protection_units[ci.kind]))
+            c = ci.make(economy, level, economy.term + 3 + i,
+                        dnum, unit_num)
+            economy.calamities.append(c)
+            c.terms = terms
+            c.raid = int(i / 3)
+            i = i + 3
+
+info = Plague
+base.calamity_info[info.kind] = info
+
+
+class Invasion (Calamity):        # 「蛮族の侵入」
+    kind = 'invasion'
+    protection_units_base = 0.5 # 人口千人あたりのユニット数
+    training_units_base = 0.5 # 人口千人あたりのユニット数
+    protection_max = 4  # 最大レベル
+    training_max = 4  # 最大レベル
+    protection_construct_max = 3.5  # 最大レベル
+    training_construct_max = 3.5  # 最大レベル
+
+    damage_coeff_proto = {
+        'soldier': 7.5,
+        'dominator': 1.0,
+        'death': 5.0,
+        'soldier_injury': 1.5,
+        'injury': 1.0,
+        'property': 1.0,
+        'rape': 1.0,
+        'protection': 1.0
+    }
+    protected_damage_coeff_proto = {
+        'soldier': 7.5,
+        'soldier_injury': 1.5,
+        'protection': 1.0
+    }
+
+    damage_max_level = 6
+    damage_unit = 30
+    protected_damage_rate = 1/5
+    training_anti_level = 2
+    protected_prophecy_anti_level = 2
+
+    def __init__ (self):
+        super().__init__()
+        self.counter_prophecy_coeff = {
+            'faith_realization': 0.10, 'people_trust': 0.10,
+            'disaster_prophecy': 0.0, 'combat_prophecy': 0.25,
+            'disaster_strategy': 0.30, # 'combat_strategy': 0.0,
+            'disaster_tactics': 0.0, 'combat_tactics': 0.25
+        }
+
+        self.prophecy_protection = 1.0
+        self.prophecy_training = 1.5
+
+        self.terms = 0
+        self.raid = 0
+
+    @classmethod
+    def make_some (cls, economy):
+        ci = cls
+        if [c for c in economy.calamities if c.kind == 'invasion']:
+            return
+        if not (random.random() < 1 / ARGS.invasion_average_term):
+            return
+        terms = random.uniform(1, 2 * 12)
+        l1 = list(range(len(ARGS.population)))
+        l2 = ARGS.population
+        l2 = np.array(l2).astype(np.longdouble)
+        l3 = np_random_choice(l1, size=1, replace=False,
+                              p=l2/np.sum(l2))
+        dnum = l3[0]
         dist = economy.nation.districts[dnum]
         i = 0
         while i <= terms:
@@ -1189,41 +1743,8 @@ class InvasionInfo (CalamityInfo):
             c.terms = terms
             c.raid = int(i / 3)
             i = i + 3
-
-
-class Invasion (Calamity):        # 蛮族の侵入
-    def __init__ (self):
-        super().__init__()
-        self.kind = 'invasion'
-        self.info = base.calamity_info[self.kind]
-        self.counter_prophecy_coeff = {
-            'faith_realization': 0.10, 'people_trust': 0.10,
-            'disaster_prophecy': 0.0, 'combat_prophecy': 0.25,
-            'disaster_strategy': 0.30, # 'combat_strategy': 0.0,
-            'disaster_tactics': 0.0, 'combat_tactics': 0.25
-        }
-
-        self.prophecy_protection = 1.0
-        self.prophecy_training = 1.5
-
-        self.damage_coeff = {
-            'soldier': 7.5,
-            'dominator': 1.0,
-            'death': 5.0,
-            'injury': 2.0,
-            'property': 1.0,
-            'rape': 1.0,
-            'protection': 1.0
-        }
-        self.protected_damage_coeff = {
-            'soldier': 7.5,
-            'protection': 1.0
-        }
-
-        self.terms = 0
-        self.raid = 0
-
-info = InvasionInfo()
+        
+info = Invasion
 base.calamity_info[info.kind] = info
 
 
@@ -1488,6 +2009,28 @@ class EconomyDM (Economy0):
         p *= dist.tmp_power
 
         return p
+
+    def add_family_political_hating (self, people, max_adder):
+        economy = self
+        fa = set()
+        for p in people:
+            if p.supported is not None:
+                fa.add(p.supported)
+            else:
+                fa.add(p.id)
+        for pid in fa:
+            p = economy.people[pid]
+            for qid in [p.id] + p.supporting:
+                q = economy.people[qid]
+                a = random.uniform(0, max_adder)
+                q.political_hating = np_clip(q.political_hating + a, 0, 1)
+
+    def add_political_hating (self, people, max_adder):
+        economy = self
+        fa = set()
+        for p in people:
+            a = random.uniform(0, max_adder)
+            p.political_hating = np_clip(p.political_hating + a, 0, 1)
 
 
 class Economy (EconomyBT, EconomyDT, EconomyDM):
@@ -1888,10 +2431,12 @@ def initialize_nation (economy):
             dist = nation.districts[dnum]
             units = math.ceil(ci.protection_units_base
                               * (ARGS.population[dnum] / 1000))
-            dist.protection_units[cn] = [ci.protection_max - 1] * units
+            dist.protection_units[cn] = [ci.protection_construct_max - 1] \
+                * units
             units = math.ceil(ci.training_units_base
                               * (ARGS.population[dnum] / 1000))
-            dist.training_units[cn] = [ci.training_max - 1] * units
+            dist.training_units[cn] = [ci.training_construct_max - 1] \
+                * units
 
 
 def initialize (economy):
@@ -2117,7 +2662,16 @@ def update_economy (economy):
     if len(n.prev_budget) > 10:
         n.prev_budget = n.prev_budget[-10:]
     n.tmp_budget = sum(budget)
-    
+
+    n = economy.nation
+    economy.people[n.king.id].prop += 50
+    for d in n.vassals:
+        economy.people[d.id].prop += 30
+    for dist in n.districts:
+        economy.people[dist.governor.id].prop += 30
+        for d in dist.cavaliers:
+            economy.people[d.id].prop += 15
+
 
 def update_education (economy):
     print("\nEducation:...", flush=True)
@@ -2157,12 +2711,6 @@ def calc_nation_parameters (economy):
         
     for dnum in range(len(ARGS.population)):
         dist = nation.districts[dnum]
-        dist.tmp_disaster_brain \
-            = max(dist.cavaliers, 
-                  key=lambda d: d.disaster_prophecy_ability())
-        dist.tmp_invasion_brain \
-            = max(dist.cavaliers, 
-                  key=lambda d: d.invasion_prophecy_ability())
         dist.tmp_education = edu[dnum] / pp2[dnum]
         dist.tmp_fidelity = 1.0 - (ph[dnum] / pp2[dnum])
         dist.tmp_population = pp[dnum]
@@ -2191,7 +2739,20 @@ def calc_nation_parameters (economy):
     print("National Power:", [dist.tmp_power for dist in nation.districts])
 
 
+def calc_district_brains (economy):
+    for dist in economy.nation.districts:
+        dist.tmp_disaster_brain \
+            = max(dist.cavaliers, 
+                  key=lambda d: d.disaster_prophecy_ability())
+        dist.tmp_invasion_brain \
+            = max(dist.cavaliers, 
+                  key=lambda d: d.invasion_prophecy_ability())
+
+
 def occur_calamities (economy):
+    # make_support_consistent(economy)
+    calc_family_asset_rank(economy)
+
     l = [c for c in economy.calamities if c.term == economy.term]
     l2 = [c for c in economy.calamities if c.term <= economy.term]
     economy.calamities \
@@ -2217,9 +2778,8 @@ def prepare_for_calamities (economy):
 
     # 慰撫する。
     for dnum, dist in enumerate(nation.districts):
-        soother = [d.id for d in
-                    sorted(dist.cavaliers, reverse=True,
-                           key=lambda d: d.soothe_ability())]
+        soother = sorted(dist.cavaliers, reverse=True,
+                         key=lambda d: d.soothe_ability())
         for d in soother:
             ph = np.mean([p.political_hating for p in economy.people.values()
                           if p.death is None and p.age >= 18
@@ -2228,8 +2788,10 @@ def prepare_for_calamities (economy):
                 break
             work[d.id]['soothe'] = True
             d.soothe_district()
+            print("Soothe:", dnum, d.id)
 
     calc_nation_parameters(economy)
+    calc_district_brains(economy)
 
     # 予言に基づいてどの災害に備えるか決定する。
     calamities = [[] for i in ARGS.population]
@@ -2299,11 +2861,13 @@ def prepare_for_calamities (economy):
         l1 = []
         for cn, l in dist.protection_units.items():
             for i, x in enumerate(l):
-                l1.append((abs(base.calamity_info[cn].protection_max - x),
+                l1.append((abs(base.calamity_info[cn].protection_construct_max
+                               - x),
                            cn, 'protection', i, x))
         for cn, l in dist.training_units.items():
             for i, x in enumerate(l):
-                l1.append((abs(base.calamity_info[cn].training_max - x),
+                l1.append((abs(base.calamity_info[cn].training_construct_max
+                               - x),
                            cn, 'training', i, x))
         l1 = sorted(l1, key=lambda q: q[0], reverse=True)
         while l1:
@@ -2327,12 +2891,12 @@ def prepare_for_calamities (economy):
                                         challengeable[dnum])
                     work[did][(cn, p_or_t)] = True
                     if p_or_t == 'protection':
-                        top = (abs(base.calamity_info[cn].protection_max
-                                   - new_x),
+                        top = (abs(base.calamity_info[cn]
+                                   .protection_construct_max - new_x),
                                cn, p_or_t, i, new_x)
                     else:
-                        top = (abs(base.calamity_info[cn].training_max
-                                   - new_x),
+                        top = (abs(base.calamity_info[cn]
+                                   .training_construct_max - new_x),
                                cn, p_or_t, i, new_x)
                     l1.insert(bisect.bisect_right([q[0] for q in l1], top[0]),
                               top)
@@ -2372,10 +2936,32 @@ def decay_calamities (economy):
                  for x in dist.training_units[cn]]
 
 
+def calc_family_asset_rank (economy):
+    fa = {}
+    for p in economy.people.values():
+        x = p.supported
+        if x is None:
+            x = p.id
+        if x not in fa:
+            fa[x] = 0
+        fa[x] += p.asset_value()
+    l = sorted(fa.keys(), key=lambda x: fa[x], reverse=True)
+    s = len(l)
+    for i, x in enumerate(l):
+        fa[x] = (s - i) / s
+    for p in economy.people.values():
+        x = p.supported
+        if x is None:
+            x = p.id
+        p.tmp_asset_rank = fa[x]
+
+
 def update_calamities (economy):
     print("\nCalamities:...", flush=True)
 
-    calc_nation_parameters(economy)
+    for d in nation.dominators():
+        d.update_hating()
+    calc_district_brains(economy)
     make_calamities(economy)
     decay_calamities(economy)
     prepare_for_calamities(economy)
@@ -2396,6 +2982,8 @@ def step (economy):
     if economy.term % ARGS.economy_period == 0:
         update_economy(economy)
 
+        for p in economy.people.values():
+            p.tmp_land_damage = 0
         l = []
         for p in economy.people.values():
             if p.death is not None:
@@ -2459,6 +3047,8 @@ def main (eplot):
             pickle.dump((ARGS, economy), f)
 
     print("\nFinish", flush=True)
+    print("N_calamity:", N_calamity)
+    print("D_calamity:", D_calamity)
     if not ARGS.no_view:
         plt.show()
 

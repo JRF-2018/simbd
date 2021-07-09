@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.1' # Time-stamp: <2021-06-28T03:54:46Z>
+__version__ = '0.0.2' # Time-stamp: <2021-07-02T11:40:00Z>
 ## Language: Japanese/UTF-8
 
 """Simulation Buddhism Prototype No.2 - Main
@@ -59,7 +59,7 @@ from simbdp2.inherit import recalc_inheritance_share
 ARGS.load = False
 ARGS.save = False
 # セーブするファイル名
-ARGS.pickle = 'simbdp1.pickle'
+ARGS.pickle = 'simbdp2.pickle'
 # 途中エラーなどがある場合に備えてセーブする間隔
 ARGS.save_period = 120
 # 試行数
@@ -334,6 +334,8 @@ def step (economy):
     if economy.term % ARGS.economy_period == 0:
         update_economy(economy)
 
+        for p in economy.people.values():
+            p.tmp_land_damage = 0
         l = []
         for p in economy.people.values():
             if p.death is not None:

@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.4' # Time-stamp: <2021-04-17T23:49:40Z>
+__version__ = '0.0.5' # Time-stamp: <2021-07-02T11:41:13Z>
 ## Language: Japanese/UTF-8
 
 """Simulation Buddhism Prototype No.1 - Main
@@ -334,6 +334,8 @@ def step (economy):
     if economy.term % ARGS.economy_period == 0:
         update_economy(economy)
 
+        for p in economy.people.values():
+            p.tmp_land_damage = 0
         l = []
         for p in economy.people.values():
             if p.death is not None:
