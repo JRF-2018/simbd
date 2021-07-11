@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.2' # Time-stamp: <2021-07-09T11:22:38Z>
+__version__ = '0.0.3' # Time-stamp: <2021-07-11T06:16:10Z>
 ## Language: Japanese/UTF-8
 
 """支配と災害のシミュレーション"""
@@ -24,9 +24,13 @@ import math
 import random
 import numpy as np
 import bisect
+# This is needed for scipy of Windows if you need Ctrl-C debugging.
+import os
+os.environ['FOR_DISABLE_CONSOLE_CTRL_HANDLER'] = '1'
 from scipy.special import gamma, factorial
 import matplotlib.pyplot as plt
 import pickle
+import signal
 
 import argparse
 ARGS = argparse.Namespace()
@@ -44,6 +48,8 @@ ARGS.save = False
 ARGS.pickle = 'test_of_domination_2.pickle'
 # 途中エラーなどがある場合に備えてセーブする間隔
 ARGS.save_period = 120
+# デバッガを起動する期
+ARGS.debug_term = None
 # 試行数
 ARGS.trials = 50
 # ID のランダムに決める部分の長さ
@@ -142,6 +148,8 @@ ARGS.damage_scale_filter = {}
 
 SAVED_ECONOMY = None
 
+DEBUG_NEXT_TERM = False
+
 N_calamity = {}
 D_calamity = {}
 
@@ -153,6 +161,7 @@ def parse_args (view_options=['none']):
 
     parser.add_argument("-L", "--load", action="store_true")
     parser.add_argument("-S", "--save", action="store_true")
+    parser.add_argument("--debug-term", type=int)
     parser.add_argument("-t", "--trials", type=int)
     parser.add_argument("-p", "--population", type=str)
     parser.add_argument("--min-birth", type=float)
@@ -162,7 +171,8 @@ def parse_args (view_options=['none']):
     parser.add_argument("--view-4", choices=view_options)
     parser.add_argument("--damage-scale-filter", type=str)
 
-    specials = set(['load', 'save', 'trials', 'population', 'min_birth',
+    specials = set(['load', 'save', 'debug_term',
+                    'trials', 'population', 'min_birth',
                     'view_1', 'view_2', 'view_3', 'view_4',
                     'damage_scale_filter'])
     for p, v in vars(ARGS).items():
@@ -2959,7 +2969,7 @@ def calc_family_asset_rank (economy):
 def update_calamities (economy):
     print("\nCalamities:...", flush=True)
 
-    for d in nation.dominators():
+    for d in economy.nation.dominators():
         d.update_hating()
     calc_district_brains(economy)
     make_calamities(economy)
@@ -2968,7 +2978,14 @@ def update_calamities (economy):
     occur_calamities(economy)
 
 
+def sigint_handler (signum, frame):
+    global DEBUG_NEXT_TERM
+    print("SIGNAL", flush=True)
+    DEBUG_NEXT_TERM = True
+
+
 def step (economy):
+    global DEBUG_NEXT_TERM
     economy.term += 1
     print("\nTerm %d (%s):"
           % (economy.term, term_to_year_month(economy.term)),
@@ -2978,6 +2995,20 @@ def step (economy):
 
     for p in economy.people.values():
         p.age = (economy.term - p.birth_term) / 12
+
+    if DEBUG_NEXT_TERM:
+        DEBUG_NEXT_TERM = False
+        import pdb; pdb.set_trace()
+    if ARGS.debug_term is not None and economy.term == ARGS.debug_term:
+        ARGS.debug_term = None
+        import pdb; pdb.set_trace()
+
+    update_education(economy)
+    update_calamities(economy)
+    update_death(economy)
+    update_birth(economy)
+    update_support(economy)
+    update_tombs(economy)
 
     if economy.term % ARGS.economy_period == 0:
         update_economy(economy)
@@ -2996,13 +3027,6 @@ def step (economy):
                 s = economy.people[p.supported]
                 s.supporting.remove(p.id)
                 p.supported = None
-
-    update_education(economy)
-    update_calamities(economy)
-    update_death(economy)
-    update_birth(economy)
-    update_support(economy)
-    update_tombs(economy)
 
 
 def main (eplot):
@@ -3056,4 +3080,5 @@ def main (eplot):
 if __name__ == '__main__':
     eplot = EconomyPlot()
     parse_args(view_options=['none'] + list(eplot.options.keys()))
+    signal.signal(signal.SIGINT, sigint_handler)
     main(eplot)
