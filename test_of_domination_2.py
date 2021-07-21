@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.3' # Time-stamp: <2021-07-11T06:16:10Z>
+__version__ = '0.0.4' # Time-stamp: <2021-07-21T11:15:48Z>
 ## Language: Japanese/UTF-8
 
 """支配と災害のシミュレーション"""
@@ -145,6 +145,11 @@ ARGS.plague_average_term = 50.0 * 12
 # 例えば、↓の場合、死亡の評価を 1/2 に、財産の評価を 2倍にする。
 #ARGS.damage_scale_filter = {'death': 0.5, 'property': 2}
 ARGS.damage_scale_filter = {}
+# 転居の際の基準の定数。
+ARGS.moving_const_1 = 2.0
+ARGS.moving_const_2 = 0.1
+ARGS.moving_const_3 = 0.05
+ARGS.moving_const_4 = 0.10
 
 SAVED_ECONOMY = None
 
@@ -348,8 +353,19 @@ class PersonEC (Person0):
             return 1 - (1 - 0.2 * self.education) * (1 - self.ambition)
 
     def change_district (self, new_district):
-        #土地を売ったり買ったりする処理が必要かも。
-        self.district = new_district
+        p = self
+        economy = self.economy
+        f = p.district
+        t = new_district
+        if f == t:
+            return
+        assert p.dominator_position is None
+        r = economy.tmp_moving_matrix[f, t]
+        new_land = math.floor(p.land * r)
+        p.prop += (new_land - p.land) * ARGS.prop_value_of_land
+        p.land = new_land
+        p.prop *= r
+        p.district = t
 
 
 class PersonBT (Person0):
@@ -1768,7 +1784,10 @@ class Economy0 (Frozen):
         self.tombs = OrderedDict()
 
         self.nation = None
+        self.dominator_parameters = {}
         self.calamities = []
+
+        self.tmp_moving_matrix = None
 
         self.want_child_mag = 1.0
         self.prev_birth = ARGS.min_birth
@@ -1867,6 +1886,11 @@ class EconomyDT (Economy0):
             economy.new_dominator(pos, q)
 
         for p in persons:
+            if p.id in economy.dominator_parameters:
+                economy.dominator_parameters[p.id].economy = None
+                del economy.dominator_parameters[p.id]
+
+        for p in persons:
             spouse = None
             if p.marriage is not None \
                and (p.marriage.spouse is ''
@@ -1947,21 +1971,26 @@ class EconomyDM (Economy0):
 
     def new_dominator (self, position, person):
         economy = self
-        d = Dominator()
         p = person
-        d.id = p.id
+        if p.id in economy.dominator_parameters:
+            d = economy.dominator_parameters[p.id]
+        else:
+            d = Dominator()
+            economy.dominator_parameters[p.id] = d
+            d.id = p.id
+            d.people_trust = random.random()
+            d.faith_realization = random.random()
+            d.disaster_prophecy = random.random()
+            d.disaster_strategy = random.random()
+            d.disaster_tactics = random.random()
+            d.combat_prophecy = random.random()
+            #d.combat_strategy = random.random()
+            d.combat_tactics = random.random()
+
         d.economy = economy
         d.district = p.district
         d.position = position
         p.dominator_position = position
-        d.people_trust = random.random()
-        d.faith_realization = random.random()
-        d.disaster_prophecy = random.random()
-        d.disaster_strategy = random.random()
-        d.disaster_tactics = random.random()
-        d.combat_prophecy = random.random()
-        #d.combat_strategy = random.random()
-        d.combat_tactics = random.random()
         if position == 'king':
             economy.nation.king = d
         elif position == 'governor':
@@ -2635,6 +2664,107 @@ def update_support (economy):
     make_support_consistent(economy)
 
 
+def calc_moving_matrix (economy):
+    mtx = np.empty((len(ARGS.population), len(ARGS.population)))
+    economy.tmp_moving_matrix = mtx
+    pp = [0] * len(ARGS.population)
+    for p in economy.people.values():
+        if p.death is None:
+            pp[p.district] += 1
+    relp = [pp[dnum] / ARGS.population[dnum]
+            for dnum in range(len(ARGS.population))]
+    print(relp)
+    for i in range(len(ARGS.population)):
+        for j in range(len(ARGS.population)):
+            q = np_clip(relp[i] / relp[j], 1.0/ARGS.moving_const_1,
+                        ARGS.moving_const_1)
+            mtx[i, j] = 1 + ARGS.moving_const_2 \
+                * (math.log(q) / math.log(ARGS.moving_const_1))
+
+
+def move_some_people (economy):
+    mtx = np.empty((len(ARGS.population), len(ARGS.population)))
+    economy.tmp_moving_matrix = mtx
+    pp = [0] * len(ARGS.population)
+    for p in economy.people.values():
+        if p.death is None:
+            pp[p.district] += 1
+    relp = [pp[dnum] / ARGS.population[dnum]
+            for dnum in range(len(ARGS.population))]
+    print(relp)
+    for i in range(len(ARGS.population)):
+        for j in range(len(ARGS.population)):
+            q = np_clip(relp[i] / relp[j], 1.0/ARGS.moving_const_1,
+                        ARGS.moving_const_1)
+            mtx[i, j] = 1 + ARGS.moving_const_2 \
+                * (math.log(q) / math.log(ARGS.moving_const_1))
+
+    dpeople = [[] for dnum in range(len(ARGS.population))]
+    for p in economy.people.values():
+        if p.death is None and p.dominator_position is None:
+            dpeople[p.district].append(p)
+    
+    arelp = np.mean(relp)
+    dfroms = [dnum for dnum in range(len(ARGS.population))
+              if relp[dnum] >= arelp]
+    dtos = [dnum for dnum in range(len(ARGS.population))
+            if relp[dnum] < arelp]
+
+    outfamily_num = 0
+    outfamily = set()
+    for dfrom in dfroms:
+        ppout = 0
+        for dto in dtos:
+            q = np_clip(relp[dfrom] / relp[dto], 1.0 / ARGS.moving_const_1,
+                        ARGS.moving_const_1)
+            assert q >= 1.0
+            pt = ARGS.moving_const_3 \
+                * (math.log(q) / math.log(ARGS.moving_const_1))
+            ppout += min([pp[dfrom], pp[dto]]) * pt
+        if ppout >= pp[dfrom] * ARGS.moving_const_4:
+            ppout = pp[dfrom] * ARGS.moving_const_4
+        ppout = math.floor(ppout)
+        pout = random.sample(dpeople[dfrom], ppout)
+        ppout2 = 0
+        while ppout2 < ppout and pout:
+            p = pout.pop(0)
+            sid = p.supported
+            if sid is None:
+                sid = p.id
+            if sid in outfamily:
+                continue
+            ex = False
+            for cid in [sid] + economy.people[sid].supporting:
+                if economy.people[cid].dominator_position is not None:
+                    ex = True
+                    break
+            if ex:
+                continue
+            outfamily.add(sid)
+            ppout2 += 1 + len(economy.people[sid].supporting)
+        outfamily_num += ppout2
+
+    mtx = np.zeros((len(ARGS.population), len(ARGS.population)),
+                   dtype=np.int)
+    s_needed = sum([arelp * ARGS.population[dnum] - pp[dnum]
+                    for dnum in dtos])
+    outfamily = list(outfamily)
+    outfamily = random.sample(outfamily, len(outfamily))
+    for dto in dtos:
+        needed = arelp * ARGS.population[dto] - pp[dto]
+        n = 0
+        ne = outfamily_num * needed / s_needed
+        while n < ne and outfamily:
+            sid = outfamily.pop(0)
+            s = economy.people[sid]
+            mtx[s.district, dto] += 1 + len(s.supporting)
+            for cid in [sid] + s.supporting:
+                economy.people[cid].change_district(dto)
+            n += 1 + len(s.supporting)
+
+    print("Move:", mtx)
+
+
 def update_economy (economy):
     print("\nEconomy:...", flush=True)
 
@@ -2674,13 +2804,25 @@ def update_economy (economy):
     n.tmp_budget = sum(budget)
 
     n = economy.nation
+    budget = [1 if b <= 1 else b for b in budget]
+    sb = sum(budget)
     economy.people[n.king.id].prop += 50
     for d in n.vassals:
         economy.people[d.id].prop += 30
+    sp = 50 + 30 * len(n.vassals)
+    n.tmp_budget -= sp
+    for dnum, dist in enumerate(n.districts):
+        dist.tmp_budget -= sp * (budget[dnum] / sb)
     for dist in n.districts:
         economy.people[dist.governor.id].prop += 30
         for d in dist.cavaliers:
             economy.people[d.id].prop += 15
+        sp = 30 + 15 * len(dist.cavaliers)
+        n.tmp_budget -= sp
+        dist.tmp_budget -= sp
+
+    # 本来は商農比率の適用の前あたりに転居を計算。
+    move_some_people(economy)
 
 
 def update_education (economy):
@@ -2715,9 +2857,7 @@ def calc_nation_parameters (economy):
         pbm = np.mean(nation.prev_budget)
     else:
         pbm = ARGS.initial_budget_per_person * sum(pp)
-    pow2n = nation.tmp_budget / pbm
-    if pow2n > 1.0:
-        pow2n = 1.0
+    pow2n = np_clip(nation.tmp_budget / pbm, 0, 1.0)
         
     for dnum in range(len(ARGS.population)):
         dist = nation.districts[dnum]
@@ -2732,9 +2872,7 @@ def calc_nation_parameters (economy):
             pbm = np.mean(dist.prev_budget)
         else:
             pbm = ARGS.initial_budget_per_person * pp[dnum]
-        pow2 = dist.tmp_budget / pbm
-        if pow2 > 1.0:
-            pow2 = 1.0
+        pow2 = np_clip(dist.tmp_budget / pbm, 0, 1.0)
         pow2 = (pow2 + pow2n) / 2
         pow3 = dist.tmp_fidelity
         ed = dist.tmp_education
@@ -3003,6 +3141,7 @@ def step (economy):
         ARGS.debug_term = None
         import pdb; pdb.set_trace()
 
+    calc_moving_matrix(economy)
     update_education(economy)
     update_calamities(economy)
     update_death(economy)

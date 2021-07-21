@@ -1,7 +1,7 @@
 
 
     仏教的哲学的社会シミュレーション
-    (Created: 2021-02-27, Time-stamp: <2021-06-28T09:16:14Z>)
+    (Created: 2021-02-27, Time-stamp: <2021-07-21T11:17:49Z>)
 
 
 ** このファイルについて
@@ -146,6 +146,10 @@ https://gist.github.com/JRF-2018/aace48ebc44229844b6f75a39a287578
   * test_of_domination_2.py
 
 支配と災害のテスト。
+
+  * test_of_moving_1.py
+
+転居のテスト。
 
 
 
