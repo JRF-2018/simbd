@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.4' # Time-stamp: <2021-07-21T11:15:48Z>
+__version__ = '0.0.5' # Time-stamp: <2021-07-23T07:21:48Z>
 ## Language: Japanese/UTF-8
 
 """支配と災害のシミュレーション"""
@@ -99,6 +99,8 @@ ARGS.a60_death_rate = calc_increase_rate((80 - 60) * 12, 70/100)
 ARGS.a80_death_rate = calc_increase_rate((110 - 80) * 12, 99/100)
 # 0歳から3歳までの幼児死亡率
 ARGS.infant_death_rate = calc_increase_rate(3 * 12, 5/100)
+# 病気またはケガによる死亡率の上昇
+ARGS.injured_death_rate = calc_increase_rate((80 - 60) * 12, 70/100)
 # 家系を辿った距離の最大値
 ARGS.max_family_distance = 6
 # 誕生率
@@ -150,6 +152,8 @@ ARGS.moving_const_1 = 2.0
 ARGS.moving_const_2 = 0.1
 ARGS.moving_const_3 = 0.05
 ARGS.moving_const_4 = 0.10
+# 自由な転居の確率。
+ARGS.free_move_rate = 0.005
 
 SAVED_ECONOMY = None
 
@@ -309,6 +313,8 @@ class Person0 (SerializableExEconomy):
         self.consumption = 0   # 消費額
         self.ambition = 0      # 上昇志向
         self.education = 0     # 教化レベル
+        self.injured = 0       # 労働力に影響する病気またはケガによる障害
+        self.tmp_injured = 0   # 労働力に影響する一時的な病気またはケガ
 
         self.trash = []        # 終った関係
         self.adult_success = 0 # 不倫成功回数
@@ -1104,7 +1110,7 @@ class Calamity (SerializableExEconomy):        # 「災害」＝「惨禍」
         people = random.sample(people, damage)
         print("People Injure:", len(people))
         economy.add_family_political_hating(people, 0.5)
-        # economy.injure(people)
+        economy.injure(people, 0.5, 0.5)
 
     def damage_soldier_injury (self, scale):
         c = self
@@ -1131,7 +1137,7 @@ class Calamity (SerializableExEconomy):        # 「災害」＝「惨禍」
                               p=l2/np.sum(l2))
         print("Soldiers Injure:", len(l3))
         economy.add_family_political_hating(l3, 0.5)
-        # economy.injure(l3)
+        economy.injure(l3, 0.5, 0.5)
 
     def damage_property (self, scale):
         c = self
@@ -2071,6 +2077,14 @@ class EconomyDM (Economy0):
             a = random.uniform(0, max_adder)
             p.political_hating = np_clip(p.political_hating + a, 0, 1)
 
+    def injure (self, people, max_permanent=0.5, max_temporal=0.5):
+        economy = self
+        fa = set()
+        for p in people:
+            a = random.uniform(0, max_permanent)
+            b = random.uniform(0, max_temporal)
+            p.injured = np_clip(p.injured + a, 0, 1)
+            p.tmp_injured = np_clip(p.tmp_injured + b, 0, 1)
 
 class Economy (EconomyBT, EconomyDT, EconomyDM):
     pass
@@ -2559,17 +2573,18 @@ def update_death (economy):
             if random.random() < ARGS.general_death_rate:
                 l.append(p)
             else:
+                threshold = 0
                 if p.age > 110:
-                    l.append(p)
+                    threshold = 1
                 elif p.age > 80 and p.age <= 100:
-                    if random.random() < ARGS.a80_death_rate:
-                        l.append(p)
+                    threshold = ARGS.a80_death_rate
                 elif p.age > 60 and p.age <= 80:
-                    if random.random() < ARGS.a60_death_rate:
-                        l.append(p)
+                    threshold = ARGS.a60_death_rate
                 elif p.age >= 0 and p.age <= 3:
-                    if random.random() < ARGS.infant_death_rate:
-                        l.append(p)
+                    threshold = ARGS.infant_death_rate
+                threshold2 = ARGS.injured_death_rate * p.injured
+                if random.random() < max([threshold, threshold2]):
+                    l.append(p)
     economy.die(l)
 
 
@@ -2682,6 +2697,72 @@ def calc_moving_matrix (economy):
                 * (math.log(q) / math.log(ARGS.moving_const_1))
 
 
+def move_freely_some_people (economy):
+    mtx = np.empty((len(ARGS.population), len(ARGS.population)))
+    economy.tmp_moving_matrix = mtx
+    pp = [0] * len(ARGS.population)
+    for p in economy.people.values():
+        if p.death is None:
+            pp[p.district] += 1
+    relp = [pp[dnum] / ARGS.population[dnum]
+            for dnum in range(len(ARGS.population))]
+    print(relp)
+    for i in range(len(ARGS.population)):
+        for j in range(len(ARGS.population)):
+            q = np_clip(relp[i] / relp[j], 1.0/ARGS.moving_const_1,
+                        ARGS.moving_const_1)
+            mtx[i, j] = 1 + ARGS.moving_const_2 \
+                * (math.log(q) / math.log(ARGS.moving_const_1))
+
+    dpeople = [[] for dnum in range(len(ARGS.population))]
+    for p in economy.people.values():
+        if p.death is None and p.dominator_position is None:
+            dpeople[p.district].append(p)
+
+    outfamily = set()
+    outfamily_num = 0
+    for dfrom in range(len(ARGS.population)):
+        ppout = math.ceil(pp[dfrom] * ARGS.free_move_rate)
+        pout = random.sample(dpeople[dfrom], ppout)
+        ppout2 = 0
+        while ppout2 < ppout and pout:
+            p = pout.pop(0)
+            sid = p.supported
+            if sid is None:
+                sid = p.id
+            if sid in outfamily:
+                continue
+            ex = False
+            for cid in [sid] + economy.people[sid].supporting:
+                if economy.people[cid].dominator_position is not None:
+                    ex = True
+                    break
+            if ex:
+                continue
+            outfamily.add(sid)
+            ppout2 += 1 + len(economy.people[sid].supporting)
+        outfamily_num += ppout2
+
+    mtx = np.zeros((len(ARGS.population), len(ARGS.population)),
+                   dtype=np.int)
+    outfamily = list(outfamily)
+    random.shuffle(outfamily)
+    dtos = list(range(len(ARGS.population)))
+    random.shuffle(dtos)
+    for dto in dtos:
+        n = 0
+        ne = math.ceil(pp[dto] * ARGS.free_move_rate)
+        while n < ne and outfamily:
+            sid = outfamily.pop(0)
+            s = economy.people[sid]
+            mtx[s.district, dto] += 1 + len(s.supporting)
+            for cid in [sid] + s.supporting:
+                economy.people[cid].change_district(dto)
+            n += 1 + len(s.supporting)
+
+    print("Free Move:", mtx)
+
+
 def move_some_people (economy):
     mtx = np.empty((len(ARGS.population), len(ARGS.population)))
     economy.tmp_moving_matrix = mtx
@@ -2707,8 +2788,9 @@ def move_some_people (economy):
     arelp = np.mean(relp)
     dfroms = [dnum for dnum in range(len(ARGS.population))
               if relp[dnum] >= arelp]
-    dtos = [dnum for dnum in range(len(ARGS.population))
-            if relp[dnum] < arelp]
+    dtos = sorted([dnum for dnum in range(len(ARGS.population))
+                   if relp[dnum] < arelp],
+                  key=lambda x: relp[x])
 
     outfamily_num = 0
     outfamily = set()
@@ -2749,7 +2831,7 @@ def move_some_people (economy):
     s_needed = sum([arelp * ARGS.population[dnum] - pp[dnum]
                     for dnum in dtos])
     outfamily = list(outfamily)
-    outfamily = random.sample(outfamily, len(outfamily))
+    random.shuffle(outfamily)
     for dto in dtos:
         needed = arelp * ARGS.population[dto] - pp[dto]
         n = 0
@@ -2822,6 +2904,7 @@ def update_economy (economy):
         dist.tmp_budget -= sp
 
     # 本来は商農比率の適用の前あたりに転居を計算。
+    move_freely_some_people(economy)
     move_some_people(economy)
 
 
@@ -2834,6 +2917,14 @@ def update_education (economy):
             p.education = np_clip(p.education, 0, 1)
 
 
+def update_injured (economy):
+    print("\nInjured:...", flush=True)
+
+    for p in economy.people.values():
+        if p.death is None:
+            p.tmp_injured = np_clip(p.tmp_injured - 0.1, 0, 1)
+
+            
 def calc_nation_parameters (economy):
     nation = economy.nation
     pp = [0] * len(ARGS.population)
@@ -3143,6 +3234,7 @@ def step (economy):
 
     calc_moving_matrix(economy)
     update_education(economy)
+    update_injured(economy)
     update_calamities(economy)
     update_death(economy)
     update_birth(economy)

@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.1' # Time-stamp: <2021-07-21T11:11:14Z>
+__version__ = '0.0.2' # Time-stamp: <2021-07-23T07:23:20Z>
 ## Language: Japanese/UTF-8
 
 """転居のシミュレーション"""
@@ -70,6 +70,8 @@ ARGS.moving_const_1 = 2.0
 ARGS.moving_const_2 = 0.1
 ARGS.moving_const_3 = 0.05
 ARGS.moving_const_4 = 0.10
+# 自由な転居の確率。
+ARGS.free_move_rate = 0.005
 
 def parse_args ():
     global SAVED_ECONOMY
@@ -501,6 +503,72 @@ def calc_moving_matrix (economy):
                 * (math.log(q) / math.log(ARGS.moving_const_1))
 
 
+def move_freely_some_people (economy):
+    mtx = np.empty((len(ARGS.population), len(ARGS.population)))
+    economy.tmp_moving_matrix = mtx
+    pp = [0] * len(ARGS.population)
+    for p in economy.people.values():
+        if p.death is None:
+            pp[p.district] += 1
+    relp = [pp[dnum] / ARGS.population[dnum]
+            for dnum in range(len(ARGS.population))]
+    print(relp)
+    for i in range(len(ARGS.population)):
+        for j in range(len(ARGS.population)):
+            q = np_clip(relp[i] / relp[j], 1.0/ARGS.moving_const_1,
+                        ARGS.moving_const_1)
+            mtx[i, j] = 1 + ARGS.moving_const_2 \
+                * (math.log(q) / math.log(ARGS.moving_const_1))
+
+    dpeople = [[] for dnum in range(len(ARGS.population))]
+    for p in economy.people.values():
+        if p.death is None and p.dominator_position is None:
+            dpeople[p.district].append(p)
+
+    outfamily = set()
+    outfamily_num = 0
+    for dfrom in range(len(ARGS.population)):
+        ppout = math.ceil(pp[dfrom] * ARGS.free_move_rate)
+        pout = random.sample(dpeople[dfrom], ppout)
+        ppout2 = 0
+        while ppout2 < ppout and pout:
+            p = pout.pop(0)
+            sid = p.supported
+            if sid is None:
+                sid = p.id
+            if sid in outfamily:
+                continue
+            ex = False
+            for cid in [sid] + economy.people[sid].supporting:
+                if economy.people[cid].dominator_position is not None:
+                    ex = True
+                    break
+            if ex:
+                continue
+            outfamily.add(sid)
+            ppout2 += 1 + len(economy.people[sid].supporting)
+        outfamily_num += ppout2
+
+    mtx = np.zeros((len(ARGS.population), len(ARGS.population)),
+                   dtype=np.int)
+    outfamily = list(outfamily)
+    random.shuffle(outfamily)
+    dtos = list(range(len(ARGS.population)))
+    random.shuffle(dtos)
+    for dto in dtos:
+        n = 0
+        ne = math.ceil(pp[dto] * ARGS.free_move_rate)
+        while n < ne and outfamily:
+            sid = outfamily.pop(0)
+            s = economy.people[sid]
+            mtx[s.district, dto] += 1 + len(s.supporting)
+            for cid in [sid] + s.supporting:
+                economy.people[cid].change_district(dto)
+            n += 1 + len(s.supporting)
+
+    print("Free Move:", mtx)
+
+
 def move_some_people (economy):
     mtx = np.empty((len(ARGS.population), len(ARGS.population)))
     economy.tmp_moving_matrix = mtx
@@ -526,8 +594,9 @@ def move_some_people (economy):
     arelp = np.mean(relp)
     dfroms = [dnum for dnum in range(len(ARGS.population))
               if relp[dnum] >= arelp]
-    dtos = [dnum for dnum in range(len(ARGS.population))
-            if relp[dnum] < arelp]
+    dtos = sorted([dnum for dnum in range(len(ARGS.population))
+                   if relp[dnum] < arelp],
+                  key=lambda x: relp[x])
 
     outfamily_num = 0
     outfamily = set()
@@ -568,7 +637,7 @@ def move_some_people (economy):
     s_needed = sum([arelp * ARGS.population[dnum] - pp[dnum]
                     for dnum in dtos])
     outfamily = list(outfamily)
-    outfamily = random.sample(outfamily, len(outfamily))
+    random.shuffle(outfamily)
     for dto in dtos:
         needed = arelp * ARGS.population[dto] - pp[dto]
         n = 0
@@ -668,6 +737,7 @@ def main ():
         economy.people[pid].change_district(1)
     print(x1)
 
+    move_freely_some_people(economy)
     move_some_people(economy)
     
     print("\nFinish", flush=True)
