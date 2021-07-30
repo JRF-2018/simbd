@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.5' # Time-stamp: <2021-07-23T07:21:48Z>
+__version__ = '0.0.6' # Time-stamp: <2021-07-30T12:16:37Z>
 ## Language: Japanese/UTF-8
 
 """支配と災害のシミュレーション"""
@@ -154,6 +154,8 @@ ARGS.moving_const_3 = 0.05
 ARGS.moving_const_4 = 0.10
 # 自由な転居の確率。
 ARGS.free_move_rate = 0.005
+# 支配層の継承者がいないときに恨むかどうか。
+ARGS.no_successor_resentment = False
 
 SAVED_ECONOMY = None
 
@@ -365,7 +367,9 @@ class PersonEC (Person0):
         t = new_district
         if f == t:
             return
-        assert p.dominator_position is None
+        if p.dominator_position is not None:
+            d = p.get_dominator()
+            d.resign()
         r = economy.tmp_moving_matrix[f, t]
         new_land = math.floor(p.land * r)
         p.prop += (new_land - p.land) * ARGS.prop_value_of_land
@@ -494,6 +498,22 @@ class PersonDM (Person0):
                 if d.id == p.id:
                     return d
         raise ValueError('Person.dominator_position is inconsistent.')
+
+    def highest_position_of_family (self):
+        p = self
+        economy = self.economy
+        sid = p.supported
+        if sid is None:
+            sid = p.id
+        
+        qid = max([sid] + economy.people[sid].supporting,
+                  key=(lambda x: 0 if economy.people[x].death is not None
+                       else economy.position_rank(economy.people[x]
+                                                  .dominator_position)))
+        if economy.people[qid].death is not None:
+            return None
+        return economy.people[qid].dominator_position
+
 
 class Person (PersonEC, PersonBT, PersonDT, PersonSUP, PersonDM):
     pass
@@ -636,16 +656,25 @@ class Dominator (SerializableExEconomy):
         for q_id, d in r.items():
             if d < k_distance:
                 q = economy.get_person(q_id)
-                if k_id in q.hating and q.hating[k_id] > hk:
+                if q is not None and k_id in q.hating and q.hating[k_id] > hk:
                     hk = q.hating[k_id]
             if d < g_distance:
                 q =  economy.get_person(q_id)
-                if g_id in q.hating and q.hating[g_id] > hg:
+                if q is not None and g_id in q.hating and q.hating[g_id] > hg:
                     hg = q.hating[g_id]
 
         d0.hating_to_king = hk
         d0.hating_to_governor = hg
 
+    def resign (self):
+        d = self
+        economy = self.economy
+        nation = economy.nation
+        p = economy.people[d.id]
+        assert p.dominator_position is not None
+        nation.nomination.append((p.dominator_position, p.district, p.dominator_position, p.id))
+        economy.delete_dominator(p)
+        
     def soothe_district (self):
         d = self
         economy = self.economy
@@ -716,6 +745,17 @@ class Dominator (SerializableExEconomy):
                         0, 1))
         return x
 
+    def general_ability (self):
+        d = self
+        return np.mean([d.people_trust,
+                        d.faith_realization,
+                        d.disaster_prophecy,
+                        d.disaster_strategy,
+                        d.disaster_tactics,
+                        d.combat_prophecy,
+                        # d.combat_strategy,
+                        d.combat_tactics])
+    
     def soothe_ability (self):
         d = self
         return 0.5 * d.people_trust + 0.5 * d.faith_realization
@@ -784,11 +824,19 @@ class Nation (Serializable):
         self.tmp_budget = 0       # 予算 (寄付金総額 / 12)
         self.prev_budget = []     # 過去10年の予算平均
 
+        self.nomination = []      # 後継者の指名
+
     def dominators (self):
         nation = self
-        return [nation.king] + nation.vassals \
-            + sum([[ds.governor] + ds.cavaliers
-                   for ds in self.districts], [])
+        l = []
+        if nation.king is not None:
+            l.append(nation.king)
+        l += nation.vassals
+        for ds in self.districts:
+            if ds.governor is not None:
+                l.append(ds.governor)
+            l += ds.cavaliers
+        return l
 
 
 base.calamity_info = {}
@@ -1272,7 +1320,7 @@ class Calamity (SerializableExEconomy):        # 「災害」＝「惨禍」
         p = damage / r
         l = []
         for d in [nation.king, dist.governor] + nation.vassals:
-            if random.random() < 0.1 * p:
+            if d is not None and random.random() < 0.1 * p:
                 l.append(d.id)
         for d in dist.cavaliers:
             p2 = p
@@ -1881,15 +1929,7 @@ class EconomyDT (Economy0):
         for p in persons:
             if p.dominator_position is None:
                 continue
-            pos = p.dominator_position
-            q = None
-            while q is None:
-                q = random.choice(pp)
-                if q.dominator_position is not None \
-                   or q.district != p.district:
-                    q = None
-            economy.delete_dominator(p)
-            economy.new_dominator(pos, q)
+            p.get_dominator().resign()
 
         for p in persons:
             if p.id in economy.dominator_parameters:
@@ -2085,6 +2125,17 @@ class EconomyDM (Economy0):
             b = random.uniform(0, max_temporal)
             p.injured = np_clip(p.injured + a, 0, 1)
             p.tmp_injured = np_clip(p.tmp_injured + b, 0, 1)
+
+    position_rank_table = {
+        None: 0,
+        'cavalier': 1,
+        'vassal': 2,
+        'governor': 3,
+        'king': 4
+    }
+    def position_rank (self, pos):
+        return type(self).position_rank_table[pos]
+
 
 class Economy (EconomyBT, EconomyDT, EconomyDM):
     pass
@@ -2443,24 +2494,29 @@ def initialize_nation (economy):
     Q.marriage = Marriage()
     Q.marriage.spouse = K.id
     ch = Child()
+    ch.birth_term = -100
     ch.id = A.id
     A.father = K.id
     A.mother = Q.id
     K.children.append(ch)
     Q.children.append(ch)
     ch = Child()
+    ch.birth_term = -110
     ch.id = B.id
     B.mother = Q.id
     Q.children.append(ch)
     ch = Child()
+    ch.birth_term = -120
     ch.id = C.id
     C.father = K.id
     K.children.append(ch)
     ch = Child()
+    ch.birth_term = -420
     ch.id = Q.id
     Q.father = H.id
     H.children.append(ch)
     ch = Child()
+    ch.birth_term = -430
     ch.id = G.id
     G.father = H.id
     H.children.append(ch)
@@ -2888,7 +2944,8 @@ def update_economy (economy):
     n = economy.nation
     budget = [1 if b <= 1 else b for b in budget]
     sb = sum(budget)
-    economy.people[n.king.id].prop += 50
+    if n.king is not None:
+        economy.people[n.king.id].prop += 50
     for d in n.vassals:
         economy.people[d.id].prop += 30
     sp = 50 + 30 * len(n.vassals)
@@ -2896,7 +2953,8 @@ def update_economy (economy):
     for dnum, dist in enumerate(n.districts):
         dist.tmp_budget -= sp * (budget[dnum] / sb)
     for dist in n.districts:
-        economy.people[dist.governor.id].prop += 30
+        if dist.governor is not None:
+            economy.people[dist.governor.id].prop += 30
         for d in dist.cavaliers:
             economy.people[d.id].prop += 15
         sp = 30 + 15 * len(dist.cavaliers)
@@ -3198,13 +3256,350 @@ def calc_family_asset_rank (economy):
 def update_calamities (economy):
     print("\nCalamities:...", flush=True)
 
-    for d in economy.nation.dominators():
-        d.update_hating()
     calc_district_brains(economy)
     make_calamities(economy)
     decay_calamities(economy)
     prepare_for_calamities(economy)
     occur_calamities(economy)
+
+
+def _random_scored_sort (paired_list):
+    l = paired_list
+    r = []
+    while l:
+        s = sum([x[0] for x in l])
+        q = s * random.random()
+        y = 0
+        for i, x in enumerate(l):
+            y += x[0]
+            if q < y:
+                r.append(x[1])
+                l = l[0:i] + l[i+1:]
+    return r
+
+
+def _successor_check (economy, person, position, dnum):
+    p = person
+    pos = position
+    if p.death is not None:
+        return False
+    if not (p.age >= 18 and p.age <= 50):
+        return False
+    pr0 = economy.position_rank(position)
+    if pr0 <= economy.position_rank(p.dominator_position):
+        return False
+    if p.district != dnum:
+        if pr0 <= economy.position_rank(p.highest_position_of_family()):
+            return False
+    return True
+
+
+def _nominate_successor (economy, person, position, dnum):
+    q = _nominate_successor_1(economy, person, position, dnum,
+                              lambda x: x.relation == 'M')
+    if q is not None:
+        return q
+    q = _nominate_successor_1(economy, person, position, dnum,
+                              lambda x: x.relation == 'M'
+                              or x.relation == 'A')
+    if q is not None:
+        return q
+    q = _nominate_successor_1(economy, person, position, dnum,
+                              lambda x: True)
+    return q
+
+
+def _nominate_successor_1 (economy, person, position, dnum, check_func):
+    p = person
+    pos = position
+
+    checked = set([p.id])
+    l = [x for x in p.children + p.trash
+         if isinstance(x, Child) and check_func(x)]
+    l.sort(key=lambda x: x.birth_term)
+    ex = None
+    for ch in l:
+        if ch.id is None or ch.id is '':
+            continue
+        checked.add(ch.id)
+        q = economy.get_person(ch.id)
+        if q is None:
+            continue
+        if _successor_check(economy, q, pos, dnum):
+            ex = q
+            break
+        l2 = [x for x in q.children + q.trash
+              if isinstance(x, Child) and check_func(x)]
+        l2.sort(key=lambda x: x.birth_term)
+        for ch2 in l2:
+            if ch2.id is None or ch2.id is '' or ch2.id not in economy.people:
+                continue
+            q2 = economy.people[ch2.id]
+            if _successor_check(economy, q2, pos, dnum):
+                ex = q2
+        if ex is not None:
+            break
+
+    if ex is not None:
+        return ex
+
+    l = []
+    q = economy.get_person(p.father)
+    if q is not None:
+        l2 = [x for x in q.children + q.trash
+              if isinstance(x, Child) and check_func(x)]
+        l2.sort(key=lambda x: x.birth_term)
+        l = l + l2
+    q = economy.get_person(p.mother)
+    if q is not None:
+        l2 = [x for x in q.children + q.trash
+              if isinstance(x, Child) and check_func(x)]
+        l2.sort(key=lambda x: x.birth_term)
+        l = l + l2
+    for ch in l:
+        if ch.id is None or ch.id is '':
+            continue
+        if ch.id in checked:
+            continue
+        checked.add(ch.id)
+        q = economy.get_person(ch.id)
+        if q is None:
+            continue
+        if _successor_check(economy, q, pos, dnum):
+            ex = q
+            break
+        l2 = [x for x in q.children + q.trash
+              if isinstance(x, Child) and check_func(x)]
+        l2.sort(key=lambda x: x.birth_term)
+        for ch2 in l2:
+            if ch2.id is None or ch2.id is '' or ch2.id not in economy.people:
+                continue
+            q2 = economy.people[ch2.id]
+            if _successor_check(economy, q2, pos, dnum):
+                ex = q2
+        if ex is not None:
+            break
+
+    return ex
+
+
+def nominate_successors (economy):
+    nation = economy.nation
+
+    new_nomination = []
+    while True:
+        ex = None
+        exd = None
+        if nation.king is None:
+            ex = 'king'
+            exd = 0
+        if ex is None:
+            if len(nation.vassals) < 10:
+                ex = 'vassal'
+                exd = 0
+        for dnum, dist in enumerate(nation.districts):
+            if ex is not None:
+                continue
+            if dist.governor is None:
+                ex = 'governor'
+                exd = dnum
+        for dnum, dist in enumerate(nation.districts):
+            if ex is not None:
+                continue
+            if len(dist.cavaliers) < math.ceil(ARGS.population[dnum] / 1000):
+                ex = 'cavalier'
+                exd = dnum
+        if ex is None:
+            break
+        print("nominate:", ex, exd)
+        nation.nomination = [((pos, dnum, pos2, pid)
+                              if pid not in economy.people
+                              or economy.position_rank(pos2) \
+                              >= economy.position_rank(economy.people[pid]
+                                                       .dominator_position)
+                              else (pos, dnum,
+                                    economy.people[pid].dominator_position,
+                                    pid))
+                             for pos, dnum, pos2, pid in nation.nomination
+                             if economy.get_person(pid) is not None]
+        noml = [(pos, dnum, pos2, pid)
+                for pos, dnum, pos2, pid in nation.nomination
+                if pos == ex and dnum == exd]
+        nom = None
+        if noml:
+            nomm = max(noml, key=lambda x: economy.position_rank(x[2]))
+            noml = [x for x in noml if economy.position_rank(x[2])
+                    == economy.position_rank(nomm[2])]
+            nom = random.choice(noml)
+        if ex is 'king':
+            l = ['from_vassals_or_governors',
+                 'from_all_cavaliers',
+                 'from_people']
+            if nom is not None:
+                l = ['nominate'] + l
+        elif ex is 'governor' or ex is 'vassal':
+            l2 = [(3, 'king_nominate'),
+                  (5, 'from_cavaliers'),
+                  (1, 'from_people')]
+            if nom is not None:
+                if nom[2] == 'king':
+                    l2.append((10, 'nominate'))
+                elif nom[2] == 'vassal' or nom[2] == 'governor':
+                    l2.append((8, 'nominate'))
+                else:
+                    l2.append((5, 'nominate'))
+            l = _random_scored_sort(l2)
+        elif ex is 'cavalier':
+            l2 = [(3, 'king_nominate'),
+                  (2, 'vassal_nominate'),
+                  (3, 'governor_nominate'),
+                  (2, 'from_people')]
+            if nom is not None:
+                if nom[2] == 'king':
+                    l2.append((10, 'nominate'))
+                elif nom[2] == 'vassal' or nom[2] == 'governor':
+                    l2.append((8, 'nominate'))
+                else:
+                    l2.append((5, 'nominate'))
+            l = _random_scored_sort(l2)
+
+        done = None
+        nom2 = None
+        for method in l:
+            nom2 = None
+            if method == 'nominate':
+                nom2 = economy.get_person(nom[3])
+                if nom2 is None:
+                    continue
+            elif method == 'king_nominate':
+                if nation.king is not None:
+                    nom2 = economy.people[nation.king.id]
+                else:
+                    continue
+            elif method == 'vassal_nominate':
+                if nation.vassals:
+                    nom2 = economy.people[random.choice(nation.vassals).id]
+                else:
+                    continue
+            elif method == 'governor_nominate':
+                if nation.districts[exd].governor is not None:
+                    nom2 = economy.people[nation.districts[exd].governor.id]
+                else:
+                    continue
+            if nom2 is not None:
+                done = _nominate_successor(economy, nom2, ex, exd)
+                if done is not None:
+                    break
+                print("no successor:", nom2.id)
+                continue
+            elif method == 'from_vassals_or_governors':
+                l2 = []
+                l2 += nation.vassals
+                for d in nation.districts:
+                    l2.append(d.governor)
+                l2 = [x for x in l2 if x is not None]
+                l2.sort(key=lambda x: x.general_ability(), reverse=True)
+                for d in l2:
+                    p = economy.people[d.id]
+                    if economy.position_rank(ex) \
+                       > economy.position_rank(p.highest_position_of_family()):
+                        done = p
+                        break
+                if done is not None:
+                    break
+                continue
+            elif method == 'from_all_cavaliers':
+                l2 = []
+                for d in nation.districts:
+                    l2 += d.cavaliers
+                l2.sort(key=lambda x: x.general_ability(), reverse=True)
+                for d in l2:
+                    p = economy.people[d.id]
+                    if economy.position_rank(ex) \
+                       > economy.position_rank(p.highest_position_of_family()):
+                        done = p
+                        break
+                if done is not None:
+                    break
+                continue
+            elif method == 'from_cavaliers':
+                l2 = [x for x in nation.districts[exd].cavaliers]
+                l2.sort(key=lambda x: x.general_ability(), reverse=True)
+                for d in l2:
+                    p = economy.people[d.id]
+                    if economy.position_rank(ex) \
+                       > economy.position_rank(p.highest_position_of_family()):
+                        done = p
+                        break
+                if done is not None:
+                    break
+                continue
+            elif method == 'from_people':
+                l2 = list(economy.people.values())
+                n = 0
+                while n < 2 * len(l2):
+                    n += 1
+                    p = random.choice(l2)
+                    if p.death is None and _successor_check(economy, p, ex, exd):
+                        done = p
+                        break
+                if done is not None:
+                    break
+                assert done is not None
+                continue
+            else:
+                raise ValueError('method ' + method +' is wrong!')
+
+        assert done is not None
+        if nom2 is not None:
+            done2 = False
+            l = []
+            for pos, dnum, pos2, pid in nation.nomination:
+                if (not done2) and pos == ex and dnum == exd and pid == nom2.id:
+                    done2 = True
+                    print("remove nomination")
+                else:
+                    l.append((pos, dnum, pos2, pid))
+            nation.nomination = l
+        p = done
+        sid = p.supported
+        if sid is None:
+            sid = p.id
+        for qid in [sid] + economy.people[sid].supporting:
+            economy.people[qid].change_district(exd)
+        if p.dominator_position is not None:
+            p.get_dominator().resign()
+        economy.new_dominator(ex, p)
+        new_nomination.append((ex, exd, p.id))
+
+    for pos, dnum, pos2, pid in nation.nomination:
+        p = economy.get_person(pid)
+        q = _nominate_successor(economy, p, pos, dnum)
+        if not ARGS.no_successor_resentment and q is None:
+            continue
+        if q is not None:
+            p = q
+        for pos3, dnum3, pid3 in new_nomination:
+            if pos3 == pos and dnum == dnum3 and p.id != pid3:
+                print("hate:", p.id, "->", pid3)
+                if pid3 not in p.hating:
+                    p.hating[pid3] = 0
+                p.hating[pid3] = np_clip(p.hating[pid3] + 0.1, 0.0, 1.0)
+    nation.nomination = []
+
+
+def update_dominators (economy):
+    print("\nNominate Dominators:...", flush=True)
+
+    nation = economy.nation
+    for d in nation.dominators():
+        if nation.king is not None and nation.king.id == d.id:
+            continue
+        if economy.people[d.id].age > 70:
+            d.resign()
+    nominate_successors(economy)
+    for d in nation.dominators():
+        d.update_hating()
 
 
 def sigint_handler (signum, frame):
@@ -3235,6 +3630,7 @@ def step (economy):
     calc_moving_matrix(economy)
     update_education(economy)
     update_injured(economy)
+    update_dominators(economy)
     update_calamities(economy)
     update_death(economy)
     update_birth(economy)

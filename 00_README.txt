@@ -1,7 +1,7 @@
 
 
     仏教的哲学的社会シミュレーション
-    (Created: 2021-02-27, Time-stamp: <2021-07-21T11:17:49Z>)
+    (Created: 2021-02-27, Time-stamp: <2021-07-30T11:31:43Z>)
 
 
 ** このファイルについて
@@ -150,6 +150,13 @@ https://gist.github.com/JRF-2018/aace48ebc44229844b6f75a39a287578
   * test_of_moving_1.py
 
 転居のテスト。
+
+  * test_of_domination_3.py
+
+支配層の代替わりのテスト。
+
+このプログラムは実行する前に、python test_of_matching_2.py -S -t 1200
+を実行し正常終了している必要がある。
 
 
 
