@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.6' # Time-stamp: <2021-07-30T12:16:37Z>
+__version__ = '0.0.7' # Time-stamp: <2021-08-04T10:10:14Z>
 ## Language: Japanese/UTF-8
 
 """支配と災害のシミュレーション"""
@@ -29,6 +29,7 @@ import os
 os.environ['FOR_DISABLE_CONSOLE_CTRL_HANDLER'] = '1'
 from scipy.special import gamma, factorial
 import matplotlib.pyplot as plt
+import sys
 import pickle
 import signal
 
@@ -48,6 +49,8 @@ ARGS.save = False
 ARGS.pickle = 'test_of_domination_2.pickle'
 # 途中エラーなどがある場合に備えてセーブする間隔
 ARGS.save_period = 120
+# エラー時にデバッガを起動
+ARGS.debug_on_error = False
 # デバッガを起動する期
 ARGS.debug_term = None
 # 試行数
@@ -172,6 +175,7 @@ def parse_args (view_options=['none']):
 
     parser.add_argument("-L", "--load", action="store_true")
     parser.add_argument("-S", "--save", action="store_true")
+    parser.add_argument("-d", "--debug-on-error", action="store_true")
     parser.add_argument("--debug-term", type=int)
     parser.add_argument("-t", "--trials", type=int)
     parser.add_argument("-p", "--population", type=str)
@@ -182,7 +186,7 @@ def parse_args (view_options=['none']):
     parser.add_argument("--view-4", choices=view_options)
     parser.add_argument("--damage-scale-filter", type=str)
 
-    specials = set(['load', 'save', 'debug_term',
+    specials = set(['load', 'save', 'debug_on_error', 'debug_term',
                     'trials', 'population', 'min_birth',
                     'view_1', 'view_2', 'view_3', 'view_4',
                     'damage_scale_filter'])
@@ -360,23 +364,6 @@ class PersonEC (Person0):
         else:
             return 1 - (1 - 0.2 * self.education) * (1 - self.ambition)
 
-    def change_district (self, new_district):
-        p = self
-        economy = self.economy
-        f = p.district
-        t = new_district
-        if f == t:
-            return
-        if p.dominator_position is not None:
-            d = p.get_dominator()
-            d.resign()
-        r = economy.tmp_moving_matrix[f, t]
-        new_land = math.floor(p.land * r)
-        p.prop += (new_land - p.land) * ARGS.prop_value_of_land
-        p.land = new_land
-        p.prop *= r
-        p.district = t
-
 
 class PersonBT (Person0):
     def is_acknowleged (self, parent_id):
@@ -515,7 +502,26 @@ class PersonDM (Person0):
         return economy.people[qid].dominator_position
 
 
-class Person (PersonEC, PersonBT, PersonDT, PersonSUP, PersonDM):
+class PersonMV (Person0):
+    def change_district (self, new_district):
+        p = self
+        economy = self.economy
+        f = p.district
+        t = new_district
+        if f == t:
+            return
+        if p.dominator_position is not None:
+            d = p.get_dominator()
+            d.resign()
+        r = economy.tmp_moving_matrix[f, t]
+        new_land = math.floor(p.land * r)
+        p.prop += (new_land - p.land) * ARGS.prop_value_of_land
+        p.land = new_land
+        p.prop *= r
+        p.district = t
+
+
+class Person (PersonEC, PersonBT, PersonDT, PersonSUP, PersonDM, PersonMV):
     pass
 
 base.Person = Person
@@ -1921,11 +1927,6 @@ class EconomyDT (Economy0):
             tomb.person = p
             economy.tombs[p.id] = tomb
 
-        pp = []
-        for p in economy.people.values():
-            if p.death is None and p.age >= 18 and p.age <= 50:
-                pp.append(p)
-
         for p in persons:
             if p.dominator_position is None:
                 continue
@@ -2982,7 +2983,7 @@ def update_injured (economy):
         if p.death is None:
             p.tmp_injured = np_clip(p.tmp_injured - 0.1, 0, 1)
 
-            
+
 def calc_nation_parameters (economy):
     nation = economy.nation
     pp = [0] * len(ARGS.population)
@@ -3562,13 +3563,13 @@ def nominate_successors (economy):
                     l.append((pos, dnum, pos2, pid))
             nation.nomination = l
         p = done
+        if p.dominator_position is not None:
+            p.get_dominator().resign()
         sid = p.supported
         if sid is None:
             sid = p.id
         for qid in [sid] + economy.people[sid].supporting:
             economy.people[qid].change_district(exd)
-        if p.dominator_position is not None:
-            p.get_dominator().resign()
         economy.new_dominator(ex, p)
         new_nomination.append((ex, exd, p.id))
 
@@ -3606,6 +3607,18 @@ def sigint_handler (signum, frame):
     global DEBUG_NEXT_TERM
     print("SIGNAL", flush=True)
     DEBUG_NEXT_TERM = True
+
+
+## Ref: 《debugging - Starting python debugger automatically on error - Stack Overflow》  
+## https://stackoverflow.com/questions/242485/starting-python-debugger-automatically-on-error
+def debug_hook(type, value, tb):
+    if hasattr(sys, 'ps1') or not sys.stderr.isatty():
+        sys.__excepthook__(type, value, tb)
+    else:
+        import traceback, pdb
+        traceback.print_exception(type, value, tb)
+        print
+        pdb.post_mortem(tb)
 
 
 def step (economy):
@@ -3708,4 +3721,6 @@ if __name__ == '__main__':
     eplot = EconomyPlot()
     parse_args(view_options=['none'] + list(eplot.options.keys()))
     signal.signal(signal.SIGINT, sigint_handler)
+    if ARGS.debug_on_error:
+        sys.excepthook = debug_hook
     main(eplot)

@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.1' # Time-stamp: <2021-07-30T12:16:20Z>
+__version__ = '0.0.2' # Time-stamp: <2021-08-04T10:10:03Z>
 ## Language: Japanese/UTF-8
 
 """支配層の代替わりのテスト
@@ -1592,13 +1592,13 @@ def nominate_successors (economy):
                     l.append((pos, dnum, pos2, pid))
             nation.nomination = l
         p = done
+        if p.dominator_position is not None:
+            p.get_dominator().resign()
         sid = p.supported
         if sid is None:
             sid = p.id
         for qid in [sid] + economy.people[sid].supporting:
             economy.people[qid].change_district(exd)
-        if p.dominator_position is not None:
-            p.get_dominator().resign()
         economy.new_dominator(ex, p)
         new_nomination.append((ex, exd, p.id))
 

@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.1' # Time-stamp: <2021-06-28T04:03:55Z>
+__version__ = '0.0.3' # Time-stamp: <2021-08-04T11:30:55Z>
 ## Language: Japanese/UTF-8
 
 """Simulation Buddhism Prototype No.2 - Birth
@@ -539,5 +539,3 @@ def update_fertility (economy):
                     p.fertility -= p.fertility / ((50 - p.age) * 12)
                     if p.fertility < 0.1:
                         p.fertility = 0
-
-

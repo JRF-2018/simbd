@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.3' # Time-stamp: <2021-04-13T18:27:28Z>
+__version__ = '0.0.6' # Time-stamp: <2021-08-04T09:58:59Z>
 ## Language: Japanese/UTF-8
 
 """Simulation Buddhism Prototype No.1 - Death
@@ -104,15 +104,15 @@ class PersonDT (Person0):
         economy = self.economy
         assert p.death is not None
         q = p.death.inheritance_share
+        a = p.prop + p.land * ARGS.prop_value_of_land
 
-        if q is None:
+        if q is None or a <= 0:
             economy.cur_forfeit_prop += p.prop
             economy.cur_forfeit_land += p.land
             p.prop = 0
             p.land = 0
             return
-        
-        a = p.prop + p.land * ARGS.prop_value_of_land
+
         land = p.land
         prop = p.prop
         for x, y in sorted(q.items(), key=lambda x: x[1], reverse=True):

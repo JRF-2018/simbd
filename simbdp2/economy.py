@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.1' # Time-stamp: <2021-06-28T04:03:04Z>
+__version__ = '0.0.3' # Time-stamp: <2021-08-04T08:45:57Z>
 ## Language: Japanese/UTF-8
 
 """Simulation Buddhism Prototype No.2 - Economy
@@ -37,6 +37,7 @@ from simbdp2.base import ARGS, Person0, EconomyPlot0, Serializable
 from simbdp2.common import np_clip, np_random_choice, Child
 from simbdp2.random import normal_levy_rand, normal_levy_1,\
     negative_binominal_distribution
+from simbdp2.moving import move_freely_some_people, move_some_people
 
 
 class EconomicalFamily (Serializable):
@@ -95,10 +96,6 @@ class PersonEC (Person0):
             if pa < 1:
                 pa = 1
             return sa / pa
-
-    def change_district (self, new_district):
-        #土地を売ったり買ったりする処理が必要かも。
-        self.district = new_district
 
     def tmp_asset_score (self):
         u = np.random.uniform()
@@ -416,6 +413,9 @@ def calc_labor_income (f, aincome):
 
 def calc_income (economy, families):
     n_b = 0
+
+    budget = [0] * len(ARGS.population)
+
     for f in families.values():
         i1, se, le, hu = calc_asset_income(f)
         i2, hu2 = calc_labor_income(f, i1)
@@ -502,9 +502,45 @@ def calc_income (economy, families):
                             * (1 + ARGS.donation_education_2 * p.education)):
                 donation = p.prop * ARGS.donation_rate * random.random()
                 p.cum_donation += donation
+                budget[p.district] += donation
                 p.prop -= donation
 
     print("Breakup of Family:", n_b, flush=True)
+
+    budget = [b / ARGS.economy_period for b in budget]
+    print("Budget:", budget)
+
+    for dist in range(len(ARGS.population)):
+        d = economy.nation.districts[dist]
+        d.prev_budget.append(d.tmp_budget)
+        if len(d.prev_budget) > 10:
+            d.prev_budget = d.prev_budget[-10:]
+        d.tmp_budget = budget[dist]
+    n = economy.nation
+    n.prev_budget.append(n.tmp_budget)
+    if len(n.prev_budget) > 10:
+        n.prev_budget = n.prev_budget[-10:]
+    n.tmp_budget = sum(budget)
+
+    n = economy.nation
+    budget = [1 if b <= 1 else b for b in budget]
+    sb = sum(budget)
+    if n.king is not None:
+        economy.people[n.king.id].prop += 50
+    for d in n.vassals:
+        economy.people[d.id].prop += 30
+    sp = 50 + 30 * len(n.vassals)
+    n.tmp_budget -= sp
+    for dnum, dist in enumerate(n.districts):
+        dist.tmp_budget -= sp * (budget[dnum] / sb)
+    for dist in n.districts:
+        if dist.governor is not None:
+            economy.people[dist.governor.id].prop += 30
+        for d in dist.cavaliers:
+            economy.people[d.id].prop += 15
+        sp = 30 + 15 * len(dist.cavaliers)
+        n.tmp_budget -= sp
+        dist.tmp_budget -= sp
 
 
 def land_gate_func_1 (x):
@@ -699,5 +735,8 @@ def update_economy (economy):
     families = make_families(economy)
     print("Calc Incomes:...", flush=True)
     calc_income (economy, families)
+    print("Move Some People:...")
+    move_freely_some_people(economy)
+    move_some_people(economy)
     print("Keep Merchant Peasant Ratio:...", flush=True)
     keep_merchant_peasant_ratio(economy)

@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.1' # Time-stamp: <2021-06-28T04:01:54Z>
+__version__ = '0.0.3' # Time-stamp: <2021-08-04T07:26:08Z>
 ## Language: Japanese/UTF-8
 
 """Simulation Buddhism Prototype No.2 - Miscellaneous
@@ -115,6 +115,14 @@ def update_education (economy):
             p.education = np_clip(p.education, 0, 1)
 
 
+def update_injured (economy):
+    print("\nInjured:...", flush=True)
+
+    for p in economy.people.values():
+        if p.death is None:
+            p.tmp_injured = np_clip(p.tmp_injured - 0.1, 0, 1)
+
+
 def update_labor (economy):
     for p in economy.people.values():
         if p.death is None:
@@ -141,6 +149,7 @@ def calc_tmp_labor (economy):
             p.tmp_labor = p.labor * 0.2
             continue
         p.tmp_labor = p.labor
+        p.tmp_labor = np_clip(p.tmp_labor - p.tmp_injured - p.injured, 0, 1)
 
 
 def update_eagerness (economy):
@@ -149,5 +158,3 @@ def update_eagerness (economy):
             p.eagerness = 0.5
         else:
             p.eagerness = random.random()
-
-

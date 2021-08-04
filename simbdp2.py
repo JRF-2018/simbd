@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.2' # Time-stamp: <2021-07-02T11:40:00Z>
+__version__ = '0.0.3' # Time-stamp: <2021-08-04T10:37:02Z>
 ## Language: Japanese/UTF-8
 
 """Simulation Buddhism Prototype No.2 - Main
@@ -30,11 +30,15 @@ __version__ = '0.0.2' # Time-stamp: <2021-07-02T11:40:00Z>
 
 #import timeit
 import matplotlib.pyplot as plt
+import math
 import pickle
+import sys
+import signal
 import argparse
 
 import simbdp2.base as base
-from simbdp2.base import ARGS, calc_increase_rate, calc_pregnant_mag,\
+from simbdp2.base import ARGS, N_calamity, D_calamity, \
+    calc_increase_rate, calc_pregnant_mag,\
     term_to_year_month
 from simbdp2.init import initialize
 from simbdp2.economy import PersonEC, EconomyPlotEC, update_economy
@@ -45,8 +49,11 @@ from simbdp2.adultery import PersonAD, EconomyPlotAD, update_adulteries
 from simbdp2.marriage import PersonMA, EconomyMA, EconomyPlotMA,\
     update_marriages
 from simbdp2.support import PersonSUP, update_support, make_support_consistent
+from simbdp2.moving import PersonMV, calc_moving_matrix
+from simbdp2.domination import PersonDM, EconomyDM, update_dominators
+from simbdp2.calamity import update_calamities
 from simbdp2.misc import update_education, update_tombs, update_labor,\
-    update_eagerness, calc_tmp_labor
+    update_eagerness, calc_tmp_labor, update_injured
 from simbdp2.inherit import recalc_inheritance_share
 
 
@@ -62,6 +69,10 @@ ARGS.save = False
 ARGS.pickle = 'simbdp2.pickle'
 # 途中エラーなどがある場合に備えてセーブする間隔
 ARGS.save_period = 120
+# エラー時にデバッガを起動
+ARGS.debug_on_error = False
+# デバッガを起動する期
+ARGS.debug_term = None
 # 試行数
 ARGS.trials = 50
 # ID のランダムに決める部分の長さ
@@ -155,6 +166,8 @@ ARGS.a60_death_rate = calc_increase_rate((80 - 60) * 12, 70/100)
 ARGS.a80_death_rate = calc_increase_rate((110 - 80) * 12, 99/100)
 # 0歳から3歳までの幼児死亡率
 ARGS.infant_death_rate = calc_increase_rate(3 * 12, 5/100)
+# 病気またはケガによる死亡率の上昇
+ARGS.injured_death_rate = calc_increase_rate((80 - 60) * 12, 70/100)
 # 妊娠しやすさが1のときの望まれた妊娠の確率
 ARGS.intended_pregnant_rate = calc_increase_rate(12, 50/100)
 #ARGS.intended_pregnant_rate = calc_increase_rate(12, 66/100)
@@ -228,8 +241,64 @@ ARGS.stock_max = 300
 # 「大バクチ」の個人の最大値
 ARGS.gamble_max = 50
 
+# 家系を辿った距離の最大値
+ARGS.max_family_distance = 6
+# 一人当たりの初期予算参考値
+ARGS.initial_budget_per_person = 0.5
+# 国力が教育で強くなる最大値
+ARGS.nation_education_power_threshold = 0.6
+# 信仰理解で戦闘が強くなる最大値
+ARGS.faith_realization_power_threshold = 0.6
+# 慰撫が必要な忠誠の最小値
+ARGS.soothe_threshold = 0.7
+# 支配者の同時仕事量
+ARGS.works_per_dominator = 5
+# 災害対応する最小値
+#ARGS.calamity_damage_threshold = 100.0
+ARGS.calamity_damage_threshold = 10.0
+# 災害対応しないことによる成長機会の拡大率
+ARGS.challengeable_mag = 10.0
+# 寺院を立てる確率
+ARGS.construct_temple_rate = 0.001
+# 成長機会があるときのベータ関数のパラメータ
+ARGS.challenging_beta = 0.5
+# 成長機会がないときのベータ関数のパラメータ
+ARGS.not_challenging_beta = 1.0
+# 成長するときの増分
+ARGS.challenging_growth = 0.01
+# 次の蛮族の侵入までの平均期。
+ARGS.invasion_average_term = 15.0 * 12
+#ARGS.invasion_average_term = 5.0 * 12
+# 洪水の頻度の目安
+#ARGS.flood_rate = 1.0 / 7
+ARGS.flood_rate = 1.0 / 14
+# 作物の病気の頻度の目安
+ARGS.cropfailure_rate = (1/8) / 3
+# 大火事の頻度の目安
+#ARGS.bigfire_rate = (1 / (5 * 12)) * (12/15)
+ARGS.bigfire_rate = (1 / (10 * 12)) * (12/15)
+# 地震の頻度の目安
+ARGS.earthquake_rate = 1 / (5 * 12)
+# 次の疫病までの平均期。
+ARGS.plague_average_term = 50.0 * 12
+# 規模の概要値の評価を換える。
+# 例えば、↓の場合、死亡の評価を 1/2 に、財産の評価を 2倍にする。
+#ARGS.damage_scale_filter = {'death': 0.5, 'property': 2}
+ARGS.damage_scale_filter = {}
+# 転居の際の基準の定数。
+ARGS.moving_const_1 = 2.0
+ARGS.moving_const_2 = 0.1
+ARGS.moving_const_3 = 0.05
+ARGS.moving_const_4 = 0.10
+# 自由な転居の確率。
+ARGS.free_move_rate = 0.005
+# 支配層の継承者がいないときに恨むかどうか。
+ARGS.no_successor_resentment = False
+
 
 SAVED_ECONOMY = None
+
+DEBUG_NEXT_TERM = False
 
 
 def parse_args (view_options=['none']):
@@ -239,6 +308,8 @@ def parse_args (view_options=['none']):
 
     parser.add_argument("-L", "--load", action="store_true")
     parser.add_argument("-S", "--save", action="store_true")
+    parser.add_argument("-d", "--debug-on-error", action="store_true")
+    parser.add_argument("--debug-term", type=int)
     parser.add_argument("-t", "--trials", type=int)
     parser.add_argument("-p", "--population", type=str)
     parser.add_argument("--min-birth", type=float)
@@ -247,8 +318,10 @@ def parse_args (view_options=['none']):
     parser.add_argument("--view-3", choices=view_options)
     parser.add_argument("--view-4", choices=view_options)
 
-    specials = set(['load', 'save', 'trials', 'population', 'min_birth',
-                    'view_1', 'view_2', 'view_3', 'view_4'])
+    specials = set(['load', 'save', 'debug_on_error', 'debug_term',
+                    'trials', 'population', 'min_birth',
+                    'view_1', 'view_2', 'view_3', 'view_4',
+                    'damage_scale_filter'])
     for p, v in vars(ARGS).items():
         if p not in specials:
             p2 = '--' + p.replace('_', '-')
@@ -285,14 +358,21 @@ def parse_args (view_options=['none']):
         ARGS.new_adulteries_pregnant_mag = calc_pregnant_mag(
             ARGS.new_adulteries_pregnant_rate, ARGS.worst_pregnant_rate
         )
+    if type(ARGS.damage_scale_filter) is str:
+        r = {}
+        for x in ARGS.damage_scale_filter.split(','):
+            if x:
+                y, z = x.split(':')
+                r[y] = float(z)
+        ARGS.damage_scale_filter = r
 
 
-class Person (PersonEC, PersonBT, PersonDT, PersonAD, PersonMA, PersonSUP):
+class Person (PersonEC, PersonBT, PersonDT, PersonAD, PersonMA, PersonSUP, PersonMV, PersonDM):
     pass
 
 base.Person = Person
 
-class Economy (EconomyDT, EconomyMA):
+class Economy (EconomyDT, EconomyMA, EconomyDM):
     pass
 
 class EconomyPlot (EconomyPlotEC, EconomyPlotBT,
@@ -300,11 +380,32 @@ class EconomyPlot (EconomyPlotEC, EconomyPlotBT,
     pass
 
 
+def sigint_handler (signum, frame):
+    global DEBUG_NEXT_TERM
+    print("SIGNAL", flush=True)
+    DEBUG_NEXT_TERM = True
+
+
+## Ref: 《debugging - Starting python debugger automatically on error - Stack Overflow》  
+## https://stackoverflow.com/questions/242485/starting-python-debugger-automatically-on-error
+def debug_hook(type, value, tb):
+    if hasattr(sys, 'ps1') or not sys.stderr.isatty():
+        sys.__excepthook__(type, value, tb)
+    else:
+        import traceback, pdb
+        traceback.print_exception(type, value, tb)
+        print
+        pdb.post_mortem(tb)
+
+
 def step (economy):
+    global DEBUG_NEXT_TERM
     economy.term += 1
     print("\nTerm %d (%s):"
           % (economy.term, term_to_year_month(economy.term)),
           flush=True)
+    economy.year = math.floor((economy.term - 1) / 12) + 1
+    economy.month = (economy.term - 1) % 12 + 1
 
     for p in economy.people.values():
         p.age = (economy.term - p.birth_term) / 12
@@ -315,10 +416,21 @@ def step (economy):
             if w is not None and w.end <= economy.term:
                 setattr(p, wait, None)
 
+    if DEBUG_NEXT_TERM:
+        DEBUG_NEXT_TERM = False
+        import pdb; pdb.set_trace()
+    if ARGS.debug_term is not None and economy.term == ARGS.debug_term:
+        ARGS.debug_term = None
+        import pdb; pdb.set_trace()
+
+    calc_moving_matrix(economy)
     update_eagerness(economy)
     update_education(economy)
     update_labor(economy)
     update_fertility(economy)
+    update_injured(economy)
+    update_dominators(economy)
+    update_calamities(economy)
     update_death(economy)
     update_adulteries(economy)
     update_marriages(economy)
@@ -389,6 +501,8 @@ def main (eplot):
             pickle.dump((ARGS, economy), f)
 
     print("\nFinish", flush=True)
+    print("N_calamity:", N_calamity)
+    print("D_calamity:", D_calamity)
     if not ARGS.no_view:
         plt.show()
 
@@ -396,4 +510,7 @@ def main (eplot):
 if __name__ == '__main__':
     eplot = EconomyPlot()
     parse_args(view_options=['none'] + list(eplot.options.keys()))
+    signal.signal(signal.SIGINT, sigint_handler)
+    if ARGS.debug_on_error:
+        sys.excepthook = debug_hook
     main(eplot)

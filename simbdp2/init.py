@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.1' # Time-stamp: <2021-06-28T04:02:32Z>
+__version__ = '0.0.3' # Time-stamp: <2021-08-04T11:31:10Z>
 ## Language: Japanese/UTF-8
 
 """Simulation Buddhism Prototype No.2 - Initialize
@@ -39,12 +39,20 @@ from simbdp2.random import negative_binominal_rand, right_triangular_rand,\
     half_normal_rand, adultery_term_rand
 from simbdp2.common import np_clip, Adultery, Marriage, Child, Wait, \
     Pregnancy
+from simbdp2.domination import initialize_nation
 
 
 def initialize (economy):
+    initialize_nation(economy)
+
+    pp = [0] * len(ARGS.population)
+    for p in economy.people.values():
+        if p.death is None:
+            pp[p.district] += 1
+
     people = []
     for district in range(len(ARGS.population)):
-        for i in range(ARGS.population[district]):
+        for i in range(ARGS.population[district] - pp[district]):
             p = base.Person()
             p.economy = economy
             p.district = district
@@ -251,7 +259,7 @@ def initialize (economy):
                     p.pregnancy_wait = w
                         
             people.append((p.id, p))
-    economy.people = OrderedDict(people)
+    economy.people.update(people)
 
     l = sorted(economy.people.values(), key=lambda p: p.asset_value(),
                reverse=True)
@@ -311,5 +319,3 @@ def initialize (economy):
                     p.supporting.append('')
                     if random.random() < 0.7:
                         p.supporting.append('')
-
-

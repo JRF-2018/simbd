@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.1' # Time-stamp: <2021-06-28T04:01:36Z>
+__version__ = '0.0.3' # Time-stamp: <2021-08-04T06:21:13Z>
 ## Language: Japanese/UTF-8
 
 """Simulation Buddhism Prototype No.2 - Random
@@ -31,6 +31,8 @@ __version__ = '0.0.1' # Time-stamp: <2021-06-28T04:01:36Z>
 import math
 import random
 import numpy as np
+import os
+os.environ['FOR_DISABLE_CONSOLE_CTRL_HANDLER'] = '1'
 from scipy.special import gamma, factorial
 import csv
 import bisect

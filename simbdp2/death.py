@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.1' # Time-stamp: <2021-06-28T04:03:20Z>
+__version__ = '0.0.3' # Time-stamp: <2021-08-04T09:58:54Z>
 ## Language: Japanese/UTF-8
 
 """Simulation Buddhism Prototype No.2 - Death
@@ -104,15 +104,15 @@ class PersonDT (Person0):
         economy = self.economy
         assert p.death is not None
         q = p.death.inheritance_share
+        a = p.prop + p.land * ARGS.prop_value_of_land
 
-        if q is None:
+        if q is None or a <= 0:
             economy.cur_forfeit_prop += p.prop
             economy.cur_forfeit_land += p.land
             p.prop = 0
             p.land = 0
             return
-        
-        a = p.prop + p.land * ARGS.prop_value_of_land
+
         land = p.land
         prop = p.prop
         for x, y in sorted(q.items(), key=lambda x: x[1], reverse=True):
@@ -170,6 +170,16 @@ class EconomyDT (Economy0):
             tomb.death_term = economy.term
             tomb.person = p
             economy.tombs[p.id] = tomb
+
+        for p in persons:
+            if p.dominator_position is None:
+                continue
+            p.get_dominator().resign()
+
+        for p in persons:
+            if p.id in economy.dominator_parameters:
+                economy.dominator_parameters[p.id].economy = None
+                del economy.dominator_parameters[p.id]
 
         for p in persons:
             p.death.inheritance_share = calc_inheritance_share(economy, p.id)
@@ -259,17 +269,16 @@ def update_death (economy):
             if random.random() < ARGS.general_death_rate:
                 l.append(p)
             else:
+                threshold = 0
                 if p.age > 110:
-                    l.append(p)
+                    threshold = 1
                 elif p.age > 80 and p.age <= 100:
-                    if random.random() < ARGS.a80_death_rate:
-                        l.append(p)
+                    threshold = ARGS.a80_death_rate
                 elif p.age > 60 and p.age <= 80:
-                    if random.random() < ARGS.a60_death_rate:
-                        l.append(p)
+                    threshold = ARGS.a60_death_rate
                 elif p.age >= 0 and p.age <= 3:
-                    if random.random() < ARGS.infant_death_rate:
-                        l.append(p)
+                    threshold = ARGS.infant_death_rate
+                threshold2 = ARGS.injured_death_rate * p.injured
+                if random.random() < max([threshold, threshold2]):
+                    l.append(p)
     economy.die(l)
-
-

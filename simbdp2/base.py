@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.1' # Time-stamp: <2021-06-28T04:04:11Z>
+__version__ = '0.0.3' # Time-stamp: <2021-08-04T07:50:51Z>
 ## Language: Japanese/UTF-8
 
 """Simulation Buddhism Prototype No.2 - Base
@@ -36,6 +36,9 @@ import matplotlib.pyplot as plt
 import argparse
 ARGS = argparse.Namespace()
 Person = None
+calamity_info = {}
+N_calamity = {}
+D_calamity = {}
 
 ## class 'Frozen' from:
 ## 《How to freeze Python classes « Python recipes « ActiveState Code》  
@@ -92,6 +95,15 @@ class Serializable (Frozen):
         return '(' + ', '.join(r) + ')'
 
 
+class SerializableExEconomy (Serializable):
+    def __str__ (self, excluding=None):
+        if excluding is None:
+            excluding = set()
+        if id(self.economy) not in excluding:
+            excluding.add(id(self.economy))
+        return super().__str__(excluding=excluding)
+
+
 class IDGenerator (Frozen):
     def __init__ (self):
         self.pool = {}
@@ -117,6 +129,8 @@ class Person0 (Serializable):
         self.district = None   # 居住区
         self.death = None      # 死
 
+        self.dominator_position = None  # 支配における役職
+
         self.prop = 0 	       # 商業財産: commercial property.
         self.land = 0	       # 農地: agricultural prpoerty.
         self.tmp_land_damage = 0 # 災害等による年間のダメージ率
@@ -125,6 +139,8 @@ class Person0 (Serializable):
         self.education = 0     # 教化レベル
         self.labor = 1.0       # 労働力
         self.tmp_labor = 0     # 阻害要因を加味した現時点の労働力
+        self.injured = 0       # 労働力に影響する病気またはケガによる障害
+        self.tmp_injured = 0   # 労働力に影響する一時的な病気またはケガ
         self.eagerness = 0     # 熱心さ
         self.stock_exp = 0     # 株式経験: stock experience
         self.land_exp = 0      # 農業経験: agricultural experience
@@ -182,9 +198,17 @@ class Person0 (Serializable):
 class Economy0 (Frozen):
     def __init__ (self):
         self.term = 0
+        self.year = 0
+        self.month = 12
         self.people = OrderedDict()
         self.id_generator = IDGenerator()
         self.tombs = OrderedDict()
+
+        self.nation = None
+        self.dominator_parameters = {}
+        self.calamities = []
+
+        self.tmp_moving_matrix = None
 
         self.want_child_mag = 1.0
         self.prev_birth = ARGS.min_birth

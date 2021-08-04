@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.17' # Time-stamp: <2021-04-14T04:26:59Z>
+__version__ = '0.0.18' # Time-stamp: <2021-08-04T10:34:08Z>
 ## Language: Japanese/UTF-8
 
 """結婚・不倫・扶養・相続などのマッチングのシミュレーション"""
@@ -23,9 +23,13 @@ import itertools
 import math
 import random
 import numpy as np
+import os
+os.environ['FOR_DISABLE_CONSOLE_CTRL_HANDLER'] = '1'
 from scipy.special import gamma, factorial
 import matplotlib.pyplot as plt
 import pickle
+import sys
+import signal
 
 import argparse
 ARGS = argparse.Namespace()
@@ -43,6 +47,10 @@ ARGS.save = False
 ARGS.pickle = 'test_of_matching_2.pickle'
 # 途中エラーなどがある場合に備えてセーブする間隔
 ARGS.save_period = 120
+# エラー時にデバッガを起動
+ARGS.debug_on_error = False
+# デバッガを起動する期
+ARGS.debug_term = None
 # 試行数
 ARGS.trials = 50
 # ID のランダムに決める部分の長さ
@@ -179,6 +187,8 @@ ARGS.support_unwanted_rate = 0.1
 
 SAVED_ECONOMY = None
 
+DEBUG_NEXT_TERM = False
+
 
 def parse_args (view_options=['none']):
     global SAVED_ECONOMY
@@ -187,6 +197,8 @@ def parse_args (view_options=['none']):
 
     parser.add_argument("-L", "--load", action="store_true")
     parser.add_argument("-S", "--save", action="store_true")
+    parser.add_argument("-d", "--debug-on-error", action="store_true")
+    parser.add_argument("--debug-term", type=int)
     parser.add_argument("-t", "--trials", type=int)
     parser.add_argument("-p", "--population", type=str)
     parser.add_argument("--min-birth", type=float)
@@ -195,7 +207,8 @@ def parse_args (view_options=['none']):
     parser.add_argument("--view-3", choices=view_options)
     parser.add_argument("--view-4", choices=view_options)
 
-    specials = set(['load', 'save', 'trials', 'population', 'min_birth',
+    specials = set(['load', 'save', 'debug_on_error', 'debug_term',
+                    'trials', 'population', 'min_birth',
                     'view_1', 'view_2', 'view_3', 'view_4'])
     for p, v in vars(ARGS).items():
         if p not in specials:
@@ -760,15 +773,15 @@ class PersonDT (Person0):
         economy = self.economy
         assert p.death is not None
         q = p.death.inheritance_share
-
-        if q is None:
+        a = self.prop + self.land * ARGS.prop_value_of_land
+        
+        if q is None or a <= 0:
             economy.cur_forfeit_prop += self.prop
             economy.cur_forfeit_land += self.land
             self.prop = 0
             self.land = 0
             return
-        
-        a = self.prop + self.land * ARGS.prop_value_of_land
+
         land = self.land
         prop = self.prop
         for x, y in sorted(q.items(), key=lambda x: x[1], reverse=True):
@@ -3997,7 +4010,26 @@ def update_education (economy):
             p.education = np_clip(p.education, 0, 1)
 
 
+def sigint_handler (signum, frame):
+    global DEBUG_NEXT_TERM
+    print("SIGNAL", flush=True)
+    DEBUG_NEXT_TERM = True
+
+
+## Ref: 《debugging - Starting python debugger automatically on error - Stack Overflow》  
+## https://stackoverflow.com/questions/242485/starting-python-debugger-automatically-on-error
+def debug_hook(type, value, tb):
+    if hasattr(sys, 'ps1') or not sys.stderr.isatty():
+        sys.__excepthook__(type, value, tb)
+    else:
+        import traceback, pdb
+        traceback.print_exception(type, value, tb)
+        print
+        pdb.post_mortem(tb)
+
+
 def step (economy):
+    global DEBUG_NEXT_TERM
     economy.term += 1
     print("\nTerm %d (%s):"
           % (economy.term, term_to_year_month(economy.term)),
@@ -4011,6 +4043,13 @@ def step (economy):
             w = getattr(p, wait)
             if w is not None and w.end <= economy.term:
                 setattr(p, wait, None)
+
+    if DEBUG_NEXT_TERM:
+        DEBUG_NEXT_TERM = False
+        import pdb; pdb.set_trace()
+    if ARGS.debug_term is not None and economy.term == ARGS.debug_term:
+        ARGS.debug_term = None
+        import pdb; pdb.set_trace()
 
     if economy.term % ARGS.economy_period == 0:
         update_economy(economy)
@@ -4078,4 +4117,7 @@ def main (eplot):
 if __name__ == '__main__':
     eplot = EconomyPlot()
     parse_args(view_options=['none'] + list(eplot.options.keys()))
+    signal.signal(signal.SIGINT, sigint_handler)
+    if ARGS.debug_on_error:
+        sys.excepthook = debug_hook
     main(eplot)
