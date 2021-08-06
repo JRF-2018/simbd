@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.3' # Time-stamp: <2021-08-04T10:24:00Z>
+__version__ = '0.0.4' # Time-stamp: <2021-08-06T12:21:25Z>
 ## Language: Japanese/UTF-8
 
 """Simulation Buddhism Prototype No.2 - Domination
@@ -41,10 +41,6 @@ from simbdp2.common import np_clip, Child, Marriage
 
 
 class PersonDM (Person0):
-    def supporting_non_nil (self):
-        return [x for x in self.supporting
-                if x is not None and x is not '']
-    
     def get_dominator (self):
         p = self
         economy = self.economy
@@ -52,15 +48,15 @@ class PersonDM (Person0):
         pos = p.dominator_position
         if pos is None:
             return None
-        elif pos is 'king':
+        elif pos == 'king':
             return nation.king
-        elif pos is 'governor':
+        elif pos == 'governor':
             return nation.districts[p.district].governor
-        elif pos is 'vassal':
+        elif pos == 'vassal':
             for d in nation.vassals:
                 if d.id == p.id:
                     return d
-        elif pos is 'cavalier':
+        elif pos == 'cavalier':
             for d in nation.districts[p.district].cavaliers:
                 if d.id == p.id:
                     return d
@@ -83,47 +79,6 @@ class PersonDM (Person0):
 
 
 class EconomyDM (Economy0):
-    def new_person (self, district_num, male_rate=0.5,
-                    age_min=18, age_max=50):
-        economy = self
-        p = base.Person()
-        p.economy = economy
-        p.sex = 'M' if random.random() < male_rate else 'F'
-        p.district = district_num
-        p.id = economy.id_generator.generate(str(p.district) + p.sex)
-        economy.people[p.id] = p
-
-        p.age = random.uniform(age_min, age_max)
-        p.birth_term = economy.term - int(p.age * 12)
-
-        if ARGS.init_zero:
-            p.prop = 0
-        else:
-            p.prop = half_normal_rand(0, ARGS.init_prop_sigma)
-        x = random.random()
-        if x < ARGS.peasant_ratio:
-            if ARGS.no_land:
-                p.land = 0
-            else:
-                p.land = negative_binominal_rand(ARGS.land_r,
-                                                 ARGS.land_theta) + 1
-        p.consumption = p.land * ARGS.prop_value_of_land * 0.025 \
-            + p.prop * 0.05
-        p.ambition = random.random()
-        p.education = random.random()
-        p.adult_success = np.random.geometric(0.5) - 1
-        p.want_child_base = random.uniform(2, 12)
-        p.cum_donation = (p.prop + p.land * ARGS.prop_value_of_land) \
-            * random.random() * p.age
-        if p.age < 40:
-            p.fertility = math.sqrt(random.random())
-        else:
-            p.fertility = random.random()
-        if p.fertility < 0.1:
-            p.fertility = 0
-        return p
-
-
     def new_dominator (self, position, person):
         economy = self
         p = person
@@ -266,6 +221,7 @@ class Dominator (SerializableExEconomy):
         self.combat_prophecy = 0   # 戦闘予知
         # self.combat_strategy = 0   # 戦闘戦略
         self.combat_tactics = 0    # 戦闘戦術
+        self.adder = 0             # 能力の全体的調整値
         self.hating_to_king = 0    # 王への家系的恨み
         self.hating_to_governor = 0   # 知事への家系的恨み
         self.soothing_by_king = 0  # 王からの慰撫 (マイナス可)
@@ -417,6 +373,44 @@ class Dominator (SerializableExEconomy):
                         0, 1))
         return x
 
+    def set_adder (self, new_adder=None):
+        d = self
+        economy = self.economy
+        p = economy.people[d.id]
+
+        if new_adder is None:
+            new_adder = 0
+            if p.pregnancy is not None:
+                if p.marriage is not None:
+                    new_adder = -1
+                else:
+                    new_adder = -2
+            else:
+                if p.marriage is not None:
+                    new_adder = 1
+                else:
+                    new_adder = 0
+
+        while new_adder != d.adder:
+            sgn = 0
+            if new_adder > d.adder:
+                d.adder += 1
+                sgn = +1
+            elif new_adder < d.adder:
+                d.adder -= 1
+                sgn = -1
+            for n in ['people_trust',
+                      'faith_realization',
+                      'disaster_prophecy',
+                      'disaster_strategy',
+                      'disaster_tactics',
+                      'combat_prophecy',
+                      # 'combat_strategy',
+                      'combat_tactics']:
+                u = sgn * random.random() * ARGS.dominator_adder
+                setattr(d, n, np_clip(getattr(d, n) + u, 0, 1))
+
+
     def general_ability (self):
         d = self
         return np.mean([d.people_trust,
@@ -517,25 +511,35 @@ def initialize_nation (economy):
     for d_num in range(len(ARGS.population)):
         district = District()
         nation.districts.append(district)
-        # district.disaster_stock = random.random()
-        # district.disaster_handling = random.random()
-        # district.combat_stock = random.random()
-        # district.combat_handling = random.random()
-    p = economy.new_person(0, 3/4)
-    d = economy.new_dominator('king', p)
-    for i in range(10):
-        p = economy.new_person(0, 3/4)
-        d = economy.new_dominator('vassal', p)
-    for d_num in range(len(ARGS.population)):
-        p = economy.new_person(d_num, 3/4)
+
+
+    dpeople = [[] for dnum in range(len(ARGS.population))]
+    for p in economy.people.values():
+        if p.death is not None:
+            continue
+        if p.age >= 18 and p.age <= 50:
+            dpeople[p.district].append(p)
+
+    for dnum, dist in enumerate(nation.districts):
+        n = math.ceil(ARGS.population[dnum] / 1000) + 1
+        if dnum == 0:
+            n += 11
+        l = random.sample(dpeople[dnum], n)
+        p = l.pop(0)
         d = economy.new_dominator('governor', p)
-        for i in range(math.ceil(ARGS.population[d_num] / 1000)):
-            p = economy.new_person(d_num, 3/4)
+        for i in range(math.ceil(ARGS.population[dnum] / 1000)):
+            p = l.pop(0)
             d = economy.new_dominator('cavalier', p)
+        if dnum == 0:
+            p = l.pop(0)
+            d = economy.new_dominator('king', p)
+            for i in range(10):
+                p = l.pop(0)
+                d = economy.new_dominator('vassal', p)
 
     for d in nation.dominators():
+        d.set_adder()
         d.update_hating()
-
 
     nation.tmp_budget = ARGS.initial_budget_per_person \
         * sum(ARGS.population)
@@ -724,13 +728,13 @@ def nominate_successors (economy):
             noml = [x for x in noml if economy.position_rank(x[2])
                     == economy.position_rank(nomm[2])]
             nom = random.choice(noml)
-        if ex is 'king':
+        if ex == 'king':
             l = ['from_vassals_or_governors',
                  'from_all_cavaliers',
                  'from_people']
             if nom is not None:
                 l = ['nominate'] + l
-        elif ex is 'governor' or ex is 'vassal':
+        elif ex == 'governor' or ex == 'vassal':
             l2 = [(3, 'king_nominate'),
                   (5, 'from_cavaliers'),
                   (1, 'from_people')]
@@ -742,7 +746,7 @@ def nominate_successors (economy):
                 else:
                     l2.append((5, 'nominate'))
             l = _random_scored_sort(l2)
-        elif ex is 'cavalier':
+        elif ex == 'cavalier':
             l2 = [(3, 'king_nominate'),
                   (2, 'vassal_nominate'),
                   (3, 'governor_nominate'),
@@ -892,4 +896,5 @@ def update_dominators (economy):
             d.resign()
     nominate_successors(economy)
     for d in nation.dominators():
+        d.set_adder()
         d.update_hating()

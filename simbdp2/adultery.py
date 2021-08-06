@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.1' # Time-stamp: <2021-06-28T04:04:35Z>
+__version__ = '0.0.4' # Time-stamp: <2021-08-06T15:07:15Z>
 ## Language: Japanese/UTF-8
 
 """Simulation Buddhism Prototype No.2 - Adultery
@@ -359,7 +359,7 @@ def update_adultery_hating (economy, person, adultery):
     p = person
     a = adultery
     success = True
-    if p.sex is 'M':
+    if p.sex == 'M':
         if a.spouse is '' or not economy.is_living(a.spouse):
             if a.begin == a.end:
                 hating = random.random() < 0.1
@@ -418,7 +418,7 @@ def update_adultery_hating (economy, person, adultery):
                             ss.hating_unknown += 0.1 * hating
                             ss.hating_unknown = np_clip(ss.hating_unknown,
                                                         0, 1)
-    else: # p.sex is 'F':
+    else: # p.sex == 'F':
         if a.spouse is '' or not economy.is_living(a.spouse):
             if a.begin == a.end:
                 hating = random.random() < 0.2
@@ -749,5 +749,3 @@ def update_adulteries (economy):
     reboot_some_adulteries(economy)
     get_pregnant_adulteries(economy)
     remove_some_adulteries(economy)
-
-

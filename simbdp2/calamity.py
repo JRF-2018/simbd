@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.3' # Time-stamp: <2021-08-04T07:48:38Z>
+__version__ = '0.0.4' # Time-stamp: <2021-08-06T13:06:02Z>
 ## Language: Japanese/UTF-8
 
 """Simulation Buddhism Prototype No.2 - Domination
@@ -35,7 +35,7 @@ import numpy as np
 import bisect
 
 import simbdp2.base as base
-from simbdp2.base import ARGS, SerializableExEconomy, N_calamity, D_calamity
+from simbdp2.base import ARGS, SerializableExEconomy
 from simbdp2.common import np_clip, np_random_choice
 
 
@@ -167,14 +167,15 @@ class Calamity (SerializableExEconomy):        # 「災害」＝「惨禍」
 
     def occur (self):
         c = self
-        print("Occur:", c)
-        if c.kind not in N_calamity:
-            N_calamity[c.kind] = 0
-        if c.kind not in D_calamity:
-            D_calamity[c.kind] = 0
-        N_calamity[c.kind] += 1
-        ci = type(self)
         economy = self.economy
+        # print("Occur:", c)
+        print("Occur:", c.kind)
+        if c.kind not in economy.n_calamity:
+            economy.n_calamity[c.kind] = 0
+        if c.kind not in economy.d_calamity:
+            economy.d_calamity[c.kind] = 0
+        economy.n_calamity[c.kind] += 1
+        ci = type(self)
         nation = economy.nation
         dist = nation.districts[c.district]
         th = np_clip(ARGS.nation_education_power_threshold, 0.5, 1.0)
@@ -196,7 +197,7 @@ class Calamity (SerializableExEconomy):        # 「災害」＝「惨禍」
                     getattr(c, 'damage_' + n)(damage * k / sum_c)
             print("Protected:", damage,
                   c.filtered_protected_damage_scale(damage))
-            D_calamity[c.kind] += damage
+            economy.d_calamity[c.kind] += damage
             return
 
         len_t = len(dist.training_units[c.kind])
@@ -223,7 +224,7 @@ class Calamity (SerializableExEconomy):        # 「災害」＝「惨禍」
                 getattr(c, 'damage_' + n)(damage * k / sum_c)
         print("Damage:", damage,
               c.filtered_damage_scale(damage))
-        D_calamity[c.kind] += damage
+        economy.d_calamity[c.kind] += damage
 
     def _prophecied_damage (self, counter_prophecy):
         c = self
@@ -1090,7 +1091,6 @@ def calc_district_brains (economy):
 
 
 def occur_calamities (economy):
-    # make_support_consistent(economy)
     calc_family_asset_rank(economy)
 
     l = [c for c in economy.calamities if c.term == economy.term]
@@ -1280,7 +1280,7 @@ def calc_family_asset_rank (economy):
     fa = {}
     for p in economy.people.values():
         x = p.supported
-        if x is None:
+        if x is None or x is '':
             x = p.id
         if x not in fa:
             fa[x] = 0
@@ -1291,7 +1291,7 @@ def calc_family_asset_rank (economy):
         fa[x] = (s - i) / s
     for p in economy.people.values():
         x = p.supported
-        if x is None:
+        if x is None or x is '':
             x = p.id
         p.tmp_asset_rank = fa[x]
 

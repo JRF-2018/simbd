@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.3' # Time-stamp: <2021-08-04T11:31:10Z>
+__version__ = '0.0.4' # Time-stamp: <2021-08-06T12:21:51Z>
 ## Language: Japanese/UTF-8
 
 """Simulation Buddhism Prototype No.2 - Initialize
@@ -43,8 +43,6 @@ from simbdp2.domination import initialize_nation
 
 
 def initialize (economy):
-    initialize_nation(economy)
-
     pp = [0] * len(ARGS.population)
     for p in economy.people.values():
         if p.death is None:
@@ -139,7 +137,7 @@ def initialize (economy):
                     c = Child()
                     m.children.append(c)
                     p.children.append(c)
-                    if p.sex is 'M':
+                    if p.sex == 'M':
                         if random.random() < 0.8:
                             c.father = p.id
                     else:
@@ -211,7 +209,7 @@ def initialize (economy):
                     c = Child()
                     a.children.append(c)
                     p.children.append(c)
-                    if p.sex is 'M':
+                    if p.sex == 'M':
                         if random.random() < 0.8:
                             c.father = p.id
                     else:
@@ -278,7 +276,7 @@ def initialize (economy):
                 for i in range(q):
                     c = Child()
                     p.children.append(c)
-                    if p.sex is 'M':
+                    if p.sex == 'M':
                         if random.random() < 0.8:
                             c.father = p.id
                     else:
@@ -319,3 +317,5 @@ def initialize (economy):
                     p.supporting.append('')
                     if random.random() < 0.7:
                         p.supporting.append('')
+
+    initialize_nation(economy)

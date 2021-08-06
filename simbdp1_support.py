@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.3' # Time-stamp: <2021-04-13T18:28:40Z>
+__version__ = '0.0.7' # Time-stamp: <2021-08-06T15:07:57Z>
 ## Language: Japanese/UTF-8
 
 """Simulation Buddhism Prototype No.1 - Support
@@ -528,5 +528,3 @@ def update_support (economy):
     update_support_unwanted(economy)
     make_support_consistent(economy)
     update_unknown_support(economy)
-
-

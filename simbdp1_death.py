@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.6' # Time-stamp: <2021-08-04T09:58:59Z>
+__version__ = '0.0.7' # Time-stamp: <2021-08-06T15:08:43Z>
 ## Language: Japanese/UTF-8
 
 """Simulation Buddhism Prototype No.1 - Death
@@ -208,7 +208,8 @@ class EconomyDT (Economy0):
                     fst_heir = max(l2, key=lambda x:
                                    economy.people[x].asset_value())
 
-            if (fst_heir is None or fst_heir not in p.children) \
+            if (fst_heir is None
+                or fst_heir not in [ch.id for ch in p.children]) \
                and spouse is not None and spouse in p.supporting:
                 if spouse is '':
                     fst_heir = ''
@@ -271,5 +272,3 @@ def update_death (economy):
                     if random.random() < ARGS.infant_death_rate:
                         l.append(p)
     economy.die(l)
-
-

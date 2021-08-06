@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.2' # Time-stamp: <2021-03-20T16:24:47Z>
+__version__ = '0.0.7' # Time-stamp: <2021-08-06T15:08:16Z>
 ## Language: Japanese/UTF-8
 
 """Simulation Buddhism Prototype No.1 - Initialize
@@ -131,7 +131,7 @@ def initialize (economy):
                     c = Child()
                     m.children.append(c)
                     p.children.append(c)
-                    if p.sex is 'M':
+                    if p.sex == 'M':
                         if random.random() < 0.8:
                             c.father = p.id
                     else:
@@ -203,7 +203,7 @@ def initialize (economy):
                     c = Child()
                     a.children.append(c)
                     p.children.append(c)
-                    if p.sex is 'M':
+                    if p.sex == 'M':
                         if random.random() < 0.8:
                             c.father = p.id
                     else:
@@ -270,7 +270,7 @@ def initialize (economy):
                 for i in range(q):
                     c = Child()
                     p.children.append(c)
-                    if p.sex is 'M':
+                    if p.sex == 'M':
                         if random.random() < 0.8:
                             c.father = p.id
                     else:
@@ -311,5 +311,3 @@ def initialize (economy):
                     p.supporting.append('')
                     if random.random() < 0.7:
                         p.supporting.append('')
-
-

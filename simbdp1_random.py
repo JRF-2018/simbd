@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.6' # Time-stamp: <2021-08-04T10:31:32Z>
+__version__ = '0.0.7' # Time-stamp: <2021-08-06T17:45:59Z>
 ## Language: Japanese/UTF-8
 
 """Simulation Buddhism Prototype No.1 - Random
@@ -31,9 +31,10 @@ __version__ = '0.0.6' # Time-stamp: <2021-08-04T10:31:32Z>
 import math
 import random
 import numpy as np
-import os
-os.environ['FOR_DISABLE_CONSOLE_CTRL_HANDLER'] = '1'
-from scipy.special import gamma, factorial
+# # This is needed for scipy of Windows if you need Ctrl-C debugging.
+# import os
+# os.environ['FOR_DISABLE_CONSOLE_CTRL_HANDLER'] = '1'
+# from scipy.special import gamma, factorial
 import csv
 import bisect
 import sys
@@ -50,7 +51,7 @@ def negative_binominal_rand (r, theta, size=None): # 負の二項分布
     return np.random.poisson(y, size=size)
 
 def negative_binominal_distribution (r, theta, x): # 負の二項分布
-    y = (gamma(r + x) / (gamma(r) * factorial(x))) * \
+    y = (math.gamma(r + x) / (math.gamma(r) * math.factorial(x))) * \
         (theta ** r) * ((1 - theta)  ** x)
     return y
 

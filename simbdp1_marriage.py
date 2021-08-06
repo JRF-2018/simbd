@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.3' # Time-stamp: <2021-04-14T04:11:22Z>
+__version__ = '0.0.7' # Time-stamp: <2021-08-06T15:08:04Z>
 ## Language: Japanese/UTF-8
 
 """Simulation Buddhism Prototype No.1 - Marriage
@@ -377,7 +377,7 @@ class EconomyMA (Economy0):
                     if sa.spouse != m.id and sa.spouse != f.id:
                         update_adultery_hating(economy, s, sa)
 
-        if m.supported is not None and p.age < 70:
+        if m.supported is not None and m.age < 70:
             if m.supported is not '' and economy.is_living(m.supported):
                 s = economy.people[m.supported]
                 s.supporting.remove(m.id)
@@ -536,7 +536,7 @@ def update_marriage_hating (economy, person, relation):
     p = person
     m = relation
     success = True
-    if p.sex is 'M':
+    if p.sex == 'M':
         if m.spouse is '' or not economy.is_living(m.spouse):
             hating = random.random() < 0.5
             if hating:
@@ -553,7 +553,7 @@ def update_marriage_hating (economy, person, relation):
                 p.hating[s.id] = np_clip(p.hating[s.id] + 0.3, 0, 1)
             if s.id in p.hating and p.hating[s.id] > 0.3:
                 p.hating[s.id] = 0.3
-    else: # p.sex is 'F':
+    else: # p.sex == 'F':
         if m.spouse is '' or not economy.is_living(m.spouse):
             hating = random.random() < 0.5
             if hating:
@@ -792,5 +792,3 @@ def update_marriages (economy):
     elevate_some_to_marriages(economy)
     get_pregnant_marriages(economy)
     remove_socially_some_marriages(economy)
-
-

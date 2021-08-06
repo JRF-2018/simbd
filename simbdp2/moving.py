@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.3' # Time-stamp: <2021-08-04T07:42:30Z>
+__version__ = '0.0.4' # Time-stamp: <2021-08-06T05:19:55Z>
 ## Language: Japanese/UTF-8
 
 """Simulation Buddhism Prototype No.2 - Moving
@@ -46,8 +46,7 @@ class PersonMV (Person0):
         if f == t:
             return
         if p.dominator_position is not None:
-            d = p.get_dominator()
-            d.resign()
+            p.get_dominator().resign()
         r = economy.tmp_moving_matrix[f, t]
         new_land = math.floor(p.land * r)
         p.prop += (new_land - p.land) * ARGS.prop_value_of_land

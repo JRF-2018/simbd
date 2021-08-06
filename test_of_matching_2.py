@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.18' # Time-stamp: <2021-08-04T10:34:08Z>
+__version__ = '0.0.19' # Time-stamp: <2021-08-06T17:47:02Z>
 ## Language: Japanese/UTF-8
 
 """結婚・不倫・扶養・相続などのマッチングのシミュレーション"""
@@ -23,9 +23,6 @@ import itertools
 import math
 import random
 import numpy as np
-import os
-os.environ['FOR_DISABLE_CONSOLE_CTRL_HANDLER'] = '1'
-from scipy.special import gamma, factorial
 import matplotlib.pyplot as plt
 import pickle
 import sys
@@ -1410,7 +1407,8 @@ class EconomyDT (Economy0):
                     fst_heir = max(l2, key=lambda x:
                                    economy.people[x].asset_value())
 
-            if (fst_heir is None or fst_heir not in p.children) \
+            if (fst_heir is None
+                or fst_heir not in [ch.id for ch in p.children]) \
                and spouse is not None and spouse in p.supporting:
                 if spouse is '':
                     fst_heir = ''
@@ -1556,7 +1554,7 @@ class EconomyMA (Economy0):
                     if sa.spouse != m.id and sa.spouse != f.id:
                         update_adultery_hating(economy, s, sa)
 
-        if m.supported is not None and p.age < 70:
+        if m.supported is not None and m.age < 70:
             if m.supported is not '' and economy.is_living(m.supported):
                 s = economy.people[m.supported]
                 s.supporting.remove(m.id)

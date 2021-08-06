@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.3' # Time-stamp: <2021-08-04T11:30:13Z>
+__version__ = '0.0.4' # Time-stamp: <2021-08-06T14:33:59Z>
 ## Language: Japanese/UTF-8
 
 """Simulation Buddhism Prototype No.2 - Support
@@ -64,13 +64,8 @@ class PersonSUP (Person0):
         economy = self.economy
         
         if p.supported is not None:
-            assert p.supported in economy.people
-            s = economy.people[p.supported]
-            s.supporting.remove(p.id)
-            p.supported = None
-        p.supported = g.id
-        g.supporting.append(p.id)
-        p.change_district(g.district)
+            p.remove_supported()
+        g.add_supporting(p)
         gs = None
         if g.marriage is not None:
             gs = g.marriage.spouse
@@ -159,6 +154,74 @@ class PersonSUP (Person0):
             if gs is not None:
                 p.father = gs
 
+    def supporting_non_nil (self):
+        return [x for x in self.supporting
+                if x is not None and x is not '']
+    
+    def remove_supported (self):
+        p = self
+        economy = self.economy
+        if p.supported is '' or p.supported is None:
+            p.supported = None
+            return
+        s2 = economy.people[p.supported]
+        s2.supporting.remove(p.id)
+        p.supported = None
+
+    def remove_supporting_nil (self):
+        p = self
+        if '' in p.supporting:
+            p.supporting.remove('')
+
+    def add_supporting (self, persons):
+        p = self
+        economy = self.economy
+        l = persons
+        if type(l) is str or isinstance(l, base.Person):
+            l = [l]
+        sid = p.supported
+        if sid is None:
+            sid = p.id
+        s = None
+        if sid is not '':
+            s = economy.people[sid]
+
+        l2 = []
+        for q in l:
+            if isinstance(q, base.Person):
+                qid = q.id
+            else:
+                qid = q
+                q = None
+                if qid is not '' and qid is not None:
+                    q = economy.people[qid]
+            l2.append(qid)
+            if q is not None:
+                l2.extend(q.supporting)
+                q.supporting = [x for x in q.supporting if x is not '']
+        
+        for qid in l2:
+            q = None
+            if qid is not '' and qid is not None:
+                q = economy.people[qid]
+
+            if q is not None:
+                if q.supported == sid:
+                    continue
+                q.remove_supported()
+
+            if sid is '':
+                if qid is '':
+                    pass
+                else:
+                    if q is not None:
+                        q.supported = ''
+            else:
+                s.supporting.append(qid)
+                if q is not None:
+                    q.supported = sid
+                    q.change_district(s.district)
+
 
 def update_support_aged (economy):
     n_s = 0
@@ -229,9 +292,7 @@ def update_support_aged (economy):
         if g.family_hating(p):
             continue
         n_s += 1
-        p.supported = g.id
-        g.supporting.append(p.id)
-        p.change_district(g.district)
+        g.add_supporting(p)
 
     print("Support Aged:", n_f, n_s - n_f)
 
@@ -281,9 +342,7 @@ def update_support_infant (economy):
     for p, g in sup:
         n_s += 1
         if p.age >= 10:
-            p.supported = g.id
-            g.supporting.append(p.id)
-            p.change_district(g.district)
+            g.add_supporting(p)
         else:
             n_o += 1
             g.adopt_child(p)
@@ -429,52 +488,25 @@ def update_become_adult (economy):
             p.land += al
             p.prop += ap
 
-        if p.supported is not '':
-            assert p.supported in economy.people
-            s = economy.people[p.supported]
-            s.supporting.remove(p.id)
-        p.supported = None
+        p.remove_supported()
 
 
-def make_support_consistent (economy):
+def check_support_consistent (economy):
     for p in economy.people.values():
-        if p.supporting and p.supported is not None:
-            s = p.supported
-            check = set([s])
-            while s is not '':
-                assert economy.is_living(s)
-                s1 = economy.people[s].supported
-                if s1 is None:
-                    break
-                if s1 in check:
-                    raise ValueError("A supporting tree loops.")
-                check.add(s1)
-                s = s1
-            supported = s
-            ns = None
-            if s is not '':
-                ns = economy.people[s]
-            for id1 in p.supporting:
-                if id1 is not '':
-                    # if id1 not in economy.people:
-                    #     print("id1", id1)
-                    #     print(economy.tombs[id1])
-                    assert id1 in economy.people
-                    p1 = economy.people[id1]
-                    p1.supported = supported
-                    if ns is not None:
-                        p1.change_district(ns.district)
-                        ns.supporting.append(id1)
-            p.supporting = []
+        assert not (p.supporting and p.supported is not None)
 
     supportings = OrderedDict()
     for p in economy.people.values():
+        if p.supported is '' or p.supported is None:
+            continue
+        assert p.supported in economy.people
         if p.supported not in supportings:
             supportings[p.supported] = []
         supportings[p.supported].append(p.id)
 
     for p in economy.people.values():
         if p.supporting:
+            assert p.death is None
             if not [True for x in p.supporting if x is not '']:
                 continue
             if p.id not in supportings:
@@ -487,6 +519,7 @@ def make_support_consistent (economy):
             l2 = p.supporting
             for x in l2:
                 if x is not '':
+                    assert economy.people[x].district == p.district
                     try:
                         l1.remove(x)
                     except:
@@ -526,5 +559,5 @@ def update_support (economy):
     update_support_aged(economy)
     update_support_infant(economy)
     update_support_unwanted(economy)
-    make_support_consistent(economy)
     update_unknown_support(economy)
+    check_support_consistent(economy)

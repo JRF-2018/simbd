@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.3' # Time-stamp: <2021-08-04T07:50:51Z>
+__version__ = '0.0.4' # Time-stamp: <2021-08-06T17:49:52Z>
 ## Language: Japanese/UTF-8
 
 """Simulation Buddhism Prototype No.2 - Base
@@ -37,8 +37,6 @@ import argparse
 ARGS = argparse.Namespace()
 Person = None
 calamity_info = {}
-N_calamity = {}
-D_calamity = {}
 
 ## class 'Frozen' from:
 ## 《How to freeze Python classes « Python recipes « ActiveState Code》  
@@ -215,6 +213,12 @@ class Economy0 (Frozen):
 
         self.cur_forfeit_prop = 0
         self.cur_forfeit_land = 0
+
+        self.n_calamity = {}
+        self.d_calamity = {}
+
+        self.rand_state = None
+        self.rand_state_np = None
 
 
 class EconomyPlot0 (Frozen):

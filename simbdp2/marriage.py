@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.1' # Time-stamp: <2021-06-28T04:02:12Z>
+__version__ = '0.0.4' # Time-stamp: <2021-08-06T16:20:38Z>
 ## Language: Japanese/UTF-8
 
 """Simulation Buddhism Prototype No.2 - Marriage
@@ -168,10 +168,10 @@ class PersonMA (Person0):
             w.end = economy.term + 11
 
         if m.spouse is '':
-            if p.sex == 'M' and '' in p.supporting:
-                p.supporting.remove('')
-            elif p.sex == 'F' and p.supported == '':
-                p.supported = None
+            if '' in p.supporting:
+                p.remove_supporting_nil()
+            elif p.supported == '':
+                p.remove_supported()
 
         if m.spouse is not '' and economy.is_living(m.spouse):
             s = economy.people[m.spouse]
@@ -195,8 +195,7 @@ class PersonMA (Person0):
                 else:
                     p1 = s
                     s1 = p
-                s1.supported = None
-                p1.supporting.remove(s1.id)
+                s1.remove_supported()
                 l1 = []
                 l2 = []
                 for r in s1.trash:
@@ -239,12 +238,11 @@ class PersonMA (Person0):
                     elif x in s1fam:
                         l.append(x)
                 for x in l:
-                    p1.supporting.remove(x)
-                    s1.supporting.append(x)
-                    if x is not '':
-                        assert x in economy.people
-                        c = economy.people[x]
-                        c.supported = s1.id
+                    if x is '':
+                        p1.remove_supporting_nil()
+                    else:
+                        economy.people[x].remove_supported()
+                    s1.add_supporting(x)
             elif p.supported is not None and p.supported is not '' \
                  and s.supported == p.supported:
                 assert p.supported in economy.people
@@ -258,11 +256,9 @@ class PersonMA (Person0):
                 if (q.father == f.id and q.mother == m.id) \
                    or (q.father != f.id and q.mother != m.id) \
                    or q.mother == m.id:
-                    f.supported = None
-                    q.supporting.remove(f.id)
+                    f.remove_supported()
                 else:
-                    m.supported = None
-                    q.supporting.remove(m.id)
+                    m.remove_supported()
 
 
 class EconomyMA (Economy0):
@@ -377,36 +373,21 @@ class EconomyMA (Economy0):
                     if sa.spouse != m.id and sa.spouse != f.id:
                         update_adultery_hating(economy, s, sa)
 
-        if m.supported is not None and p.age < 70:
-            if m.supported is not '' and economy.is_living(m.supported):
-                s = economy.people[m.supported]
-                s.supporting.remove(m.id)
-            m.supported = None
+        if m.supported is not None and m.age < 70:
+            m.remove_supported()
+        if f.supported is not None and f.age < 70:
+            f.remove_supported()
+        mpos = economy.position_rank(m.highest_position_of_family())
+        fpos = economy.position_rank(f.highest_position_of_family())
+        if fpos > mpos:
+            f, m = m, f
+
         if m.supported is not None:
-            s = m.id
-            check = set([s])
-            while s is not '' and s is not None:
-                assert s in economy.people
-                q = economy.people[s]
-                s1 = q.supported
-                if s1 is None:
-                    break
-                if s1 == f.id:
-                    # print("CHK EX")
-                    f.supporting.remove(s)
-                    q.supported = None
-                    break
-                if s1 in check:
-                    raise ValueError("A supporting tree loops.")
-                check.add(s1)
-                s = s1
+            if m.supported == f.id:
+                m.remove_supported()
         if f.supported is not None:
-            if f.supported is not '' and economy.is_living(f.supported):
-                s = economy.people[f.supported]
-                s.supporting.remove(f.id)
-        f.supported = m.id
-        m.supporting.append(f.id)
-        f.change_district(m.district)
+            f.remove_supported()
+        m.add_supporting(f)
 
 
 class EconomyPlotMA (EconomyPlot0):
@@ -536,7 +517,7 @@ def update_marriage_hating (economy, person, relation):
     p = person
     m = relation
     success = True
-    if p.sex is 'M':
+    if p.sex == 'M':
         if m.spouse is '' or not economy.is_living(m.spouse):
             hating = random.random() < 0.5
             if hating:
@@ -553,7 +534,7 @@ def update_marriage_hating (economy, person, relation):
                 p.hating[s.id] = np_clip(p.hating[s.id] + 0.3, 0, 1)
             if s.id in p.hating and p.hating[s.id] > 0.3:
                 p.hating[s.id] = 0.3
-    else: # p.sex is 'F':
+    else: # p.sex == 'F':
         if m.spouse is '' or not economy.is_living(m.spouse):
             hating = random.random() < 0.5
             if hating:
@@ -792,5 +773,3 @@ def update_marriages (economy):
     elevate_some_to_marriages(economy)
     get_pregnant_marriages(economy)
     remove_socially_some_marriages(economy)
-
-

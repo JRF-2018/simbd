@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.3' # Time-stamp: <2021-08-04T10:37:02Z>
+__version__ = '0.0.4' # Time-stamp: <2021-08-06T16:23:25Z>
 ## Language: Japanese/UTF-8
 
 """Simulation Buddhism Prototype No.2 - Main
@@ -31,14 +31,15 @@ __version__ = '0.0.3' # Time-stamp: <2021-08-04T10:37:02Z>
 #import timeit
 import matplotlib.pyplot as plt
 import math
+import random
+import numpy as np
 import pickle
 import sys
 import signal
 import argparse
 
 import simbdp2.base as base
-from simbdp2.base import ARGS, N_calamity, D_calamity, \
-    calc_increase_rate, calc_pregnant_mag,\
+from simbdp2.base import ARGS, calc_increase_rate, calc_pregnant_mag,\
     term_to_year_month
 from simbdp2.init import initialize
 from simbdp2.economy import PersonEC, EconomyPlotEC, update_economy
@@ -48,7 +49,7 @@ from simbdp2.death import PersonDT, EconomyDT, update_death
 from simbdp2.adultery import PersonAD, EconomyPlotAD, update_adulteries
 from simbdp2.marriage import PersonMA, EconomyMA, EconomyPlotMA,\
     update_marriages
-from simbdp2.support import PersonSUP, update_support, make_support_consistent
+from simbdp2.support import PersonSUP, update_support, check_support_consistent
 from simbdp2.moving import PersonMV, calc_moving_matrix
 from simbdp2.domination import PersonDM, EconomyDM, update_dominators
 from simbdp2.calamity import update_calamities
@@ -271,29 +272,31 @@ ARGS.invasion_average_term = 15.0 * 12
 #ARGS.invasion_average_term = 5.0 * 12
 # 洪水の頻度の目安
 #ARGS.flood_rate = 1.0 / 7
-ARGS.flood_rate = 1.0 / 14
+ARGS.flood_rate = (1.0 / 14) * (1/2)
 # 作物の病気の頻度の目安
 ARGS.cropfailure_rate = (1/8) / 3
 # 大火事の頻度の目安
 #ARGS.bigfire_rate = (1 / (5 * 12)) * (12/15)
 ARGS.bigfire_rate = (1 / (10 * 12)) * (12/15)
 # 地震の頻度の目安
-ARGS.earthquake_rate = 1 / (5 * 12)
-# 次の疫病までの平均期。
+ARGS.earthquake_rate = (1 / (5 * 12)) * (1/2)
+# 次の疫病までの平均期
 ARGS.plague_average_term = 50.0 * 12
 # 規模の概要値の評価を換える。
 # 例えば、↓の場合、死亡の評価を 1/2 に、財産の評価を 2倍にする。
 #ARGS.damage_scale_filter = {'death': 0.5, 'property': 2}
 ARGS.damage_scale_filter = {}
-# 転居の際の基準の定数。
+# 転居の際の基準の定数
 ARGS.moving_const_1 = 2.0
 ARGS.moving_const_2 = 0.1
 ARGS.moving_const_3 = 0.05
 ARGS.moving_const_4 = 0.10
-# 自由な転居の確率。
+# 自由な転居の確率
 ARGS.free_move_rate = 0.005
-# 支配層の継承者がいないときに恨むかどうか。
+# 支配層の継承者がいないときに恨むかどうか
 ARGS.no_successor_resentment = False
+# 支配層の能力調整の基準値
+ARGS.dominator_adder = 0.1
 
 
 SAVED_ECONOMY = None
@@ -455,18 +458,15 @@ def step (economy):
         for p, q in l:
             p.death.inheritance_share = q
             p.do_inheritance()
+            if p.supported is not None and p.supported is not '':
+                p.remove_supported()
+        for p, q in l:
             del economy.people[p.id]
-            if p.supported is not None and p.supported is not '' \
-               and p.supported in economy.people:
-                s = economy.people[p.supported]
-                s.supporting.remove(p.id)
-                p.supported = None
-
         for p in economy.people.values():
             for n in p.mlog:
                 p.mlog[n] = []
         p.tmp_land_damage = 0
-        # make_support_consistent(economy)
+        # check_support_consistent(economy)
 
 
 def main (eplot):
@@ -475,11 +475,18 @@ def main (eplot):
         economy = Economy()
         print("Initializing...", flush=True)
         initialize(economy)
+        eplot.plot(economy)
+        if not ARGS.no_view:
+            plt.pause(1.0)
     else:
         economy = SAVED_ECONOMY
-    eplot.plot(economy)
-    if not ARGS.no_view:
-        plt.pause(1.0)
+        eplot.plot(economy)
+        if not ARGS.no_view:
+            plt.pause(1.0)
+        random.setstate(economy.rand_state)
+        np.random.set_state(economy.rand_state_np)
+        economy.rand_state_np = None
+        economy.rand_state = None
 
     saved_last = False
     for trial in range(ARGS.trials):
@@ -491,18 +498,26 @@ def main (eplot):
             plt.pause(0.5)
         if ARGS.save and (trial % ARGS.save_period) == ARGS.save_period - 1:
             print("\nSaving...", flush=True)
+            economy.rand_state_np = np.random.get_state()
+            economy.rand_state = random.getstate()
             with open(ARGS.pickle, 'wb') as f:
                 pickle.dump((ARGS, economy), f)
+            economy.rand_state_np = None
+            economy.rand_state = None
             saved_last = True
 
     if ARGS.save and not saved_last:
         print("\nSaving...", flush=True)
+        economy.rand_state_np = np.random.get_state()
+        economy.rand_state = random.getstate()
         with open(ARGS.pickle, 'wb') as f:
             pickle.dump((ARGS, economy), f)
+        economy.rand_state_np = None
+        economy.rand_state = None
 
     print("\nFinish", flush=True)
-    print("N_calamity:", N_calamity)
-    print("D_calamity:", D_calamity)
+    print("N_calamity:", economy.n_calamity)
+    print("D_calamity:", economy.d_calamity)
     if not ARGS.no_view:
         plt.show()
 
