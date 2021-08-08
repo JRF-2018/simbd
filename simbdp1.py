@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.7' # Time-stamp: <2021-08-06T08:54:46Z>
+__version__ = '0.0.8' # Time-stamp: <2021-08-08T05:28:36Z>
 ## Language: Japanese/UTF-8
 
 """Simulation Buddhism Prototype No.1 - Main
@@ -30,6 +30,9 @@ __version__ = '0.0.7' # Time-stamp: <2021-08-06T08:54:46Z>
 
 #import timeit
 import matplotlib.pyplot as plt
+import math
+import random
+import numpy as np
 import pickle
 import sys
 import signal
@@ -46,7 +49,7 @@ from simbdp1_death import PersonDT, EconomyDT, update_death
 from simbdp1_adultery import PersonAD, EconomyPlotAD, update_adulteries
 from simbdp1_marriage import PersonMA, EconomyMA, EconomyPlotMA,\
     update_marriages
-from simbdp1_support import PersonSUP, update_support, make_support_consistent
+from simbdp1_support import PersonSUP, update_support, check_support_consistent
 from simbdp1_misc import update_education, update_tombs, update_labor,\
     update_eagerness, calc_tmp_labor
 from simbdp1_inherit import recalc_inheritance_share
@@ -380,18 +383,14 @@ def step (economy):
         for p, q in l:
             p.death.inheritance_share = q
             p.do_inheritance()
+            if p.supported is not None and p.supported is not '':
+                p.remove_supported()
+        for p, q in l:
             del economy.people[p.id]
-            if p.supported is not None and p.supported is not '' \
-               and p.supported in economy.people:
-                s = economy.people[p.supported]
-                s.supporting.remove(p.id)
-                p.supported = None
-
         for p in economy.people.values():
             for n in p.mlog:
                 p.mlog[n] = []
-        p.tmp_land_damage = 0
-        # make_support_consistent(economy)
+        # check_support_consistent(economy)
 
 
 def main (eplot):
@@ -400,11 +399,18 @@ def main (eplot):
         economy = Economy()
         print("Initializing...", flush=True)
         initialize(economy)
+        eplot.plot(economy)
+        if not ARGS.no_view:
+            plt.pause(1.0)
     else:
         economy = SAVED_ECONOMY
-    eplot.plot(economy)
-    if not ARGS.no_view:
-        plt.pause(1.0)
+        eplot.plot(economy)
+        if not ARGS.no_view:
+            plt.pause(1.0)
+        random.setstate(economy.rand_state)
+        np.random.set_state(economy.rand_state_np)
+        economy.rand_state_np = None
+        economy.rand_state = None
 
     saved_last = False
     for trial in range(ARGS.trials):
@@ -416,14 +422,22 @@ def main (eplot):
             plt.pause(0.5)
         if ARGS.save and (trial % ARGS.save_period) == ARGS.save_period - 1:
             print("\nSaving...", flush=True)
+            economy.rand_state_np = np.random.get_state()
+            economy.rand_state = random.getstate()
             with open(ARGS.pickle, 'wb') as f:
                 pickle.dump((ARGS, economy), f)
+            economy.rand_state_np = None
+            economy.rand_state = None
             saved_last = True
 
     if ARGS.save and not saved_last:
         print("\nSaving...", flush=True)
+        economy.rand_state_np = np.random.get_state()
+        economy.rand_state = random.getstate()
         with open(ARGS.pickle, 'wb') as f:
             pickle.dump((ARGS, economy), f)
+        economy.rand_state_np = None
+        economy.rand_state = None
 
     print("\nFinish", flush=True)
     if not ARGS.no_view:

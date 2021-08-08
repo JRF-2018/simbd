@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.4' # Time-stamp: <2021-04-18T01:06:44Z>
+__version__ = '0.0.8' # Time-stamp: <2021-08-08T04:09:25Z>
 ## Language: Japanese/UTF-8
 
 """Simulation Buddhism Prototype No.1 - Economy
@@ -483,17 +483,22 @@ def calc_income (economy, families):
                 p.land = 0
                 if p.age >= 15:
                     if p.supported is not None:
-                        if p.supported is not '':
-                            f.leader.supporting.remove(p.id)
-                        p.supported = None
+                        p.remove_supported()
+            pairs = set()
             for p in f.members.values():
-                if p.supported is None and not p.supporting \
-                   and p.sex == 'F' and p.marriage is not None \
-                   and p.marriage.spouse in f.members:
-                    s = f.members[p.marriage.spouse]
-                    if s.supported is None:
-                        s.supporting.append(p.id)
-                        p.supported = s.id
+                if p.death is not None:
+                    continue
+                if p.marriage is not None and p.marriage.spouse in f.members:
+                    if f.members[p.marriage.spouse].death is not None:
+                        continue
+                    if p.sex == 'M':
+                        pairs.add((p.id, p.marriage.spouse))
+                    else:
+                        pairs.add((p.marriage.spouse, p.id))
+            for m1id, f1id in pairs:
+                m1 = economy.people[m1id]
+                f1 = economy.people[f1id]
+                m1.add_supporting(f1)
 
         for p in f.members.values():
             if random.random() * (1 + ARGS.donation_education

@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.4' # Time-stamp: <2021-08-06T11:42:06Z>
+__version__ = '0.0.5' # Time-stamp: <2021-08-08T08:08:59Z>
 ## Language: Japanese/UTF-8
 
 """Simulation Buddhism Prototype No.2 - Death
@@ -92,7 +92,7 @@ class PersonDT (Person0):
                     else:
                         s.supported = ''
         else:
-            ns.add_supporting(p.supporting)
+            ns.add_supporting(p.supporting_non_nil())
         p.supporting = []
 
     def do_inheritance (self):

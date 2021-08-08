@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.3' # Time-stamp: <2021-04-14T19:29:20Z>
+__version__ = '0.0.8' # Time-stamp: <2021-08-08T03:59:50Z>
 ## Language: Japanese/UTF-8
 
 """Simulation Buddhism Prototype No.1 - Birth
@@ -184,8 +184,7 @@ class PersonBT (Person0):
             ch.father = ''
             rel.children.append(ch)
             m.children.append(ch)
-            p.supported = m.id
-            m.supporting.append(p.id)
+            m.add_supporting(p)
         elif isinstance(rel, Marriage):
             f = economy.people[rel.spouse]
             p.father = f.id
@@ -214,8 +213,7 @@ class PersonBT (Person0):
                 and ma.spouse == m.id
             ma.children.append(ch)
             rel.children.append(ch)
-            p.supported = f.id
-            f.supporting.append(p.id)
+            f.add_supporting(p)
         else:
             f = economy.people[rel.spouse]
             foster_father = f.id
@@ -292,13 +290,9 @@ class PersonBT (Person0):
                         f.children.append(ch)
                     assert f.marriage is not None \
                         and f.marriage.spouse == m.id
-                    p.supported = f.id
-                    f.supporting.append(p.id)
-                    p.district = f.district
+                    f.add_supporting(p)
                 else:
-                    p.supported = m.id
-                    m.supporting.append(p.id)
-                    p.district = m.district
+                    m.add_supporting(p)
             else:
                 supporting = False
                 if father_bfather_thinks == f.id:
@@ -311,13 +305,9 @@ class PersonBT (Person0):
                     f.children.append(ch)
                     supporting = random.random() < 0.7
                 if supporting:
-                    p.supported = f.id
-                    f.supporting.append(p.id)
-                    p.district = f.district
+                    f.add_supporting(p)
                 else:
-                    p.supported = m.id
-                    m.supporting.append(p.id)
-                    p.district = m.district
+                    m.add_supporting(p)
 
             assert p.supported is not None
 

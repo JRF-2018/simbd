@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.7' # Time-stamp: <2021-08-06T15:08:43Z>
+__version__ = '0.0.8' # Time-stamp: <2021-08-08T06:41:11Z>
 ## Language: Japanese/UTF-8
 
 """Simulation Buddhism Prototype No.1 - Death
@@ -77,28 +77,24 @@ class PersonDT (Person0):
         economy = self.economy
         ns = None
         if new_supporter is not None \
-           and new_supporter is not '' and economy.is_living(new_supporter):
+           and new_supporter is not '':
+            assert economy.is_living(new_supporter)
             ns = economy.people[new_supporter]
         assert new_supporter is None or new_supporter is ''\
             or (ns is not None and ns.supported is None)
-        for x in p.supporting:
-            if x is not '' and x in economy.people \
-               and x != new_supporter:
-                s = economy.people[x]
-                assert s.supported == p.id
-                s.supported = new_supporter
-                if ns is not None:
-                    ns.supporting.append(s.id)
-                    s.change_district(ns.district)
+        if new_supporter is None or new_supporter is '':
+            for x in [x for x in p.supporting]:
+                if x is not '' and x in economy.people:
+                    s = economy.people[x]
+                    assert s.supported == p.id
+                    if new_supporter is None:
+                        s.remove_supported()
+                    else:
+                        s.supported = ''
+        else:
+            ns.add_supporting(p.supporting_non_nil())
         p.supporting = []
 
-    def die_supported (self):
-        p = self
-        economy = self.economy
-        if p.supported is not '' and p.supported in economy.people:
-            s = economy.people[p.supported]
-            s.supporting.remove(p.id)
-        
     def do_inheritance (self):
         p = self
         economy = self.economy
@@ -213,19 +209,17 @@ class EconomyDT (Economy0):
                and spouse is not None and spouse in p.supporting:
                 if spouse is '':
                     fst_heir = ''
-                    p.supporting.remove(spouse)
+                    p.remove_supporting_nil()
                 else:
                     s = economy.people[spouse]
                     if s.age >= 18 and s.age < 70:
                         fst_heir = spouse
-                        s.supported = None
-                        p.supporting.remove(spouse)
+                        s.remove_supported()
 
             if fst_heir is not None and fst_heir is not '' \
                and fst_heir in p.supporting:
-                s = economy.people[fst_heir]
-                s.supported = None
-                p.supporting.remove(fst_heir)
+                fh = economy.people[fst_heir]
+                fh.remove_supported()
 
             if p.supporting:
                 if p.supported is not None \
@@ -235,18 +229,14 @@ class EconomyDT (Economy0):
                     p.die_supporting(None)
                 else:
                     p.die_supporting(fst_heir)
-                p.supporting = []
 
-            if p.supported:
-                p.die_supported()
-                p.supported = None
+            if p.supported is not None:
+                p.remove_supported()
 
-            p.supported = fst_heir
             if fst_heir is not None and fst_heir is not '':
                 fh = economy.people[fst_heir]
-                fh.supporting.append(p.id)
-                p.change_district(fh.district)
-        
+                fh.add_supporting(p)
+
         for p in persons:
             p.do_inheritance()
 

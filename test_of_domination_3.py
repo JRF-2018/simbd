@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.2' # Time-stamp: <2021-08-04T10:10:03Z>
+__version__ = '0.0.3' # Time-stamp: <2021-08-08T08:07:17Z>
 ## Language: Japanese/UTF-8
 
 """支配層の代替わりのテスト
@@ -47,6 +47,9 @@ def calc_pregnant_mag (r, rworst):
 
 # ロードするファイル名
 ARGS.pickle = 'test_of_matching_2.pickle'
+#ARGS.pickle = 'simbdp1.pickle'
+# クラスのモジュールが使っているかもしれない前方文字列
+ARGS.module_prefix = 'simbd'
 # 試行数
 ARGS.subtrials = 50
 # ID のランダムに決める部分の長さ
@@ -143,6 +146,9 @@ ARGS.moving_const_4 = 0.10
 ARGS.free_move_rate = 0.005
 # 支配層の継承者がいないときに恨むかどうか。
 ARGS.no_successor_resentment = False
+# 支配層の能力調整の基準値
+ARGS.dominator_adder = 0.1
+
 
 SAVED_ECONOMY = None
 
@@ -179,7 +185,7 @@ def parse_args ():
     if True:
         print("Loading...\n", flush=True)
         with open(ARGS.pickle, 'rb') as f:
-            args, SAVED_ECONOMY = pickle.load(f)
+            args, SAVED_ECONOMY = RenameUnpickler(f).load()
             vars(ARGS).update(vars(args))
             ARGS.save = False
         parser.parse_args(namespace=ARGS)
@@ -467,6 +473,10 @@ class PersonSUP (Person0):
                     return True
         return False
 
+    def supporting_non_nil (self):
+        return [x for x in self.supporting
+                if x is not None and x is not '']
+
 
 class PersonDM (Person0):
     def get_dominator (self):
@@ -476,15 +486,15 @@ class PersonDM (Person0):
         pos = p.dominator_position
         if pos is None:
             return None
-        elif pos is 'king':
+        elif pos == 'king':
             return nation.king
-        elif pos is 'governor':
+        elif pos == 'governor':
             return nation.districts[p.district].governor
-        elif pos is 'vassal':
+        elif pos == 'vassal':
             for d in nation.vassals:
                 if d.id == p.id:
                     return d
-        elif pos is 'cavalier':
+        elif pos == 'cavalier':
             for d in nation.districts[p.district].cavaliers:
                 if d.id == p.id:
                     return d
@@ -497,7 +507,7 @@ class PersonDM (Person0):
         if sid is None:
             sid = p.id
         
-        qid = max([sid] + economy.people[sid].supporting,
+        qid = max([sid] + economy.people[sid].supporting_non_nil(),
                   key=(lambda x: 0 if economy.people[x].death is not None
                        else economy.position_rank(economy.people[x]
                                                   .dominator_position)))
@@ -824,6 +834,34 @@ class Nation (Serializable):
                    for ds in self.districts], [])
 
 
+class Calamity (SerializableExEconomy):        # 「災害」＝「惨禍」
+    pass
+
+class Disaster (Calamity):        # 天災
+    pass
+
+class Flood (Disaster):           # 「洪水」＝「水害」
+    pass
+
+class BigFire (Disaster):           # (都市の)「大火事」
+    pass
+
+class Earthquake (Disaster):           # 「大地震」
+    pass
+
+class CropFailure (Disaster):           # 「作物の病気」または「日照り」
+    pass
+
+class Famine (Disaster):           # 「作物の病気」または「日照り」
+    pass
+
+class Plague (Disaster):           # 「疫病」
+    pass
+
+class Invasion (Calamity):        # 「蛮族の侵入」
+    pass
+
+
 class Economy0 (Frozen):
     def __init__ (self):
         self.term = 0
@@ -844,6 +882,12 @@ class Economy0 (Frozen):
 
         self.cur_forfeit_prop = 0
         self.cur_forfeit_land = 0
+
+        self.n_calamity = {}
+        self.d_calamity = {}
+
+        self.rand_state = None
+        self.rand_state_np = None
 
 
 class EconomyBT (Economy0):
@@ -1019,11 +1063,12 @@ class EconomyDM (Economy0):
         return p
 
 
-    def new_dominator (self, position, person):
+    def new_dominator (self, position, person, adder=0):
         economy = self
         p = person
         if p.id in economy.dominator_parameters:
             d = economy.dominator_parameters[p.id]
+            adder = 0
         else:
             d = Dominator()
             economy.dominator_parameters[p.id] = d
@@ -1036,6 +1081,25 @@ class EconomyDM (Economy0):
             d.combat_prophecy = random.random()
             #d.combat_strategy = random.random()
             d.combat_tactics = random.random()
+
+        while adder != 0:
+            sgn = 0
+            if adder > 0:
+                adder -= 1
+                sgn = +1
+            elif adder < 0:
+                adder += 1
+                sgn = -1
+            for n in ['people_trust',
+                      'faith_realization',
+                      'disaster_prophecy',
+                      'disaster_strategy',
+                      'disaster_tactics',
+                      'combat_prophecy',
+                      # 'combat_strategy',
+                      'combat_tactics']:
+                u = sgn * random.random() * ARGS.dominator_adder
+                setattr(d, n, np_clip(getattr(d, n) + u, 0, 1))
 
         d.economy = economy
         d.district = p.district
@@ -1109,7 +1173,7 @@ class EconomyDM (Economy0):
                 fa.add(p.id)
         for pid in fa:
             p = economy.people[pid]
-            for qid in [p.id] + p.supporting:
+            for qid in [p.id] + p.supporting_non_nil():
                 q = economy.people[qid]
                 a = random.uniform(0, max_adder)
                 q.political_hating = np_clip(q.political_hating + a, 0, 1)
@@ -1143,6 +1207,17 @@ class EconomyDM (Economy0):
 
 class Economy (EconomyBT, EconomyDT, EconomyDM):
     pass
+
+
+## Ref: 《pickle - Python pickling after changing a module's directory - Stack Overflow》  
+## https://stackoverflow.com/questions/2121874/python-pickling-after-changing-a-modules-directory
+class RenameUnpickler (pickle.Unpickler):
+    def find_class(self, module, name):
+        renamed_module = module
+        if module.startswith(ARGS.module_prefix):
+            renamed_module = __name__
+
+        return super().find_class(renamed_module, name)
 
 
 def np_clip (x, a, b): # faster than np.clip
@@ -1288,7 +1363,11 @@ def reinit_economy (orig):
         tombs.append((new_t.person.id, new_t))
     economy.tombs = OrderedDict(tombs)
 
-    initialize_nation(economy)
+    if economy.nation is None:
+        initialize_nation(economy)
+    else:
+        for d in economy.nation.dominators():
+            d.economy = economy
     
     return economy
 
@@ -1461,13 +1540,13 @@ def nominate_successors (economy):
             noml = [x for x in noml if economy.position_rank(x[2])
                     == economy.position_rank(nomm[2])]
             nom = random.choice(noml)
-        if ex is 'king':
+        if ex == 'king':
             l = ['from_vassals_or_governors',
                  'from_all_cavaliers',
                  'from_people']
             if nom is not None:
                 l = ['nominate'] + l
-        elif ex is 'governor' or ex is 'vassal':
+        elif ex == 'governor' or ex == 'vassal':
             l2 = [(3, 'king_nominate'),
                   (5, 'from_cavaliers'),
                   (1, 'from_people')]
@@ -1479,7 +1558,7 @@ def nominate_successors (economy):
                 else:
                     l2.append((5, 'nominate'))
             l = _random_scored_sort(l2)
-        elif ex is 'cavalier':
+        elif ex == 'cavalier':
             l2 = [(3, 'king_nominate'),
                   (2, 'vassal_nominate'),
                   (3, 'governor_nominate'),
@@ -1493,6 +1572,7 @@ def nominate_successors (economy):
                     l2.append((5, 'nominate'))
             l = _random_scored_sort(l2)
 
+        adder = 0
         done = None
         nom2 = None
         for method in l:
@@ -1574,6 +1654,7 @@ def nominate_successors (economy):
                         done = p
                         break
                 if done is not None:
+                    adder = 2
                     break
                 assert done is not None
                 continue
@@ -1587,6 +1668,8 @@ def nominate_successors (economy):
             for pos, dnum, pos2, pid in nation.nomination:
                 if (not done2) and pos == ex and dnum == exd and pid == nom2.id:
                     done2 = True
+                    if pos2 == 'cavalier':
+                        adder = 1
                     print("remove nomination")
                 else:
                     l.append((pos, dnum, pos2, pid))
@@ -1597,9 +1680,9 @@ def nominate_successors (economy):
         sid = p.supported
         if sid is None:
             sid = p.id
-        for qid in [sid] + economy.people[sid].supporting:
+        for qid in [sid] + economy.people[sid].supporting_non_nil():
             economy.people[qid].change_district(exd)
-        economy.new_dominator(ex, p)
+        economy.new_dominator(ex, p, adder=adder)
         new_nomination.append((ex, exd, p.id))
 
     for pos, dnum, pos2, pid in nation.nomination:

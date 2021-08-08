@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.4' # Time-stamp: <2021-08-06T16:20:38Z>
+__version__ = '0.0.5' # Time-stamp: <2021-08-08T05:11:43Z>
 ## Language: Japanese/UTF-8
 
 """Simulation Buddhism Prototype No.2 - Marriage
@@ -725,7 +725,18 @@ def update_marriages (economy):
     print("\nMarriages:...", flush=True)
 
     # 結婚用の tmp_asset_rank の計算
+    domrank = {
+        None: 0,
+        'cavalier': 1 - 0.15,
+        'vassal': 1 - 0.05,
+        'governor': 1 - 0.05,
+        'king': 1 - 0.01
+    }
     calc_with_support_asset_rank(economy)
+    for p in economy.people.values():
+        if p.dominator_position is not None:
+            p.tmp_asset_rank = max([p.tmp_asset_rank,
+                                    domrank[p.dominator_position]])
 
     for p in economy.people.values():
         p.tmp_luck = 0

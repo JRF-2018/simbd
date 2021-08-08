@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.4' # Time-stamp: <2021-04-17T23:22:37Z>
+__version__ = '0.0.8' # Time-stamp: <2021-08-08T03:32:09Z>
 ## Language: Japanese/UTF-8
 
 """Simulation Buddhism Prototype No.1 - Base
@@ -191,6 +191,9 @@ class Economy0 (Frozen):
 
         self.cur_forfeit_prop = 0
         self.cur_forfeit_land = 0
+
+        self.rand_state = None
+        self.rand_state_np = None
 
 
 class EconomyPlot0 (Frozen):

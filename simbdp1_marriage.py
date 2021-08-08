@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.7' # Time-stamp: <2021-08-06T15:08:04Z>
+__version__ = '0.0.8' # Time-stamp: <2021-08-08T08:08:39Z>
 ## Language: Japanese/UTF-8
 
 """Simulation Buddhism Prototype No.1 - Marriage
@@ -169,9 +169,9 @@ class PersonMA (Person0):
 
         if m.spouse is '':
             if p.sex == 'M' and '' in p.supporting:
-                p.supporting.remove('')
+                p.remove_supporting_nil()
             elif p.sex == 'F' and p.supported == '':
-                p.supported = None
+                p.remove_supported()
 
         if m.spouse is not '' and economy.is_living(m.spouse):
             s = economy.people[m.spouse]
@@ -195,8 +195,7 @@ class PersonMA (Person0):
                 else:
                     p1 = s
                     s1 = p
-                s1.supported = None
-                p1.supporting.remove(s1.id)
+                s1.remove_supported()
                 l1 = []
                 l2 = []
                 for r in s1.trash:
@@ -239,12 +238,11 @@ class PersonMA (Person0):
                     elif x in s1fam:
                         l.append(x)
                 for x in l:
-                    p1.supporting.remove(x)
-                    s1.supporting.append(x)
-                    if x is not '':
-                        assert x in economy.people
-                        c = economy.people[x]
-                        c.supported = s1.id
+                    if x is '':
+                        p1.remove_supporting_nil()
+                    else:
+                        economy.people[x].remove_supported()
+                    s1.add_supporting(x)
             elif p.supported is not None and p.supported is not '' \
                  and s.supported == p.supported:
                 assert p.supported in economy.people
@@ -258,11 +256,9 @@ class PersonMA (Person0):
                 if (q.father == f.id and q.mother == m.id) \
                    or (q.father != f.id and q.mother != m.id) \
                    or q.mother == m.id:
-                    f.supported = None
-                    q.supporting.remove(f.id)
+                    f.remove_supported()
                 else:
-                    m.supported = None
-                    q.supporting.remove(m.id)
+                    m.remove_supported()
 
 
 class EconomyMA (Economy0):
@@ -378,35 +374,14 @@ class EconomyMA (Economy0):
                         update_adultery_hating(economy, s, sa)
 
         if m.supported is not None and m.age < 70:
-            if m.supported is not '' and economy.is_living(m.supported):
-                s = economy.people[m.supported]
-                s.supporting.remove(m.id)
-            m.supported = None
+            m.remove_supported()
+
         if m.supported is not None:
-            s = m.id
-            check = set([s])
-            while s is not '' and s is not None:
-                assert s in economy.people
-                q = economy.people[s]
-                s1 = q.supported
-                if s1 is None:
-                    break
-                if s1 == f.id:
-                    # print("CHK EX")
-                    f.supporting.remove(s)
-                    q.supported = None
-                    break
-                if s1 in check:
-                    raise ValueError("A supporting tree loops.")
-                check.add(s1)
-                s = s1
+            if m.supported == f.id:
+                m.remove_supported()
         if f.supported is not None:
-            if f.supported is not '' and economy.is_living(f.supported):
-                s = economy.people[f.supported]
-                s.supporting.remove(f.id)
-        f.supported = m.id
-        m.supporting.append(f.id)
-        f.change_district(m.district)
+            f.remove_supported()
+        m.add_supporting(f)
 
 
 class EconomyPlotMA (EconomyPlot0):

@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.4' # Time-stamp: <2021-08-06T16:23:25Z>
+__version__ = '0.0.5' # Time-stamp: <2021-08-08T05:12:00Z>
 ## Language: Japanese/UTF-8
 
 """Simulation Buddhism Prototype No.2 - Main
@@ -465,7 +465,6 @@ def step (economy):
         for p in economy.people.values():
             for n in p.mlog:
                 p.mlog[n] = []
-        p.tmp_land_damage = 0
         # check_support_consistent(economy)
 
 

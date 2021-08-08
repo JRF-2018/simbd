@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.4' # Time-stamp: <2021-08-06T15:07:15Z>
+__version__ = '0.0.5' # Time-stamp: <2021-08-08T05:11:50Z>
 ## Language: Japanese/UTF-8
 
 """Simulation Buddhism Prototype No.2 - Adultery
@@ -711,11 +711,22 @@ def update_adulteries (economy):
     print("Choosing...", flush=True)
 
     # 不倫用の tmp_asset_rank の計算
+    domrank = {
+        None: 0,
+        'cavalier': 1 - 0.30,
+        'vassal': 1 - 0.10,
+        'governor': 1 - 0.10,
+        'king': 1 - 0.05
+    }
     l = sorted(economy.people.values(), key=lambda p: p.consumption,
                reverse=True)
     s = len(l)
     for i in range(len(l)):
-        l[i].tmp_asset_rank = (s - i) / s
+        p = l[i]
+        p.tmp_asset_rank = (s - i) / s
+        if p.dominator_position is not None:
+            p.tmp_asset_rank = max([p.tmp_asset_rank,
+                                    domrank[p.dominator_position]])
 
     # 不倫用の幸運度の計算
     for p in economy.people.values():

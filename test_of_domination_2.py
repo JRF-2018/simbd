@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.7' # Time-stamp: <2021-08-04T10:10:14Z>
+__version__ = '0.0.8' # Time-stamp: <2021-08-08T05:08:03Z>
 ## Language: Japanese/UTF-8
 
 """支配と災害のシミュレーション"""
@@ -159,6 +159,8 @@ ARGS.moving_const_4 = 0.10
 ARGS.free_move_rate = 0.005
 # 支配層の継承者がいないときに恨むかどうか。
 ARGS.no_successor_resentment = False
+# 支配層の能力調整の基準値
+ARGS.dominator_adder = 0.1
 
 SAVED_ECONOMY = None
 
@@ -2016,11 +2018,12 @@ class EconomyDM (Economy0):
         return p
 
 
-    def new_dominator (self, position, person):
+    def new_dominator (self, position, person, adder=0):
         economy = self
         p = person
         if p.id in economy.dominator_parameters:
             d = economy.dominator_parameters[p.id]
+            adder = 0
         else:
             d = Dominator()
             economy.dominator_parameters[p.id] = d
@@ -2033,6 +2036,25 @@ class EconomyDM (Economy0):
             d.combat_prophecy = random.random()
             #d.combat_strategy = random.random()
             d.combat_tactics = random.random()
+
+        while adder != 0:
+            sgn = 0
+            if adder > 0:
+                adder -= 1
+                sgn = +1
+            elif adder < 0:
+                adder += 1
+                sgn = -1
+            for n in ['people_trust',
+                      'faith_realization',
+                      'disaster_prophecy',
+                      'disaster_strategy',
+                      'disaster_tactics',
+                      'combat_prophecy',
+                      # 'combat_strategy',
+                      'combat_tactics']:
+                u = sgn * random.random() * ARGS.dominator_adder
+                setattr(d, n, np_clip(getattr(d, n) + u, 0, 1))
 
         d.economy = economy
         d.district = p.district
@@ -3464,6 +3486,7 @@ def nominate_successors (economy):
                     l2.append((5, 'nominate'))
             l = _random_scored_sort(l2)
 
+        adder = 0
         done = None
         nom2 = None
         for method in l:
@@ -3545,6 +3568,7 @@ def nominate_successors (economy):
                         done = p
                         break
                 if done is not None:
+                    adder = 2
                     break
                 assert done is not None
                 continue
@@ -3558,6 +3582,8 @@ def nominate_successors (economy):
             for pos, dnum, pos2, pid in nation.nomination:
                 if (not done2) and pos == ex and dnum == exd and pid == nom2.id:
                     done2 = True
+                    if pos2 == 'cavalier':
+                        adder = 1
                     print("remove nomination")
                 else:
                     l.append((pos, dnum, pos2, pid))
@@ -3570,7 +3596,7 @@ def nominate_successors (economy):
             sid = p.id
         for qid in [sid] + economy.people[sid].supporting:
             economy.people[qid].change_district(exd)
-        economy.new_dominator(ex, p)
+        economy.new_dominator(ex, p, adder=adder)
         new_nomination.append((ex, exd, p.id))
 
     for pos, dnum, pos2, pid in nation.nomination:

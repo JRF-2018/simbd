@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.19' # Time-stamp: <2021-08-06T17:47:02Z>
+__version__ = '0.0.20' # Time-stamp: <2021-08-08T06:41:22Z>
 ## Language: Japanese/UTF-8
 
 """結婚・不倫・扶養・相続などのマッチングのシミュレーション"""
@@ -548,8 +548,7 @@ class PersonBT (Person0):
             ch.father = ''
             rel.children.append(ch)
             m.children.append(ch)
-            p.supported = m.id
-            m.supporting.append(p.id)
+            m.add_supporting(p)
         elif isinstance(rel, Marriage):
             f = economy.people[rel.spouse]
             p.father = f.id
@@ -578,8 +577,7 @@ class PersonBT (Person0):
                 and ma.spouse == m.id
             ma.children.append(ch)
             rel.children.append(ch)
-            p.supported = f.id
-            f.supporting.append(p.id)
+            f.add_supporting(p)
         else:
             f = economy.people[rel.spouse]
             foster_father = f.id
@@ -656,13 +654,9 @@ class PersonBT (Person0):
                         f.children.append(ch)
                     assert f.marriage is not None \
                         and f.marriage.spouse == m.id
-                    p.supported = f.id
-                    f.supporting.append(p.id)
-                    p.district = f.district
+                    f.add_supporting(p)
                 else:
-                    p.supported = m.id
-                    m.supporting.append(p.id)
-                    p.district = m.district
+                    m.add_supporting(p)
             else:
                 supporting = False
                 if father_bfather_thinks == f.id:
@@ -675,13 +669,9 @@ class PersonBT (Person0):
                     f.children.append(ch)
                     supporting = random.random() < 0.7
                 if supporting:
-                    p.supported = f.id
-                    f.supporting.append(p.id)
-                    p.district = f.district
+                    f.add_supporting(p)
                 else:
-                    p.supported = m.id
-                    m.supporting.append(p.id)
-                    p.district = m.district
+                    m.add_supporting(p)
 
             assert p.supported is not None
 
@@ -743,28 +733,24 @@ class PersonDT (Person0):
         economy = self.economy
         ns = None
         if new_supporter is not None \
-           and new_supporter is not '' and economy.is_living(new_supporter):
+           and new_supporter is not '':
+            assert economy.is_living(new_supporter)
             ns = economy.people[new_supporter]
         assert new_supporter is None or new_supporter is ''\
             or (ns is not None and ns.supported is None)
-        for x in p.supporting:
-            if x is not '' and x in economy.people \
-               and x != new_supporter:
-                s = economy.people[x]
-                assert s.supported == p.id
-                s.supported = new_supporter
-                if ns is not None:
-                    ns.supporting.append(s.id)
-                    s.change_district(ns.district)
+        if new_supporter is None or new_supporter is '':
+            for x in [x for x in p.supporting]:
+                if x is not '' and x in economy.people:
+                    s = economy.people[x]
+                    assert s.supported == p.id
+                    if new_supporter is None:
+                        s.remove_supported()
+                    else:
+                        s.supported = ''
+        else:
+            ns.add_supporting(p.supporting_non_nil())
         p.supporting = []
 
-    def die_supported (self):
-        p = self
-        economy = self.economy
-        if p.supported is not '' and p.supported in economy.people:
-            s = economy.people[p.supported]
-            s.supporting.remove(p.id)
-        
     def do_inheritance (self):
         p = self
         economy = self.economy
@@ -1046,9 +1032,9 @@ class PersonMA (Person0):
 
         if m.spouse is '':
             if p.sex == 'M' and '' in p.supporting:
-                p.supporting.remove('')
+                p.remove_supporting_nil()
             elif p.sex == 'F' and p.supported == '':
-                p.supported = None
+                p.remove_supported()
 
         if m.spouse is not '' and economy.is_living(m.spouse):
             s = economy.people[m.spouse]
@@ -1072,8 +1058,7 @@ class PersonMA (Person0):
                 else:
                     p1 = s
                     s1 = p
-                s1.supported = None
-                p1.supporting.remove(s1.id)
+                s1.remove_supported()
                 l1 = []
                 l2 = []
                 for r in s1.trash:
@@ -1116,12 +1101,11 @@ class PersonMA (Person0):
                     elif x in s1fam:
                         l.append(x)
                 for x in l:
-                    p1.supporting.remove(x)
-                    s1.supporting.append(x)
-                    if x is not '':
-                        assert x in economy.people
-                        c = economy.people[x]
-                        c.supported = s1.id
+                    if x is '':
+                        p1.remove_supporting_nil()
+                    else:
+                        economy.people[x].remove_supported()
+                    s1.add_supporting(x)
             elif p.supported is not None and p.supported is not '' \
                  and s.supported == p.supported:
                 assert p.supported in economy.people
@@ -1135,11 +1119,9 @@ class PersonMA (Person0):
                 if (q.father == f.id and q.mother == m.id) \
                    or (q.father != f.id and q.mother != m.id) \
                    or q.mother == m.id:
-                    f.supported = None
-                    q.supporting.remove(f.id)
+                    f.remove_supported()
                 else:
-                    m.supported = None
-                    q.supporting.remove(m.id)
+                    m.remove_supported()
 
 
 class PersonSUP (Person0):
@@ -1167,13 +1149,8 @@ class PersonSUP (Person0):
         economy = self.economy
         
         if p.supported is not None:
-            assert p.supported in economy.people
-            s = economy.people[p.supported]
-            s.supporting.remove(p.id)
-            p.supported = None
-        p.supported = g.id
-        g.supporting.append(p.id)
-        p.change_district(g.district)
+            p.remove_supported()
+        g.add_supporting(p)
         gs = None
         if g.marriage is not None:
             gs = g.marriage.spouse
@@ -1262,6 +1239,74 @@ class PersonSUP (Person0):
             if gs is not None:
                 p.father = gs
 
+    def supporting_non_nil (self):
+        return [x for x in self.supporting
+                if x is not None and x is not '']
+    
+    def remove_supported (self):
+        p = self
+        economy = self.economy
+        if p.supported is '' or p.supported is None:
+            p.supported = None
+            return
+        s2 = economy.people[p.supported]
+        s2.supporting.remove(p.id)
+        p.supported = None
+
+    def remove_supporting_nil (self):
+        p = self
+        if '' in p.supporting:
+            p.supporting.remove('')
+
+    def add_supporting (self, persons):
+        p = self
+        economy = self.economy
+        l = persons
+        if type(l) is str or isinstance(l, base.Person):
+            l = [l]
+        sid = p.supported
+        if sid is None:
+            sid = p.id
+        s = None
+        if sid is not '':
+            s = economy.people[sid]
+
+        l2 = []
+        for q in l:
+            if isinstance(q, base.Person):
+                qid = q.id
+            else:
+                qid = q
+                q = None
+                if qid is not '' and qid is not None:
+                    q = economy.people[qid]
+            l2.append(qid)
+            if q is not None:
+                l2.extend(q.supporting)
+                q.supporting = [x for x in q.supporting if x is not '']
+        
+        for qid in l2:
+            q = None
+            if qid is not '' and qid is not None:
+                q = economy.people[qid]
+
+            if q is not None:
+                if q.supported == sid:
+                    continue
+                q.remove_supported()
+
+            if sid is '':
+                if qid is '':
+                    pass
+                else:
+                    if q is not None:
+                        q.supported = ''
+            else:
+                s.supporting.append(qid)
+                if q is not None:
+                    q.supported = sid
+                    q.change_district(s.district)
+
 
 class Person (PersonEC, PersonBT, PersonDT, PersonAD, PersonMA, PersonSUP):
     pass
@@ -1341,6 +1386,10 @@ class Economy0 (Frozen):
         self.cur_forfeit_prop = 0
         self.cur_forfeit_land = 0
 
+        self.rand_state = None
+        self.rand_state_np = None
+
+
 class EconomyDT (Economy0):
     def is_living (self, id_or_person):
         s = id_or_person
@@ -1412,19 +1461,17 @@ class EconomyDT (Economy0):
                and spouse is not None and spouse in p.supporting:
                 if spouse is '':
                     fst_heir = ''
-                    p.supporting.remove(spouse)
+                    p.remove_supporting_nil()
                 else:
                     s = economy.people[spouse]
                     if s.age >= 18 and s.age < 70:
                         fst_heir = spouse
-                        s.supported = None
-                        p.supporting.remove(spouse)
+                        s.remove_supported()
 
             if fst_heir is not None and fst_heir is not '' \
                and fst_heir in p.supporting:
-                s = economy.people[fst_heir]
-                s.supported = None
-                p.supporting.remove(fst_heir)
+                fh = economy.people[fst_heir]
+                fh.remove_supported()
 
             if p.supporting:
                 if p.supported is not None \
@@ -1434,18 +1481,14 @@ class EconomyDT (Economy0):
                     p.die_supporting(None)
                 else:
                     p.die_supporting(fst_heir)
-                p.supporting = []
 
-            if p.supported:
-                p.die_supported()
-                p.supported = None
+            if p.supported is not None:
+                p.remove_supported()
 
-            p.supported = fst_heir
             if fst_heir is not None and fst_heir is not '':
                 fh = economy.people[fst_heir]
-                fh.supporting.append(p.id)
-                p.change_district(fh.district)
-        
+                fh.add_supporting(p)
+
         for p in persons:
             p.do_inheritance()
 
@@ -1555,35 +1598,14 @@ class EconomyMA (Economy0):
                         update_adultery_hating(economy, s, sa)
 
         if m.supported is not None and m.age < 70:
-            if m.supported is not '' and economy.is_living(m.supported):
-                s = economy.people[m.supported]
-                s.supporting.remove(m.id)
-            m.supported = None
+            m.remove_supported()
+
         if m.supported is not None:
-            s = m.id
-            check = set([s])
-            while s is not '' and s is not None:
-                assert s in economy.people
-                q = economy.people[s]
-                s1 = q.supported
-                if s1 is None:
-                    break
-                if s1 == f.id:
-                    # print("CHK EX")
-                    f.supporting.remove(s)
-                    q.supported = None
-                    break
-                if s1 in check:
-                    raise ValueError("A supporting tree loops.")
-                check.add(s1)
-                s = s1
+            if m.supported == f.id:
+                m.remove_supported()
         if f.supported is not None:
-            if f.supported is not '' and economy.is_living(f.supported):
-                s = economy.people[f.supported]
-                s.supporting.remove(f.id)
-        f.supported = m.id
-        m.supporting.append(f.id)
-        f.change_district(m.district)
+            f.remove_supported()
+        m.add_supporting(f)
 
 
 class Economy (EconomyDT, EconomyMA):
@@ -3685,9 +3707,7 @@ def update_support_aged (economy):
         if g.family_hating(p):
             continue
         n_s += 1
-        p.supported = g.id
-        g.supporting.append(p.id)
-        p.change_district(g.district)
+        g.add_supporting(p)
 
     print("Support Aged:", n_f, n_s - n_f)
 
@@ -3737,9 +3757,7 @@ def update_support_infant (economy):
     for p, g in sup:
         n_s += 1
         if p.age >= 10:
-            p.supported = g.id
-            g.supporting.append(p.id)
-            p.change_district(g.district)
+            g.add_supporting(p)
         else:
             n_o += 1
             g.adopt_child(p)
@@ -3877,52 +3895,25 @@ def update_become_adult (economy):
             p.land += al
             p.prop += ap
 
-        if p.supported is not '':
-            assert p.supported in economy.people
-            s = economy.people[p.supported]
-            s.supporting.remove(p.id)
-        p.supported = None
+        p.remove_supported()
 
 
-def make_support_consistent (economy):
+def check_support_consistent (economy):
     for p in economy.people.values():
-        if p.supporting and p.supported is not None:
-            s = p.supported
-            check = set([s])
-            while s is not '':
-                assert economy.is_living(s)
-                s1 = economy.people[s].supported
-                if s1 is None:
-                    break
-                if s1 in check:
-                    raise ValueError("A supporting tree loops.")
-                check.add(s1)
-                s = s1
-            supported = s
-            ns = None
-            if s is not '':
-                ns = economy.people[s]
-            for id1 in p.supporting:
-                if id1 is not '':
-                    # if id1 not in economy.people:
-                    #     print("id1", id1)
-                    #     print(economy.tombs[id1])
-                    assert id1 in economy.people
-                    p1 = economy.people[id1]
-                    p1.supported = supported
-                    if ns is not None:
-                        p1.change_district(ns.district)
-                        ns.supporting.append(id1)
-            p.supporting = []
+        assert not (p.supporting and p.supported is not None)
 
     supportings = OrderedDict()
     for p in economy.people.values():
+        if p.supported is '' or p.supported is None:
+            continue
+        assert p.supported in economy.people
         if p.supported not in supportings:
             supportings[p.supported] = []
         supportings[p.supported].append(p.id)
 
     for p in economy.people.values():
         if p.supporting:
+            assert p.death is None
             if not [True for x in p.supporting if x is not '']:
                 continue
             if p.id not in supportings:
@@ -3935,6 +3926,7 @@ def make_support_consistent (economy):
             l2 = p.supporting
             for x in l2:
                 if x is not '':
+                    assert economy.people[x].district == p.district
                     try:
                         l1.remove(x)
                     except:
@@ -3974,8 +3966,8 @@ def update_support (economy):
     update_support_aged(economy)
     update_support_infant(economy)
     update_support_unwanted(economy)
-    make_support_consistent(economy)
     update_unknown_support(economy)
+    check_support_consistent(economy)
 
 
 def update_economy (economy):
@@ -4049,6 +4041,15 @@ def step (economy):
         ARGS.debug_term = None
         import pdb; pdb.set_trace()
 
+    update_education(economy)
+    update_fertility(economy)
+    update_death(economy)
+    update_adulteries(economy)
+    update_marriages(economy)
+    update_birth(economy)
+    update_support(economy)
+    update_tombs(economy)
+
     if economy.term % ARGS.economy_period == 0:
         update_economy(economy)
 
@@ -4059,21 +4060,10 @@ def step (economy):
         for p, q in l:
             p.death.inheritance_share = q
             p.do_inheritance()
+            if p.supported is not None and p.supported is not '':
+                p.remove_supported()
+        for p, q in l:
             del economy.people[p.id]
-            if p.supported is not None and p.supported is not '' \
-               and p.supported in economy.people:
-                s = economy.people[p.supported]
-                s.supporting.remove(p.id)
-                p.supported = None
-
-    update_education(economy)
-    update_fertility(economy)
-    update_death(economy)
-    update_adulteries(economy)
-    update_marriages(economy)
-    update_birth(economy)
-    update_support(economy)
-    update_tombs(economy)
 
 
 def main (eplot):
@@ -4082,11 +4072,18 @@ def main (eplot):
         economy = Economy()
         print("Initializing...", flush=True)
         initialize(economy)
+        eplot.plot(economy)
+        if not ARGS.no_view:
+            plt.pause(1.0)
     else:
         economy = SAVED_ECONOMY
-    eplot.plot(economy)
-    if not ARGS.no_view:
-        plt.pause(1.0)
+        eplot.plot(economy)
+        if not ARGS.no_view:
+            plt.pause(1.0)
+        random.setstate(economy.rand_state)
+        np.random.set_state(economy.rand_state_np)
+        economy.rand_state_np = None
+        economy.rand_state = None
 
     saved_last = False
     for trial in range(ARGS.trials):
@@ -4098,14 +4095,22 @@ def main (eplot):
             plt.pause(0.5)
         if ARGS.save and (trial % ARGS.save_period) == ARGS.save_period - 1:
             print("\nSaving...", flush=True)
+            economy.rand_state_np = np.random.get_state()
+            economy.rand_state = random.getstate()
             with open(ARGS.pickle, 'wb') as f:
                 pickle.dump((ARGS, economy), f)
+            economy.rand_state_np = None
+            economy.rand_state = None
             saved_last = True
 
     if ARGS.save and not saved_last:
         print("\nSaving...", flush=True)
+        economy.rand_state_np = np.random.get_state()
+        economy.rand_state = random.getstate()
         with open(ARGS.pickle, 'wb') as f:
             pickle.dump((ARGS, economy), f)
+        economy.rand_state_np = None
+        economy.rand_state = None
 
     print("\nFinish", flush=True)
     if not ARGS.no_view:
