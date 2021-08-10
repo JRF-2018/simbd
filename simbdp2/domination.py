@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.5' # Time-stamp: <2021-08-08T05:23:31Z>
+__version__ = '0.0.6' # Time-stamp: <2021-08-10T04:41:12Z>
 ## Language: Japanese/UTF-8
 
 """Simulation Buddhism Prototype No.2 - Domination
@@ -37,7 +37,7 @@ import simbdp2.base as base
 from simbdp2.base import ARGS, Person0, Economy0, \
     Serializable, SerializableExEconomy
 from simbdp2.random import negative_binominal_rand, half_normal_rand
-from simbdp2.common import np_clip, Child, Marriage
+from simbdp2.common import np_clip, Child, Marriage, Rape
 
 
 class PersonDM (Person0):
@@ -207,14 +207,37 @@ class EconomyDM (Economy0):
             a = random.uniform(0, max_adder)
             p.political_hating = np_clip(p.political_hating + a, 0, 1)
 
-    def injure (self, people, max_permanent=0.5, max_temporal=0.5):
+    def injure (self, people, max_permanent=0.5, max_temporal=0.5,
+                permanent_injure_rate=None):
         economy = self
+        if permanent_injure_rate is None:
+            permanent_injure_rate = ARGS.permanent_injure_rate
         fa = set()
         for p in people:
-            a = random.uniform(0, max_permanent)
             b = random.uniform(0, max_temporal)
-            p.injured = np_clip(p.injured + a, 0, 1)
             p.tmp_injured = np_clip(p.tmp_injured + b, 0, 1)
+            if random.random() < permanent_injure_rate:
+                a = random.uniform(0, max_permanent)
+                p.injured = np_clip(p.injured + a, 0, 1)
+
+    def rape (self, people):
+        economy = self
+        n_p = 0
+
+        for f in people:
+            af = Rape()
+            af.spouse = ''
+            af.init_favor = 0
+            af.begin = economy.term
+            af.end = economy.term
+            f.trash.append(af)
+            if f.fertility != 0 and f.pregnancy is None:
+                ft = f.fertility
+                if random.random() < ARGS.rape_pregnant_rate \
+                   * (ft ** ARGS.rape_pregnant_mag):
+                    f.get_pregnant(af)
+                    n_p += 1
+        return n_p
 
     position_rank_table = {
         None: 0,
@@ -410,6 +433,12 @@ class Dominator (SerializableExEconomy):
                     new_adder = 1
                 else:
                     new_adder = 0
+            if p.injured >= 0.6:
+                new_adder -= 3
+            elif p.injured >= 0.3:
+                new_adder -= 2
+            elif p.injured >= 0.1:
+                new_adder -= 1
 
         while new_adder != d.adder:
             sgn = 0
@@ -914,9 +943,12 @@ def update_dominators (economy):
 
     nation = economy.nation
     for d in nation.dominators():
+        p = economy.people[d.id]
         if nation.king is not None and nation.king.id == d.id:
+            if p.injured >= 0.75:
+                d.resign()
             continue
-        if economy.people[d.id].age > 70:
+        if p.age > 70 or p.injured >= 0.5:
             d.resign()
     nominate_successors(economy)
     for d in nation.dominators():

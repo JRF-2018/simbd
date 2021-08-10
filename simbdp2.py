@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.5' # Time-stamp: <2021-08-08T05:12:00Z>
+__version__ = '0.0.6' # Time-stamp: <2021-08-10T05:39:15Z>
 ## Language: Japanese/UTF-8
 
 """Simulation Buddhism Prototype No.2 - Main
@@ -184,6 +184,9 @@ ARGS.worst_pregnant_rate = calc_increase_rate(12, 1/100)
 # 妊娠しやすさが1のときの行きずりの不倫の妊娠確率
 ARGS.new_adulteries_pregnant_rate = (ARGS.intended_pregnant_rate + ARGS.unintended_pregnant_rate) / 2
 ARGS.new_adulteries_pregnant_mag = None
+# 妊娠しやすさが1のときの強姦の妊娠確率
+ARGS.rape_pregnant_rate = (ARGS.intended_pregnant_rate + ARGS.unintended_pregnant_rate) / 2
+ARGS.rape_pregnant_mag = None
 # 40歳以上の男性の生殖能力の衰えのパラメータ
 ARGS.male_fertility_reduce_rate = calc_increase_rate(12, 0.1)
 ARGS.male_fertility_reduce = 0.9
@@ -258,7 +261,8 @@ ARGS.works_per_dominator = 5
 #ARGS.calamity_damage_threshold = 100.0
 ARGS.calamity_damage_threshold = 10.0
 # 災害対応しないことによる成長機会の拡大率
-ARGS.challengeable_mag = 10.0
+#ARGS.challengeable_mag = 10.0
+ARGS.challengeable_mag = 1.0
 # 寺院を立てる確率
 ARGS.construct_temple_rate = 0.001
 # 成長機会があるときのベータ関数のパラメータ
@@ -272,14 +276,14 @@ ARGS.invasion_average_term = 15.0 * 12
 #ARGS.invasion_average_term = 5.0 * 12
 # 洪水の頻度の目安
 #ARGS.flood_rate = 1.0 / 7
-ARGS.flood_rate = (1.0 / 14) * (1/2)
+ARGS.flood_rate = (1.0 / 14) * (1/4)
 # 作物の病気の頻度の目安
 ARGS.cropfailure_rate = (1/8) / 3
 # 大火事の頻度の目安
 #ARGS.bigfire_rate = (1 / (5 * 12)) * (12/15)
 ARGS.bigfire_rate = (1 / (10 * 12)) * (12/15)
 # 地震の頻度の目安
-ARGS.earthquake_rate = (1 / (5 * 12)) * (1/2)
+ARGS.earthquake_rate = (1 / (5 * 12)) * (1/4)
 # 次の疫病までの平均期
 ARGS.plague_average_term = 50.0 * 12
 # 規模の概要値の評価を換える。
@@ -297,6 +301,8 @@ ARGS.free_move_rate = 0.005
 ARGS.no_successor_resentment = False
 # 支配層の能力調整の基準値
 ARGS.dominator_adder = 0.1
+# ケガ・病気の障害として残る確率
+ARGS.permanent_injure_rate = 1/2
 
 
 SAVED_ECONOMY = None
@@ -360,6 +366,10 @@ def parse_args (view_options=['none']):
     if ARGS.new_adulteries_pregnant_mag is None:
         ARGS.new_adulteries_pregnant_mag = calc_pregnant_mag(
             ARGS.new_adulteries_pregnant_rate, ARGS.worst_pregnant_rate
+        )
+    if ARGS.rape_pregnant_mag is None:
+        ARGS.rape_pregnant_mag = calc_pregnant_mag(
+            ARGS.rape_pregnant_rate, ARGS.worst_pregnant_rate
         )
     if type(ARGS.damage_scale_filter) is str:
         r = {}

@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.4' # Time-stamp: <2021-08-06T13:06:02Z>
+__version__ = '0.0.6' # Time-stamp: <2021-08-10T05:34:30Z>
 ## Language: Japanese/UTF-8
 
 """Simulation Buddhism Prototype No.2 - Domination
@@ -351,7 +351,7 @@ class Calamity (SerializableExEconomy):        # 「災害」＝「惨禍」
         for p in economy.people.values():
             if p.death is None and p.district == dnum:
                 people.append(p)
-        damage = math.floor(scale * (150 / 30) * (len(people) / 10000))
+        damage = math.floor(scale * (300 / 30) * (len(people) / 10000))
         if damage > len(people):
             damage = len(people)
         people = random.sample(people, damage)
@@ -376,7 +376,7 @@ class Calamity (SerializableExEconomy):        # 「災害」＝「惨禍」
                 else:
                     l2.append(1.0)
 
-        damage = math.floor(scale * (150 / 45) * (dpeople_len / 10000))
+        damage = math.floor(scale * (300 / 45) * (dpeople_len / 10000))
         if damage > len(people):
             damage = len(people)
         l2 = np.array(l2).astype(np.longdouble)
@@ -501,7 +501,9 @@ class Calamity (SerializableExEconomy):        # 「災害」＝「惨禍」
         people = random.sample(people, damage)
         print("Rape:", len(people))
         economy.add_family_political_hating(people, 0.5)
-        # economy.rape(people)
+        n_p = economy.rape(people)
+        print("Rape Pregnancy:", n_p)
+
 
     def damage_dominator (self, scale):
         c = self
@@ -976,7 +978,8 @@ class Invasion (Calamity):        # 「蛮族の侵入」
     }
 
     damage_max_level = 6
-    damage_unit = 30
+    # damage_unit = 30
+    damage_unit = 60
     protected_damage_rate = 1/5
     training_anti_level = 2
     protected_prophecy_anti_level = 2

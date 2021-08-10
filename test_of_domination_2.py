@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.8' # Time-stamp: <2021-08-08T05:08:03Z>
+__version__ = '0.0.9' # Time-stamp: <2021-08-10T04:28:08Z>
 ## Language: Japanese/UTF-8
 
 """支配と災害のシミュレーション"""
@@ -122,7 +122,8 @@ ARGS.works_per_dominator = 5
 #ARGS.calamity_damage_threshold = 100.0
 ARGS.calamity_damage_threshold = 10.0
 # 災害対応しないことによる成長機会の拡大率
-ARGS.challengeable_mag = 10.0
+#ARGS.challengeable_mag = 10.0
+ARGS.challengeable_mag = 1.0
 # 寺院を立てる確率
 ARGS.construct_temple_rate = 0.001
 # 成長機会があるときのベータ関数のパラメータ
@@ -161,6 +162,9 @@ ARGS.free_move_rate = 0.005
 ARGS.no_successor_resentment = False
 # 支配層の能力調整の基準値
 ARGS.dominator_adder = 0.1
+# ケガ・病気の障害として残る確率
+ARGS.permanent_injure_rate = 1/2
+
 
 SAVED_ECONOMY = None
 
@@ -1160,7 +1164,7 @@ class Calamity (SerializableExEconomy):        # 「災害」＝「惨禍」
         for p in economy.people.values():
             if p.death is None and p.district == dnum:
                 people.append(p)
-        damage = math.floor(scale * (150 / 30) * (len(people) / 10000))
+        damage = math.floor(scale * (300 / 30) * (len(people) / 10000))
         if damage > len(people):
             damage = len(people)
         people = random.sample(people, damage)
@@ -1185,7 +1189,7 @@ class Calamity (SerializableExEconomy):        # 「災害」＝「惨禍」
                 else:
                     l2.append(1.0)
 
-        damage = math.floor(scale * (150 / 45) * (dpeople_len / 10000))
+        damage = math.floor(scale * (300 / 45) * (dpeople_len / 10000))
         if damage > len(people):
             damage = len(people)
         l2 = np.array(l2).astype(np.longdouble)
@@ -2140,14 +2144,18 @@ class EconomyDM (Economy0):
             a = random.uniform(0, max_adder)
             p.political_hating = np_clip(p.political_hating + a, 0, 1)
 
-    def injure (self, people, max_permanent=0.5, max_temporal=0.5):
+    def injure (self, people, max_permanent=0.5, max_temporal=0.5,
+                permanent_injure_rate=None):
         economy = self
+        if permanent_injure_rate is None:
+            permanent_injure_rate = ARGS.permanent_injure_rate
         fa = set()
         for p in people:
-            a = random.uniform(0, max_permanent)
             b = random.uniform(0, max_temporal)
-            p.injured = np_clip(p.injured + a, 0, 1)
             p.tmp_injured = np_clip(p.tmp_injured + b, 0, 1)
+            if random.random() < permanent_injure_rate:
+                a = random.uniform(0, max_permanent)
+                p.injured = np_clip(p.injured + a, 0, 1)
 
     position_rank_table = {
         None: 0,
@@ -3620,9 +3628,12 @@ def update_dominators (economy):
 
     nation = economy.nation
     for d in nation.dominators():
+        p = economy.people[d.id]
         if nation.king is not None and nation.king.id == d.id:
+            if p.injured >= 0.75:
+                d.resign()
             continue
-        if economy.people[d.id].age > 70:
+        if p.age > 70 or p.injured >= 0.5:
             d.resign()
     nominate_successors(economy)
     for d in nation.dominators():

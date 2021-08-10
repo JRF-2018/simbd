@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.3' # Time-stamp: <2021-08-08T08:07:17Z>
+__version__ = '0.0.4' # Time-stamp: <2021-08-10T06:53:31Z>
 ## Language: Japanese/UTF-8
 
 """支配層の代替わりのテスト
@@ -541,6 +541,9 @@ class Adultery (Serializable):
         self.init_favor = None
         self.children = []
         self.tmp_relative_spouse_asset = None
+
+class Rape (Adultery):
+    pass
 
 class Pregnancy (Serializable):
     def __init__ (self):

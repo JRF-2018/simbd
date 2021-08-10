@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.4' # Time-stamp: <2021-08-06T07:07:27Z>
+__version__ = '0.0.6' # Time-stamp: <2021-08-10T04:37:18Z>
 ## Language: Japanese/UTF-8
 
 """Simulation Buddhism Prototype No.2 - Birth
@@ -34,7 +34,7 @@ import numpy as np
 
 import simbdp2.base as base
 from simbdp2.base import ARGS, Person0, EconomyPlot0
-from simbdp2.common import np_clip, Child, Marriage, Adultery,\
+from simbdp2.common import np_clip, Child, Marriage, Adultery, Rape, \
     Pregnancy, Wait
 from simbdp2.random import half_normal_rand, negative_binominal_rand
 
@@ -65,6 +65,8 @@ class PersonBT (Person0):
                 return (p.children_wanting() + s.children_wanting()) / 2 \
                     > len(p.children)
 
+        elif isinstance(rel, Rape):
+            return False
         elif isinstance(rel, Adultery):
             if rel.spouse is '' or not economy.is_living(rel.spouse):
                 return p.adultery_want_child() > 0

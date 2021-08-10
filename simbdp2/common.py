@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.1' # Time-stamp: <2021-06-28T04:03:37Z>
+__version__ = '0.0.6' # Time-stamp: <2021-08-10T04:30:45Z>
 ## Language: Japanese/UTF-8
 
 """Simulation Buddhism Prototype No.2 - Common
@@ -51,6 +51,9 @@ class Adultery (Serializable):
         self.init_favor = None
         self.children = []
         self.tmp_relative_spouse_asset = None
+
+class Rape (Adultery):
+    pass
 
 class Pregnancy (Serializable):
     def __init__ (self):
