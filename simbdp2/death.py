@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.5' # Time-stamp: <2021-08-08T08:08:59Z>
+__version__ = '0.0.7' # Time-stamp: <2021-08-16T23:21:17Z>
 ## Language: Japanese/UTF-8
 
 """Simulation Buddhism Prototype No.2 - Death
@@ -47,7 +47,7 @@ class PersonDT (Person0):
             p.a60_spouse_death = True
 
         rel.end = economy.term
-        if rel.spouse is not '' and economy.is_living(rel.spouse):
+        if rel.spouse != '' and economy.is_living(rel.spouse):
             s = economy.people[rel.spouse]
             if s.marriage is not None and s.marriage.spouse == p.id:
                 s.marriage.end = economy.term
@@ -77,14 +77,14 @@ class PersonDT (Person0):
         economy = self.economy
         ns = None
         if new_supporter is not None \
-           and new_supporter is not '':
+           and new_supporter != '':
             assert economy.is_living(new_supporter)
             ns = economy.people[new_supporter]
-        assert new_supporter is None or new_supporter is ''\
+        assert new_supporter is None or new_supporter == ''\
             or (ns is not None and ns.supported is None)
-        if new_supporter is None or new_supporter is '':
+        if new_supporter is None or new_supporter == '':
             for x in [x for x in p.supporting]:
-                if x is not '' and x in economy.people:
+                if x != '' and x in economy.people:
                     s = economy.people[x]
                     assert s.supported == p.id
                     if new_supporter is None:
@@ -119,7 +119,7 @@ class PersonDT (Person0):
                 land = 0
             else:
                 land -= l
-            if x is '':
+            if x == '':
                 economy.cur_forfeit_land += l
                 economy.cur_forfeit_prop += a1 - l * ARGS.prop_value_of_land
                 prop -= a1 - l * ARGS.prop_value_of_land
@@ -183,7 +183,7 @@ class EconomyDT (Economy0):
         for p in persons:
             spouse = None
             if p.marriage is not None \
-               and (p.marriage.spouse is ''
+               and (p.marriage.spouse == ''
                     or economy.is_living(p.marriage.spouse)):
                 spouse = p.marriage.spouse
                                            
@@ -194,16 +194,16 @@ class EconomyDT (Economy0):
 
             # father mother は死んでも情報の更新はないが、child は欲し
             # い子供の数に影響するため、更新が必要。
-            if p.father is not '' and economy.is_living(p.father):
+            if p.father != '' and economy.is_living(p.father):
                 economy.people[p.father].die_child(p.id)
-            if p.mother is not '' and economy.is_living(p.mother):
+            if p.mother != '' and economy.is_living(p.mother):
                 economy.people[p.mother].die_child(p.id)
 
             fst_heir = None
             if p.death.inheritance_share is not None:
                 l1 = [(x, y) for x, y
                       in p.death.inheritance_share.items()
-                      if x is not '' and economy.is_living(x)
+                      if x != '' and economy.is_living(x)
                       and x != spouse
                       and (economy.people[x].supported is None or
                            economy.people[x].supported == p.id)
@@ -217,7 +217,7 @@ class EconomyDT (Economy0):
             if (fst_heir is None
                 or fst_heir not in [ch.id for ch in p.children]) \
                and spouse is not None and spouse in p.supporting:
-                if spouse is '':
+                if spouse == '':
                     fst_heir = ''
                     p.remove_supporting_nil()
                 else:
@@ -226,7 +226,7 @@ class EconomyDT (Economy0):
                         fst_heir = spouse
                         s.remove_supported()
 
-            if fst_heir is not None and fst_heir is not '' \
+            if fst_heir is not None and fst_heir != '' \
                and fst_heir in p.supporting:
                 fh = economy.people[fst_heir]
                 fh.remove_supported()
@@ -243,7 +243,7 @@ class EconomyDT (Economy0):
             if p.supported is not None:
                 p.remove_supported()
 
-            if fst_heir is not None and fst_heir is not '':
+            if fst_heir is not None and fst_heir != '':
                 fh = economy.people[fst_heir]
                 fh.add_supporting(p)
 

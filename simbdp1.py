@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.8' # Time-stamp: <2021-08-08T05:28:36Z>
+__version__ = '0.0.9' # Time-stamp: <2021-08-16T23:08:06Z>
 ## Language: Japanese/UTF-8
 
 """Simulation Buddhism Prototype No.1 - Main
@@ -383,7 +383,7 @@ def step (economy):
         for p, q in l:
             p.death.inheritance_share = q
             p.do_inheritance()
-            if p.supported is not None and p.supported is not '':
+            if p.supported is not None and p.supported != '':
                 p.remove_supported()
         for p, q in l:
             del economy.people[p.id]

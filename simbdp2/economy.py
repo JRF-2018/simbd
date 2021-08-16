@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.4' # Time-stamp: <2021-08-06T14:50:19Z>
+__version__ = '0.0.7' # Time-stamp: <2021-08-16T23:20:25Z>
 ## Language: Japanese/UTF-8
 
 """Simulation Buddhism Prototype No.2 - Economy
@@ -83,7 +83,7 @@ class PersonEC (Person0):
     def relative_spouse_asset (self, relation):
         p = self
         economy = self.economy
-        if relation.spouse is '':
+        if relation.spouse == '':
             return relation.tmp_relative_spouse_asset
         elif not economy.is_living(relation.spouse):
             return 1.0
@@ -159,7 +159,7 @@ class EconomyPlotEC (EconomyPlot0):
     def view_family (self, ax, economy):
         od = OrderedDict()
         for x in economy.people.values():
-            if x.supported is not None and x.supported is not '':
+            if x.supported is not None and x.supported != '':
                 f = x.supported
             else:
                 f = x.id
@@ -172,7 +172,7 @@ class EconomyPlotEC (EconomyPlot0):
     def view_family_asset (self, ax, economy):
         od = OrderedDict()
         for x in economy.people.values():
-            if x.supported is not None and x.supported is not '':
+            if x.supported is not None and x.supported != '':
                 f = x.supported
             else:
                 f = x.id
@@ -184,7 +184,7 @@ class EconomyPlotEC (EconomyPlot0):
     def view_family_prop (self, ax, economy):
         od = OrderedDict()
         for x in economy.people.values():
-            if x.supported is not None and x.supported is not '':
+            if x.supported is not None and x.supported != '':
                 f = x.supported
             else:
                 f = x.id
@@ -196,7 +196,7 @@ class EconomyPlotEC (EconomyPlot0):
     def view_family_land (self, ax, economy):
         od = OrderedDict()
         for x in economy.people.values():
-            if x.supported is not None and x.supported is not '':
+            if x.supported is not None and x.supported != '':
                 f = x.supported
             else:
                 f = x.id
@@ -209,7 +209,7 @@ class EconomyPlotEC (EconomyPlot0):
 def make_families (economy):
     families = OrderedDict()
     for p in economy.people.values():
-        if p.supported is None or p.supported is '':
+        if p.supported is None or p.supported == '':
             if p.id not in families:
                 families[p.id] = EconomicalFamily()
             f = families[p.id]

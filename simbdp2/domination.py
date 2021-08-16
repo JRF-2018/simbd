@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.6' # Time-stamp: <2021-08-10T04:41:12Z>
+__version__ = '0.0.7' # Time-stamp: <2021-08-16T23:20:51Z>
 ## Language: Japanese/UTF-8
 
 """Simulation Buddhism Prototype No.2 - Domination
@@ -66,7 +66,7 @@ class PersonDM (Person0):
         p = self
         economy = self.economy
         sid = p.supported
-        if sid is None or sid is '':
+        if sid is None or sid == '':
             sid = p.id
         
         qid = max([sid] + economy.people[sid].supporting_non_nil(),
@@ -189,7 +189,7 @@ class EconomyDM (Economy0):
         economy = self
         fa = set()
         for p in people:
-            if p.supported is not None and p.supported is not '':
+            if p.supported is not None and p.supported != '':
                 fa.add(p.supported)
             else:
                 fa.add(p.id)
@@ -292,21 +292,21 @@ class Dominator (SerializableExEconomy):
                 if q is None:
                     continue
                 for x in [q.father, q.mother]:
-                    if x is '' or x in checked:
+                    if x == '' or x in checked:
                         continue
                     s2.add(x)
                     r[x] = distance
                 for ch in q.children + q.trash:
                     if isinstance(ch, Child):
                         x = ch.id
-                        if x is '' or x in checked:
+                        if x == '' or x in checked:
                             continue
                         s2.add(x)
                         r[x] = distance
                 for m in [q.marriage] + q.trash:
                     if m is not None and isinstance(m, Marriage):
                         x = m.spouse
-                        if x is '' or x in checked:
+                        if x == '' or x in checked:
                             continue
                         s2.add(x)
                         r[x] = distance
@@ -665,7 +665,7 @@ def _nominate_successor_1 (economy, person, position, dnum, check_func):
     l.sort(key=lambda x: x.birth_term)
     ex = None
     for ch in l:
-        if ch.id is None or ch.id is '':
+        if ch.id is None or ch.id == '':
             continue
         checked.add(ch.id)
         q = economy.get_person(ch.id)
@@ -678,7 +678,7 @@ def _nominate_successor_1 (economy, person, position, dnum, check_func):
               if isinstance(x, Child) and check_func(x)]
         l2.sort(key=lambda x: x.birth_term)
         for ch2 in l2:
-            if ch2.id is None or ch2.id is '' or ch2.id not in economy.people:
+            if ch2.id is None or ch2.id == '' or ch2.id not in economy.people:
                 continue
             q2 = economy.people[ch2.id]
             if _successor_check(economy, q2, pos, dnum):
@@ -703,7 +703,7 @@ def _nominate_successor_1 (economy, person, position, dnum, check_func):
         l2.sort(key=lambda x: x.birth_term)
         l = l + l2
     for ch in l:
-        if ch.id is None or ch.id is '':
+        if ch.id is None or ch.id == '':
             continue
         if ch.id in checked:
             continue
@@ -718,7 +718,7 @@ def _nominate_successor_1 (economy, person, position, dnum, check_func):
               if isinstance(x, Child) and check_func(x)]
         l2.sort(key=lambda x: x.birth_term)
         for ch2 in l2:
-            if ch2.id is None or ch2.id is '' or ch2.id not in economy.people:
+            if ch2.id is None or ch2.id == '' or ch2.id not in economy.people:
                 continue
             q2 = economy.people[ch2.id]
             if _successor_check(economy, q2, pos, dnum):
@@ -915,7 +915,7 @@ def nominate_successors (economy):
         if p.dominator_position is not None:
             p.get_dominator().resign()
         sid = p.supported
-        if sid is None or sid is '':
+        if sid is None or sid == '':
             sid = p.id
         for qid in [sid] + economy.people[sid].supporting_non_nil():
             economy.people[qid].change_district(exd)

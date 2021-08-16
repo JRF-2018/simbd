@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.4' # Time-stamp: <2021-08-10T06:53:31Z>
+__version__ = '0.0.5' # Time-stamp: <2021-08-16T23:06:45Z>
 ## Language: Japanese/UTF-8
 
 """支配層の代替わりのテスト
@@ -380,7 +380,7 @@ class PersonBT (Person0):
         p = self
         qid = parent_id
         economy = self.economy
-        if qid is '':
+        if qid == '':
             return True
         q = economy.get_person(qid)
         if q is None:
@@ -400,7 +400,7 @@ class PersonDT (Person0):
             p.a60_spouse_death = True
 
         rel.end = economy.term
-        if rel.spouse is not '' and economy.is_living(rel.spouse):
+        if rel.spouse != '' and economy.is_living(rel.spouse):
             s = economy.people[rel.spouse]
             if s.marriage is not None and s.marriage.spouse == p.id:
                 s.marriage.end = economy.term
@@ -430,12 +430,12 @@ class PersonDT (Person0):
         economy = self.economy
         ns = None
         if new_supporter is not None \
-           and new_supporter is not '' and economy.is_living(new_supporter):
+           and new_supporter != '' and economy.is_living(new_supporter):
             ns = economy.people[new_supporter]
-        assert new_supporter is None or new_supporter is ''\
+        assert new_supporter is None or new_supporter == ''\
             or (ns is not None and ns.supported is None)
         for x in p.supporting:
-            if x is not '' and x in economy.people \
+            if x != '' and x in economy.people \
                and x != new_supporter:
                 s = economy.people[x]
                 assert s.supported == p.id
@@ -448,7 +448,7 @@ class PersonDT (Person0):
     def die_supported (self):
         p = self
         economy = self.economy
-        if p.supported is not '' and p.supported in economy.people:
+        if p.supported != '' and p.supported in economy.people:
             s = economy.people[p.supported]
             s.supporting.remove(p.id)
         
@@ -462,12 +462,12 @@ class PersonSUP (Person0):
             else person_or_id
         assert p.supported is None
 
-        if id1 is '':
+        if id1 == '':
             return False
         if id1 in p.hating and p.hating[id1] >= threshold:
             return True
         for x in p.supporting:
-            if x is not '' and economy.is_living(x):
+            if x != '' and economy.is_living(x):
                 q = economy.people[x]
                 if id1 in q.hating and q.hating[id1] >= threshold:
                     return True
@@ -475,7 +475,7 @@ class PersonSUP (Person0):
 
     def supporting_non_nil (self):
         return [x for x in self.supporting
-                if x is not None and x is not '']
+                if x is not None and x != '']
 
 
 class PersonDM (Person0):
@@ -625,21 +625,21 @@ class Dominator (SerializableExEconomy):
                 if q is None:
                     continue
                 for x in [q.father, q.mother]:
-                    if x is '' or x in checked:
+                    if x == '' or x in checked:
                         continue
                     s2.add(x)
                     r[x] = distance
                 for ch in q.children + q.trash:
                     if isinstance(ch, Child):
                         x = ch.id
-                        if x is '' or x in checked:
+                        if x == '' or x in checked:
                             continue
                         s2.add(x)
                         r[x] = distance
                 for m in [q.marriage] + q.trash:
                     if m is not None and isinstance(m, Marriage):
                         x = m.spouse
-                        if x is '' or x in checked:
+                        if x == '' or x in checked:
                             continue
                         s2.add(x)
                         r[x] = distance
@@ -990,7 +990,7 @@ class EconomyDT (Economy0):
         for p in persons:
             spouse = None
             if p.marriage is not None \
-               and (p.marriage.spouse is ''
+               and (p.marriage.spouse == ''
                     or economy.is_living(p.marriage.spouse)):
                 spouse = p.marriage.spouse
                                            
@@ -1001,9 +1001,9 @@ class EconomyDT (Economy0):
 
             # father mother は死んでも情報の更新はないが、child は欲し
             # い子供の数に影響するため、更新が必要。
-            if p.father is not '' and economy.is_living(p.father):
+            if p.father != '' and economy.is_living(p.father):
                 economy.people[p.father].die_child(p.id)
-            if p.mother is not '' and economy.is_living(p.mother):
+            if p.mother != '' and economy.is_living(p.mother):
                 economy.people[p.mother].die_child(p.id)
 
             fst_heir = None
@@ -1431,7 +1431,7 @@ def _nominate_successor_1 (economy, person, position, dnum, check_func):
     l.sort(key=lambda x: x.birth_term)
     ex = None
     for ch in l:
-        if ch.id is None or ch.id is '':
+        if ch.id is None or ch.id == '':
             continue
         checked.add(ch.id)
         q = economy.get_person(ch.id)
@@ -1444,7 +1444,7 @@ def _nominate_successor_1 (economy, person, position, dnum, check_func):
               if isinstance(x, Child) and check_func(x)]
         l2.sort(key=lambda x: x.birth_term)
         for ch2 in l2:
-            if ch2.id is None or ch2.id is '' or ch2.id not in economy.people:
+            if ch2.id is None or ch2.id == '' or ch2.id not in economy.people:
                 continue
             q2 = economy.people[ch2.id]
             if _successor_check(economy, q2, pos, dnum):
@@ -1469,7 +1469,7 @@ def _nominate_successor_1 (economy, person, position, dnum, check_func):
         l2.sort(key=lambda x: x.birth_term)
         l = l + l2
     for ch in l:
-        if ch.id is None or ch.id is '':
+        if ch.id is None or ch.id == '':
             continue
         if ch.id in checked:
             continue
@@ -1484,7 +1484,7 @@ def _nominate_successor_1 (economy, person, position, dnum, check_func):
               if isinstance(x, Child) and check_func(x)]
         l2.sort(key=lambda x: x.birth_term)
         for ch2 in l2:
-            if ch2.id is None or ch2.id is '' or ch2.id not in economy.people:
+            if ch2.id is None or ch2.id == '' or ch2.id not in economy.people:
                 continue
             q2 = economy.people[ch2.id]
             if _successor_check(economy, q2, pos, dnum):

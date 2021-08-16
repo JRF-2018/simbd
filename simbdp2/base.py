@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.4' # Time-stamp: <2021-08-06T17:49:52Z>
+__version__ = '0.0.7' # Time-stamp: <2021-08-16T23:22:50Z>
 ## Language: Japanese/UTF-8
 
 """Simulation Buddhism Prototype No.2 - Base

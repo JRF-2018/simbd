@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.8' # Time-stamp: <2021-08-08T08:08:39Z>
+__version__ = '0.0.9' # Time-stamp: <2021-08-16T23:11:38Z>
 ## Language: Japanese/UTF-8
 
 """Simulation Buddhism Prototype No.1 - Marriage
@@ -122,7 +122,7 @@ class PersonMA (Person0):
         years = (economy.term - m.begin) / 12
         hating = 0
         rel_favor = 0
-        if m.spouse is not '' and economy.is_living(m.spouse):
+        if m.spouse != '' and economy.is_living(m.spouse):
             s = economy.people[m.spouse]
             if p.id in s.hating:
                 hating = s.hating[p.id]
@@ -167,13 +167,13 @@ class PersonMA (Person0):
         else:
             w.end = economy.term + 11
 
-        if m.spouse is '':
+        if m.spouse == '':
             if p.sex == 'M' and '' in p.supporting:
                 p.remove_supporting_nil()
             elif p.sex == 'F' and p.supported == '':
                 p.remove_supported()
 
-        if m.spouse is not '' and economy.is_living(m.spouse):
+        if m.spouse != '' and economy.is_living(m.spouse):
             s = economy.people[m.spouse]
             sm = s.marriage
             sm.end = economy.term
@@ -205,7 +205,7 @@ class PersonMA (Person0):
                         else:
                             l2.extend([c.id for c in r.children])
                 for x in [s1.father, s1.mother]:
-                    if x is '' or x == p1.father or x == p1.mother:
+                    if x == '' or x == p1.father or x == p1.mother:
                         continue
                     l2.append(x)
                     q = economy.get_person(x)
@@ -213,7 +213,7 @@ class PersonMA (Person0):
                     if q is not None:
                         l3.append(q)
                         if q.marriage is not None \
-                           and q.marriage.spouse is not '':
+                           and q.marriage.spouse != '':
                             y = q.marriage.spouse
                             l2.append(y)
                             qs = economy.get_person(y)
@@ -221,29 +221,29 @@ class PersonMA (Person0):
                                 l3.append(qs)
                     for q1 in l3:
                         for y in [q1.father, q1.mother]:
-                            if y is not '':
+                            if y != '':
                                 l2.append(y)
                                 g = economy.get_person(y)
                                 if g is not None:
                                     if g.marriage is not None \
-                                       and g.marriage.spouse is not '':
+                                       and g.marriage.spouse != '':
                                         l2.append(g.marriage.spouse)
                 ch = set(l1)
                 s1fam = set(l2)
                 l = []
                 for x in p1.supporting:
-                    if x is '' or x in ch:
+                    if x == '' or x in ch:
                         if random.random() < 0.5:
                             l.append(x)
                     elif x in s1fam:
                         l.append(x)
                 for x in l:
-                    if x is '':
+                    if x == '':
                         p1.remove_supporting_nil()
                     else:
                         economy.people[x].remove_supported()
                     s1.add_supporting(x)
-            elif p.supported is not None and p.supported is not '' \
+            elif p.supported is not None and p.supported != '' \
                  and s.supported == p.supported:
                 assert p.supported in economy.people
                 q = economy.people[p.supported]
@@ -286,12 +286,12 @@ class EconomyMA (Economy0):
             pf = None
             pm = None
             sup = False
-            if p.father is not '' and economy.is_living(p.father):
+            if p.father != '' and economy.is_living(p.father):
                 pf = economy.people[p.father]
                 if p.supported is not None and p.age < 18 \
                    and p.supported == pf.id:
                     sup = True
-            if p.mother is not '' and economy.is_living(p.mother):
+            if p.mother != '' and economy.is_living(p.mother):
                 pm = economy.people[p.mother]
                 if p.supported is not None and p.age < 18 \
                    and p.supported == pm.id:
@@ -364,7 +364,7 @@ class EconomyMA (Economy0):
                 p.trash.append(a)
                 if a.spouse != m.id and a.spouse != f.id:
                     update_adultery_hating(economy, p, a)
-                if a.spouse is not '' and economy.is_living(a.spouse):
+                if a.spouse != '' and economy.is_living(a.spouse):
                     s = economy.people[a.spouse]
                     sa = [a for a in s.adulteries if a.spouse == p.id][0]
                     sa.end = economy.term
@@ -512,7 +512,7 @@ def update_marriage_hating (economy, person, relation):
     m = relation
     success = True
     if p.sex == 'M':
-        if m.spouse is '' or not economy.is_living(m.spouse):
+        if m.spouse == '' or not economy.is_living(m.spouse):
             hating = random.random() < 0.5
             if hating:
                 success = False
@@ -529,7 +529,7 @@ def update_marriage_hating (economy, person, relation):
             if s.id in p.hating and p.hating[s.id] > 0.3:
                 p.hating[s.id] = 0.3
     else: # p.sex == 'F':
-        if m.spouse is '' or not economy.is_living(m.spouse):
+        if m.spouse == '' or not economy.is_living(m.spouse):
             hating = random.random() < 0.5
             if hating:
                 success = False
@@ -560,7 +560,7 @@ def elevate_some_to_marriages (economy):
            or p.marriage_wait is not None:
             continue
         for a in p.adulteries:
-            if a.spouse is '' or not economy.is_living(a.spouse):
+            if a.spouse == '' or not economy.is_living(a.spouse):
                 continue
             s = economy.people[a.spouse]
             if s.marriage is not None:
@@ -611,7 +611,7 @@ def get_pregnant_marriages (economy):
             if p.marriage is not None:
                 m = p.marriage
                 wc = p.want_child(m)
-                if m.spouse is '' or not economy.is_living(m.spouse):
+                if m.spouse == '' or not economy.is_living(m.spouse):
                     if p.age < 40:
                         ft = math.sqrt(random.random())
                     else:
@@ -642,7 +642,7 @@ def remove_naturally_some_marriages (economy):
             ht = 0
             m = p.marriage
             mag = math.sqrt(2)
-            if m.spouse is not '' and economy.is_living(m.spouse):
+            if m.spouse != '' and economy.is_living(m.spouse):
                 mag = 1.0
                 s = economy.people[m.spouse]
                 if p.id in s.hating:
@@ -652,7 +652,7 @@ def remove_naturally_some_marriages (economy):
                   + ARGS.natural_divorce_rate
             if random.random() < q * mag:
                 n_d += 1
-                if m.spouse is not '' and economy.is_living(m.spouse):
+                if m.spouse != '' and economy.is_living(m.spouse):
                     n_d += 1
                 p.divorce()
 
@@ -679,7 +679,7 @@ def remove_socially_some_marriages (economy):
                 if p.sex == 'F':
                     laf.append(p)
                 else:
-                    if p.marriage.spouse is '':
+                    if p.marriage.spouse == '':
                         lamu.append(p)
     l1 = list(range(len(laf)))
     l2 = list(map(lambda x: x.marriage_separability(), laf))
@@ -694,7 +694,7 @@ def remove_socially_some_marriages (economy):
         n_d += 1
         p = laf[i]
         m = p.marriage
-        if m.spouse is '' or not economy.is_living(m.spouse):
+        if m.spouse == '' or not economy.is_living(m.spouse):
             n_u += 1
         else:
             n_d += 1

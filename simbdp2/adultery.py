@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.5' # Time-stamp: <2021-08-08T05:11:50Z>
+__version__ = '0.0.7' # Time-stamp: <2021-08-16T23:23:15Z>
 ## Language: Japanese/UTF-8
 
 """Simulation Buddhism Prototype No.2 - Adultery
@@ -135,7 +135,7 @@ class PersonAD (Person0):
         q = ((0.1 - 1) / (3 - 0)) * (x - 0) + 1
         hating = 0
         rel_favor = 0
-        if a.spouse is not '' and economy.is_living(a.spouse):
+        if a.spouse != '' and economy.is_living(a.spouse):
             s = economy.people[a.spouse]
             if p.id in s.hating:
                 hating = s.hating[p.id]
@@ -360,7 +360,7 @@ def update_adultery_hating (economy, person, adultery):
     a = adultery
     success = True
     if p.sex == 'M':
-        if a.spouse is '' or not economy.is_living(a.spouse):
+        if a.spouse == '' or not economy.is_living(a.spouse):
             if a.begin == a.end:
                 hating = random.random() < 0.1
             else:
@@ -419,7 +419,7 @@ def update_adultery_hating (economy, person, adultery):
                             ss.hating_unknown = np_clip(ss.hating_unknown,
                                                         0, 1)
     else: # p.sex == 'F':
-        if a.spouse is '' or not economy.is_living(a.spouse):
+        if a.spouse == '' or not economy.is_living(a.spouse):
             if a.begin == a.end:
                 hating = random.random() < 0.2
             else:
@@ -571,7 +571,7 @@ def reboot_some_adulteries (economy):
             l2 = np.array(l2).astype(np.longdouble)
             y = np_random_choice(rellist, 1, replace=False,
                                  p=l2/np.sum(l2))[0]
-            if y.spouse is '' or not economy.is_living(y.spouse):
+            if y.spouse == '' or not economy.is_living(y.spouse):
                 continue
             s = economy.people[y.spouse]
             if s.marriage is not None or s.adulteries:
@@ -624,7 +624,7 @@ def get_pregnant_adulteries (economy):
         if p.death is None and p.sex == 'F' and p.pregnancy is None:
             for a in p.adulteries:
                 wc = p.want_child(a)
-                if a.spouse is '' or not economy.is_living(a.spouse):
+                if a.spouse == '' or not economy.is_living(a.spouse):
                     ft = random.random()
                     if ft < 0.1:
                         ft = 0
@@ -665,7 +665,7 @@ def remove_some_adulteries (economy):
                     laf.extend([(p, a) for a in p.adulteries])
                 else:
                     lamu.extend([(p, a) for a in p.adulteries
-                                 if a.spouse is ''])
+                                 if a.spouse == ''])
     l1 = list(range(len(laf)))
     l2 = list(map(lambda x: x[0].adultery_separability(x[1]), laf))
     n = math.floor(n_f * ARGS.adultery_rate)
@@ -681,7 +681,7 @@ def remove_some_adulteries (economy):
         p.adulteries.remove(a)
         p.trash.append(a)
         update_adultery_hating(economy, p, a)
-        if a.spouse is '' or not economy.is_living(a.spouse):
+        if a.spouse == '' or not economy.is_living(a.spouse):
             n_u += 1
         else:
             s = economy.people[a.spouse]

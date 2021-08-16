@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.2' # Time-stamp: <2021-04-02T20:09:24Z>
+__version__ = '0.0.9' # Time-stamp: <2021-08-16T23:11:14Z>
 ## Language: Japanese/UTF-8
 
 """Simulation Buddhism Prototype No.1 - Miscellaneous
@@ -43,14 +43,14 @@ def calc_with_support_asset_rank (economy):
         else:
             sup = False
             f = None
-            if p.father is not '' and economy.is_living(p.father):
+            if p.father != '' and economy.is_living(p.father):
                 f = economy.people[p.father]
                 if p.supported is not None and p.age < 18 \
                    and p.supported == f.id:
                     sup = True
 
             m = None
-            if p.mother is not '' and economy.is_living(p.mother):
+            if p.mother != '' and economy.is_living(p.mother):
                 m = economy.people[p.mother]
                 if p.supported is not None and p.age < 18 \
                    and p.supported == m.id:

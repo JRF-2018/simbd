@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.2' # Time-stamp: <2021-03-11T12:14:19Z>
+__version__ = '0.0.3' # Time-stamp: <2021-08-16T23:26:56Z>
 ## Language: Japanese/UTF-8
 
 """近親婚のテスト"""
@@ -142,11 +142,11 @@ def check_consanguineous_marriage (economy, male, female):
     femalespouse = set()
     for r in male.trash:
         if isinstance(r, Marriage):
-            if r.spouse is not '':
+            if r.spouse != '':
                 malespouse.add(r.spouse)
     for r in female.trash:
         if isinstance(r, Marriage):
-            if r.spouse is not '':
+            if r.spouse != '':
                 femalespouse.add(r.spouse)
     if female.id in malespouse:
         return False
@@ -169,12 +169,12 @@ def check_consanguineous_marriage (economy, male, female):
         s = set()
         ex = set()
         for z in [x.father, x.mother, x.initial_father, x.initial_mother]:
-            if z is not '':
+            if z != '':
                 s.add(z)
         for r in x.trash:
             if isinstance(r, Dissolution) \
                and (r.relation == 'MO' or r.relation == 'FA') \
-               and r.id is not '':
+               and r.id != '':
                 s.add(r.id)
         if y in s:
             print("父母")
@@ -185,11 +185,11 @@ def check_consanguineous_marriage (economy, male, female):
             for z in s:
                 p = economy.get_person(z)
                 if p is not None:
-                    if p.initial_father is not '' \
+                    if p.initial_father != '' \
                        and p.initial_father not in ex:
                         s2.add(p.initial_father)
                         ex.add(p.initial_father)
-                    if p.initial_mother is not '' \
+                    if p.initial_mother != '' \
                        and p.initial_mother not in ex:
                         s2.add(p.initial_mother)
                         ex.add(p.initial_mother)
@@ -197,7 +197,7 @@ def check_consanguineous_marriage (economy, male, female):
                         for r in [p.marriage] + p.trash:
                             if r is None:
                                 continue
-                            if isinstance(r, Marriage) and r.spouse is not '':
+                            if isinstance(r, Marriage) and r.spouse != '':
                                 if y == r.spouse:
                                     print("尊属の配偶者")
                                     return True
@@ -241,7 +241,7 @@ def check_consanguineous_marriage (economy, male, female):
                         for r in [p.marriage] + p.trash:
                             if r is None:
                                 continue
-                            if isinstance(r, Marriage) and r.spouse is not '':
+                            if isinstance(r, Marriage) and r.spouse != '':
                                 if y == r.spouse:
                                     print("卑属の配偶者")
                                     return True
@@ -253,7 +253,7 @@ def check_consanguineous_marriage (economy, male, female):
     # 三親等内の傍系血族のチェック
     for x, y in [(male, female.id), (female, male.id)]:
         for z in [x.initial_father, x.initial_mother]:
-            if z is '':
+            if z == '':
                 continue
             p = economy.get_person(z)
             if p is not None:

@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.8' # Time-stamp: <2021-08-08T03:54:04Z>
+__version__ = '0.0.9' # Time-stamp: <2021-08-16T23:10:21Z>
 ## Language: Japanese/UTF-8
 
 """Simulation Buddhism Prototype No.1 - Support
@@ -47,12 +47,12 @@ class PersonSUP (Person0):
             else person_or_id
         assert p.supported is None
 
-        if id1 is '':
+        if id1 == '':
             return False
         if id1 in p.hating and p.hating[id1] >= threshold:
             return True
         for x in p.supporting:
-            if x is not '' and economy.is_living(x):
+            if x != '' and economy.is_living(x):
                 q = economy.people[x]
                 if id1 in q.hating and q.hating[id1] >= threshold:
                     return True
@@ -96,7 +96,7 @@ class PersonSUP (Person0):
                 cf.father = gs
                 cm.father = gs
         g.children.append(cf)
-        if gs is not None and gs is not '':
+        if gs is not None and gs != '':
             assert economy.is_living(gs)
             economy.people[gs].children.append(cm)
 
@@ -112,7 +112,7 @@ class PersonSUP (Person0):
         p.trash.append(ds)
         
         pf = None
-        if p.father is not '':
+        if p.father != '':
             pf = economy.get_person(p.father)
         if pf is not None:
             ch = None
@@ -129,7 +129,7 @@ class PersonSUP (Person0):
                 pf.trash.append(ds)
 
         pm = None
-        if p.mother is not '':
+        if p.mother != '':
             pm = economy.get_person(p.mother)
         if pm is not None:
             ch = None
@@ -156,12 +156,12 @@ class PersonSUP (Person0):
 
     def supporting_non_nil (self):
         return [x for x in self.supporting
-                if x is not None and x is not '']
+                if x is not None and x != '']
     
     def remove_supported (self):
         p = self
         economy = self.economy
-        if p.supported is '' or p.supported is None:
+        if p.supported == '' or p.supported is None:
             p.supported = None
             return
         s2 = economy.people[p.supported]
@@ -183,7 +183,7 @@ class PersonSUP (Person0):
         if sid is None:
             sid = p.id
         s = None
-        if sid is not '':
+        if sid != '':
             s = economy.people[sid]
 
         l2 = []
@@ -193,16 +193,16 @@ class PersonSUP (Person0):
             else:
                 qid = q
                 q = None
-                if qid is not '' and qid is not None:
+                if qid != '' and qid is not None:
                     q = economy.people[qid]
             l2.append(qid)
             if q is not None:
                 l2.extend(q.supporting)
-                q.supporting = [x for x in q.supporting if x is not '']
+                q.supporting = [x for x in q.supporting if x != '']
         
         for qid in l2:
             q = None
-            if qid is not '' and qid is not None:
+            if qid != '' and qid is not None:
                 q = economy.people[qid]
 
             if q is not None:
@@ -210,8 +210,8 @@ class PersonSUP (Person0):
                     continue
                 q.remove_supported()
 
-            if sid is '':
-                if qid is '':
+            if sid == '':
+                if qid == '':
                     pass
                 else:
                     if q is not None:
@@ -243,11 +243,11 @@ def update_support_aged (economy):
             if q is None:
                 continue
             for c1 in q.children:
-                if c1.id is not '' and economy.is_living(c1.id):
+                if c1.id != '' and economy.is_living(c1.id):
                     l.append(c1.id)
         l2 = []
         for x in l:
-            if x is '' or not economy.is_living(x):
+            if x == '' or not economy.is_living(x):
                 continue
             c = economy.people[x]
             if c.supported is None:
@@ -256,7 +256,7 @@ def update_support_aged (economy):
                     l2.append(c)
             elif c.marriage is not None:
                 s = c.marriage.spouse
-                if s is '' or not economy.is_living(s):
+                if s == '' or not economy.is_living(s):
                     continue
                 s = economy.people[s]
                 if s.supported is None and s.age >= 18 and s.age < 70 \
@@ -272,9 +272,9 @@ def update_support_aged (economy):
     for p in economy.people.values():
         if p.death is not None or p.supported is not None or p.age >= 70:
             continue
-        if p.father is '' or economy.is_living(p.father):
+        if p.father == '' or economy.is_living(p.father):
             continue
-        if p.mother is '' or economy.is_living(p.mother):
+        if p.mother == '' or economy.is_living(p.mother):
             continue
         if not (random.random() < ARGS.guard_aged_rate):
             continue
@@ -362,7 +362,7 @@ def update_support_unwanted (economy):
         q = None
         if p.marriage is not None:
             m = p.marriage
-            if m.spouse is '' or not economy.is_living(m.spouse):
+            if m.spouse == '' or not economy.is_living(m.spouse):
                 q = p.children_wanting() + 2.5 < len(p.children)
             else:
                 s = economy.people[m.spouse]
@@ -372,7 +372,7 @@ def update_support_unwanted (economy):
             q = p.children_wanting() + 2.5 < len(p.children)
         if not q:
             continue
-        l = [c.id for c in p.children if c.id is not ''
+        l = [c.id for c in p.children if c.id != ''
              and economy.is_living(c.id)
              and (economy.term - economy.people[c.id].birth_term) / 12 < 10
              and c.id in p.supporting]
@@ -426,12 +426,12 @@ def update_become_adult (economy):
         pf = None
         pm = None
         sup = False
-        if p.father is not '' and economy.is_living(p.father):
+        if p.father != '' and economy.is_living(p.father):
             pf = economy.people[p.father]
             if p.supported is not None and p.age < 18 \
                and p.supported == pf.id:
                 sup = True
-        if p.mother is not '' and economy.is_living(p.mother):
+        if p.mother != '' and economy.is_living(p.mother):
             pm = economy.people[p.mother]
             if p.supported is not None and p.age < 18 \
                and p.supported == pm.id:
@@ -497,7 +497,7 @@ def check_support_consistent (economy):
 
     supportings = OrderedDict()
     for p in economy.people.values():
-        if p.supported is '' or p.supported is None:
+        if p.supported == '' or p.supported is None:
             continue
         assert p.supported in economy.people
         if p.supported not in supportings:
@@ -507,7 +507,7 @@ def check_support_consistent (economy):
     for p in economy.people.values():
         if p.supporting:
             assert p.death is None
-            if not [True for x in p.supporting if x is not '']:
+            if not [True for x in p.supporting if x != '']:
                 continue
             if p.id not in supportings:
                 # print("p.id", p.id)
@@ -518,7 +518,7 @@ def check_support_consistent (economy):
             l1 = supportings[p.id]
             l2 = p.supporting
             for x in l2:
-                if x is not '':
+                if x != '':
                     assert economy.people[x].district == p.district
                     try:
                         l1.remove(x)
@@ -530,14 +530,14 @@ def update_unknown_support (economy):
     for p in economy.people.values():
         if p.death is not None:
             continue
-        if p.supported is '':
+        if p.supported == '':
             if p.age >= 18 and p.age < 70:
                 if not (p.marriage is not None and p.sex == 'F'):
                     p.supported = None
         if '' in p.supporting:
-            l1 = [x for x in p.supporting if x is not '']
-            l2 = [x for x in p.supporting if x is '']
-            l3 = [c for c in p.children if c.id is ''
+            l1 = [x for x in p.supporting if x != '']
+            l2 = [x for x in p.supporting if x == '']
+            l3 = [c for c in p.children if c.id == ''
                   and economy.term - c.birth_term == 18 * 12]
             for i in range(len(l3)):
                 if l2:

@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.6' # Time-stamp: <2021-08-10T05:34:30Z>
+__version__ = '0.0.7' # Time-stamp: <2021-08-16T23:22:14Z>
 ## Language: Japanese/UTF-8
 
 """Simulation Buddhism Prototype No.2 - Domination
@@ -1283,7 +1283,7 @@ def calc_family_asset_rank (economy):
     fa = {}
     for p in economy.people.values():
         x = p.supported
-        if x is None or x is '':
+        if x is None or x == '':
             x = p.id
         if x not in fa:
             fa[x] = 0
@@ -1294,7 +1294,7 @@ def calc_family_asset_rank (economy):
         fa[x] = (s - i) / s
     for p in economy.people.values():
         x = p.supported
-        if x is None or x is '':
+        if x is None or x == '':
             x = p.id
         p.tmp_asset_rank = fa[x]
 

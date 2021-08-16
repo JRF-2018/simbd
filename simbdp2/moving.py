@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.4' # Time-stamp: <2021-08-06T05:19:55Z>
+__version__ = '0.0.7' # Time-stamp: <2021-08-16T23:18:38Z>
 ## Language: Japanese/UTF-8
 
 """Simulation Buddhism Prototype No.2 - Moving
@@ -104,7 +104,7 @@ def move_freely_some_people (economy):
         while ppout2 < ppout and pout:
             p = pout.pop(0)
             sid = p.supported
-            if sid is None or sid is '':
+            if sid is None or sid == '':
                 sid = p.id
             if sid in outfamily:
                 continue
@@ -187,7 +187,7 @@ def move_some_people (economy):
         while ppout2 < ppout and pout:
             p = pout.pop(0)
             sid = p.supported
-            if sid is None or sid is '':
+            if sid is None or sid == '':
                 sid = p.id
             if sid in outfamily:
                 continue

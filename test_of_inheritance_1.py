@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.5' # Time-stamp: <2021-04-02T19:34:49Z>
+__version__ = '0.0.6' # Time-stamp: <2021-08-16T23:26:29Z>
 ## Language: Japanese/UTF-8
 
 """相続のテスト"""
@@ -90,7 +90,7 @@ class Person (Serializable):
         p = self
         qid = parent_id
         economy = self.economy
-        if qid is '':
+        if qid == '':
             return True
         q = economy.get_person(qid)
         if q is None:
@@ -124,7 +124,7 @@ class Person (Serializable):
                 land = 0
             else:
                 land -= l
-            if x is '':
+            if x == '':
                 economy.cur_forfeit_land += l
                 economy.cur_forfeit_prop += a1 - l * ARGS.prop_value_of_land
                 prop -= a1 - l * ARGS.prop_value_of_land
@@ -179,7 +179,7 @@ class Economy (Frozen):
 
 
 def calc_descendant_inheritance_share (economy, id1, excluding=None):
-    if excluding != id1 and (id1 is '' or economy.is_living(id1)):
+    if excluding != id1 and (id1 == '' or economy.is_living(id1)):
         return {id1: 1.0}
     p = economy.get_person(id1)
     if p is None:
@@ -233,21 +233,21 @@ def calc_inheritance_share_1 (economy, id1):
     ack_father = p.is_acknowleged(p.father)
     ack_mother = p.is_acknowleged(p.mother)
 
-    if p.father is '' or (economy.is_living(p.father) and ack_father):
+    if p.father == '' or (economy.is_living(p.father) and ack_father):
         l.append(p.father)
-    if p.mother is '' or (economy.is_living(p.mother) and ack_mother):
+    if p.mother == '' or (economy.is_living(p.mother) and ack_mother):
         l.append(p.mother)
 
     if not l:
         s = []
-        if p.father is '' or ack_father:
+        if p.father == '' or ack_father:
             s.append(p.father)
-        if p.mother is '' or ack_mother:
+        if p.mother == '' or ack_mother:
             s.append(p.mother)
         for i in range(4):
             s2 = []
             for x in s:
-                if x is not '' and economy.is_living(x):
+                if x != '' and economy.is_living(x):
                     l.append(x)
                 else:
                     if x in economy.tombs:
@@ -277,11 +277,11 @@ def calc_inheritance_share_1 (economy, id1):
             return r
 
     l = []
-    if p.father is '' or ack_father:
+    if p.father == '' or ack_father:
         q = calc_descendant_inheritance_share(economy, p.father, excluding=id1)
         if q is not None:
             l.append(q)
-    if p.mother is '' or ack_mother:
+    if p.mother == '' or ack_mother:
         q = calc_descendant_inheritance_share(economy, p.mother, excluding=id1)
         if q is not None:
             l.append(q)
@@ -319,7 +319,7 @@ def calc_inheritance_share (economy, id1):
     if p.supported is not None and spouse is not None \
        and spouse != p.supported:
         supported = p.supported
-    if supported is not None and supported is not '' \
+    if supported is not None and supported != '' \
        and not economy.is_living(supported):
         supported = None
 
@@ -340,7 +340,7 @@ def calc_inheritance_share (economy, id1):
             r[x] += 0.8 * y
         return r
 
-    l = [x for x in p.supporting if x is '' or economy.is_living(x)]
+    l = [x for x in p.supporting if x == '' or economy.is_living(x)]
     if l:
         if q is None:
             q = {}

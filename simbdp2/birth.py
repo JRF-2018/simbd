@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.6' # Time-stamp: <2021-08-10T04:37:18Z>
+__version__ = '0.0.7' # Time-stamp: <2021-08-16T23:22:43Z>
 ## Language: Japanese/UTF-8
 
 """Simulation Buddhism Prototype No.2 - Birth
@@ -58,7 +58,7 @@ class PersonBT (Person0):
         ch = 0
         t = []
         if isinstance(rel, Marriage):
-            if rel.spouse is '' or not economy.is_living(rel.spouse):
+            if rel.spouse == '' or not economy.is_living(rel.spouse):
                 return p.children_wanting() > len(p.children)
             else:
                 s = economy.people[rel.spouse]
@@ -68,7 +68,7 @@ class PersonBT (Person0):
         elif isinstance(rel, Rape):
             return False
         elif isinstance(rel, Adultery):
-            if rel.spouse is '' or not economy.is_living(rel.spouse):
+            if rel.spouse == '' or not economy.is_living(rel.spouse):
                 return p.adultery_want_child() > 0
             else:
                 s = economy.people[rel.spouse]
@@ -102,7 +102,7 @@ class PersonBT (Person0):
         p = self
         qid = parent_id
         economy = self.economy
-        if qid is '':
+        if qid == '':
             return True
         q = economy.get_person(qid)
         if q is None:
@@ -174,7 +174,7 @@ class PersonBT (Person0):
         p.biological_father = rel.spouse
         p.mother = m.id
 
-        if rel.spouse is '' or not economy.is_living(rel.spouse):
+        if rel.spouse == '' or not economy.is_living(rel.spouse):
             f = None
             p.father = ''
             ch = Child()
@@ -282,7 +282,7 @@ class PersonBT (Person0):
                 acknowledge = True
                 if father_mfather_thinks != mf_id:
                     acknowledge = random.random() < 0.7
-                if foster_father is not '' \
+                if foster_father != '' \
                    and economy.is_living(foster_father):
                     f = economy.people[foster_father]
                     if acknowledge:
@@ -314,13 +314,13 @@ class PersonBT (Person0):
             assert p.supported is not None
 
             if m.marriage is not None and father_mfather_thinks == rel.spouse \
-               and m.marriage.spouse is not '' \
+               and m.marriage.spouse != '' \
                and economy.is_living(m.marriage.spouse):
                 f = economy.people[m.marriage.spouse]
                 if m.id not in f.hating:
                     f.hating[m.id] = 0
                 f.hating[m.id] += np_clip(f.hating[m.id] + 0.3, 0, 1)
-                if random.random() < 0.5 or rel.spouse is '':
+                if random.random() < 0.5 or rel.spouse == '':
                     f.hating_unknown += 0.1 * 0.6
                     f.hating_unknown = np_clip(p.hating_unknown, 0, 1)
                 else:

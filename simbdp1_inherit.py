@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.2' # Time-stamp: <2021-04-02T19:38:59Z>
+__version__ = '0.0.9' # Time-stamp: <2021-08-16T23:12:42Z>
 ## Language: Japanese/UTF-8
 
 """Simulation Buddhism Prototype No.1 - Inheritance
@@ -40,11 +40,11 @@ def check_consanguineous_marriage (economy, male, female):
     femalespouse = set()
     for r in male.trash:
         if isinstance(r, Marriage):
-            if r.spouse is not '':
+            if r.spouse != '':
                 malespouse.add(r.spouse)
     for r in female.trash:
         if isinstance(r, Marriage):
-            if r.spouse is not '':
+            if r.spouse != '':
                 femalespouse.add(r.spouse)
     if female.id in malespouse:
         return False
@@ -67,12 +67,12 @@ def check_consanguineous_marriage (economy, male, female):
         s = set()
         ex = set()
         for z in [x.father, x.mother, x.initial_father, x.initial_mother]:
-            if z is not '':
+            if z != '':
                 s.add(z)
         for r in x.trash:
             if isinstance(r, Dissolution) \
                and (r.relation == 'MO' or r.relation == 'FA') \
-               and r.id is not '':
+               and r.id != '':
                 s.add(r.id)
         if y in s:
             # print("父母")
@@ -83,11 +83,11 @@ def check_consanguineous_marriage (economy, male, female):
             for z in s:
                 p = economy.get_person(z)
                 if p is not None:
-                    if p.initial_father is not '' \
+                    if p.initial_father != '' \
                        and p.initial_father not in ex:
                         s2.add(p.initial_father)
                         ex.add(p.initial_father)
-                    if p.initial_mother is not '' \
+                    if p.initial_mother != '' \
                        and p.initial_mother not in ex:
                         s2.add(p.initial_mother)
                         ex.add(p.initial_mother)
@@ -95,7 +95,7 @@ def check_consanguineous_marriage (economy, male, female):
                         for r in [p.marriage] + p.trash:
                             if r is None:
                                 continue
-                            if isinstance(r, Marriage) and r.spouse is not '':
+                            if isinstance(r, Marriage) and r.spouse != '':
                                 if y == r.spouse:
                                     # print("尊属の配偶者")
                                     return True
@@ -139,7 +139,7 @@ def check_consanguineous_marriage (economy, male, female):
                         for r in [p.marriage] + p.trash:
                             if r is None:
                                 continue
-                            if isinstance(r, Marriage) and r.spouse is not '':
+                            if isinstance(r, Marriage) and r.spouse != '':
                                 if y == r.spouse:
                                     # print("卑属の配偶者")
                                     return True
@@ -151,7 +151,7 @@ def check_consanguineous_marriage (economy, male, female):
     # 三親等内の傍系血族のチェック
     for x, y in [(male, female.id), (female, male.id)]:
         for z in [x.initial_father, x.initial_mother]:
-            if z is '':
+            if z == '':
                 continue
             p = economy.get_person(z)
             if p is not None:
@@ -172,7 +172,7 @@ def check_consanguineous_marriage (economy, male, female):
 
 
 def calc_descendant_inheritance_share (economy, id1, excluding=None):
-    if excluding != id1 and (id1 is '' or economy.is_living(id1)):
+    if excluding != id1 and (id1 == '' or economy.is_living(id1)):
         return {id1: 1.0}
     p = economy.get_person(id1)
     if p is None:
@@ -227,21 +227,21 @@ def calc_inheritance_share_1 (economy, id1):
     ack_father = p.is_acknowleged(p.father)
     ack_mother = p.is_acknowleged(p.mother)
 
-    if p.father is '' or (economy.is_living(p.father) and ack_father):
+    if p.father == '' or (economy.is_living(p.father) and ack_father):
         l.append(p.father)
-    if p.mother is '' or (economy.is_living(p.mother) and ack_mother):
+    if p.mother == '' or (economy.is_living(p.mother) and ack_mother):
         l.append(p.mother)
 
     if not l:
         s = []
-        if p.father is '' or ack_father:
+        if p.father == '' or ack_father:
             s.append(p.father)
-        if p.mother is '' or ack_mother:
+        if p.mother == '' or ack_mother:
             s.append(p.mother)
         for i in range(4):
             s2 = []
             for x in s:
-                if x is not '' and economy.is_living(x):
+                if x != '' and economy.is_living(x):
                     l.append(x)
                 else:
                     if x in economy.tombs:
@@ -271,11 +271,11 @@ def calc_inheritance_share_1 (economy, id1):
             return r
 
     l = []
-    if p.father is '' or ack_father:
+    if p.father == '' or ack_father:
         q = calc_descendant_inheritance_share(economy, p.father, excluding=id1)
         if q is not None:
             l.append(q)
-    if p.mother is '' or ack_mother:
+    if p.mother == '' or ack_mother:
         q = calc_descendant_inheritance_share(economy, p.mother, excluding=id1)
         if q is not None:
             l.append(q)
@@ -314,7 +314,7 @@ def calc_inheritance_share (economy, id1):
     if p.supported is not None and spouse is not None \
        and spouse != p.supported:
         supported = p.supported
-    if supported is not None and supported is not '' \
+    if supported is not None and supported != '' \
        and not economy.is_living(supported):
         supported = None
 
@@ -335,7 +335,7 @@ def calc_inheritance_share (economy, id1):
             r[x] += 0.8 * y
         return r
 
-    l = [x for x in p.supporting if x is '' or economy.is_living(x)]
+    l = [x for x in p.supporting if x == '' or economy.is_living(x)]
     if l:
         if q is None:
             q = {}
