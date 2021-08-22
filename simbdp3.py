@@ -1,10 +1,10 @@
 #!/usr/bin/python3
-__version__ = '0.0.10' # Time-stamp: <2021-08-17T00:00:57Z>
+__version__ = '0.0.1' # Time-stamp: <2021-08-21T18:24:45Z>
 ## Language: Japanese/UTF-8
 
-"""Simulation Buddhism Prototype No.1 - Main
+"""Simulation Buddhism Prototype No.3 - Main
 
-「シミュレーション仏教」プロトタイプ 1号 - メインルーチン
+「シミュレーション仏教」プロトタイプ 3号 - メインルーチン
 """
 
 ##
@@ -38,21 +38,27 @@ import sys
 import signal
 import argparse
 
-import simbdp1_base as base
-from simbdp1_base import ARGS, calc_increase_rate, calc_pregnant_mag,\
+import simbdp3.base as base
+from simbdp3.base import ARGS, calc_increase_rate, calc_pregnant_mag,\
     term_to_year_month
-from simbdp1_init import initialize
-from simbdp1_economy import PersonEC, EconomyPlotEC, update_economy
-from simbdp1_birth import PersonBT, EconomyPlotBT, update_birth,\
+from simbdp3.init import initialize
+from simbdp3.economy import PersonEC, EconomyPlotEC, update_economy
+from simbdp3.birth import PersonBT, EconomyPlotBT, update_birth,\
     update_fertility
-from simbdp1_death import PersonDT, EconomyDT, update_death
-from simbdp1_adultery import PersonAD, EconomyPlotAD, update_adulteries
-from simbdp1_marriage import PersonMA, EconomyMA, EconomyPlotMA,\
+from simbdp3.death import PersonDT, EconomyDT, update_death
+from simbdp3.adultery import PersonAD, EconomyPlotAD, update_adulteries
+from simbdp3.marriage import PersonMA, EconomyMA, EconomyPlotMA,\
     update_marriages
-from simbdp1_support import PersonSUP, update_support, check_support_consistent
-from simbdp1_misc import update_education, update_tombs, update_labor,\
-    update_eagerness, calc_tmp_labor
-from simbdp1_inherit import recalc_inheritance_share
+from simbdp3.support import PersonSUP, update_support, check_support_consistent
+from simbdp3.moving import PersonMV, calc_moving_matrix
+from simbdp3.domination import PersonDM, EconomyDM, update_dominators
+from simbdp3.calamity import update_calamities
+from simbdp3.crime import PersonCR, update_crimes
+from simbdp3.priest import PersonPR, update_priests, \
+    update_education, update_tombs
+from simbdp3.misc import update_labor, update_eagerness,\
+    calc_tmp_labor, update_injured
+from simbdp3.inherit import recalc_inheritance_share
 
 
 ##
@@ -64,7 +70,7 @@ from simbdp1_inherit import recalc_inheritance_share
 ARGS.load = False
 ARGS.save = False
 # セーブするファイル名
-ARGS.pickle = 'simbdp1.pickle'
+ARGS.pickle = 'simbdp3.pickle'
 # 途中エラーなどがある場合に備えてセーブする間隔
 ARGS.save_period = 120
 # エラー時にデバッガを起動
@@ -164,6 +170,8 @@ ARGS.a60_death_rate = calc_increase_rate((80 - 60) * 12, 70/100)
 ARGS.a80_death_rate = calc_increase_rate((110 - 80) * 12, 99/100)
 # 0歳から3歳までの幼児死亡率
 ARGS.infant_death_rate = calc_increase_rate(3 * 12, 5/100)
+# 病気またはケガによる死亡率の上昇
+ARGS.injured_death_rate = calc_increase_rate((80 - 60) * 12, 70/100)
 # 妊娠しやすさが1のときの望まれた妊娠の確率
 ARGS.intended_pregnant_rate = calc_increase_rate(12, 50/100)
 #ARGS.intended_pregnant_rate = calc_increase_rate(12, 66/100)
@@ -179,6 +187,9 @@ ARGS.worst_pregnant_rate = calc_increase_rate(12, 1/100)
 # 妊娠しやすさが1のときの行きずりの不倫の妊娠確率
 ARGS.new_adulteries_pregnant_rate = (ARGS.intended_pregnant_rate + ARGS.unintended_pregnant_rate) / 2
 ARGS.new_adulteries_pregnant_mag = None
+# 妊娠しやすさが1のときの強姦の妊娠確率
+ARGS.rape_pregnant_rate = (ARGS.intended_pregnant_rate + ARGS.unintended_pregnant_rate) / 2
+ARGS.rape_pregnant_mag = None
 # 40歳以上の男性の生殖能力の衰えのパラメータ
 ARGS.male_fertility_reduce_rate = calc_increase_rate(12, 0.1)
 ARGS.male_fertility_reduce = 0.9
@@ -190,6 +201,8 @@ ARGS.adultery_reboot_rate = calc_increase_rate(12, 10/100)
 ARGS.with_child_adultery_elevate_rate = calc_increase_rate(12, 20/100)
 # 24歳までの不倫の結婚への昇格確率
 ARGS.a24_adultery_elevate_rate = calc_increase_rate(12, 20/100)
+# 男の僧の不倫の結婚への昇格確率
+ARGS.male_priest_adultery_elevate_rate = calc_increase_rate(12, 1/100)
 # 不倫の結婚への昇格確率
 ARGS.adultery_elevate_rate = calc_increase_rate(12, 5/100)
 # 15歳から18歳までが早期に扶養から離れる最大の確率
@@ -237,6 +250,110 @@ ARGS.stock_max = 300
 # 「大バクチ」の個人の最大値
 ARGS.gamble_max = 50
 
+# 家系を辿った距離の最大値
+ARGS.max_family_distance = 6
+# 一人当たりの初期予算参考値
+ARGS.initial_budget_per_person = 0.5
+# 国力が教育で強くなる最大値
+ARGS.nation_education_power_threshold = 0.6
+# 信仰理解で戦闘が強くなる最大値
+ARGS.faith_realization_power_threshold = 0.6
+# 慰撫が必要な忠誠の最小値
+ARGS.soothe_threshold = 0.7
+# 支配者の同時仕事量
+ARGS.works_per_dominator = 5
+# 災害対応する最小値
+#ARGS.calamity_damage_threshold = 100.0
+ARGS.calamity_damage_threshold = 10.0
+# 災害対応しないことによる成長機会の拡大率
+#ARGS.challengeable_mag = 10.0
+ARGS.challengeable_mag = 1.0
+# 寺院を立てる確率
+ARGS.construct_temple_rate = 0.001
+# 成長機会があるときのベータ関数のパラメータ
+ARGS.challenging_beta = 0.5
+# 成長機会がないときのベータ関数のパラメータ
+ARGS.not_challenging_beta = 1.0
+# 成長するときの増分
+ARGS.challenging_growth = 0.01
+# 次の蛮族の侵入までの平均期。
+ARGS.invasion_average_term = 15.0 * 12
+#ARGS.invasion_average_term = 5.0 * 12
+# 洪水の頻度の目安
+#ARGS.flood_rate = 1.0 / 7
+ARGS.flood_rate = (1.0 / 14) * (1/4)
+# 作物の病気の頻度の目安
+ARGS.cropfailure_rate = (1/8) / 3
+# 大火事の頻度の目安
+#ARGS.bigfire_rate = (1 / (5 * 12)) * (12/15)
+ARGS.bigfire_rate = (1 / (10 * 12)) * (12/15)
+# 地震の頻度の目安
+ARGS.earthquake_rate = (1 / (5 * 12)) * (1/4)
+# 次の疫病までの平均期
+ARGS.plague_average_term = 50.0 * 12
+# 規模の概要値の評価を換える。
+# 例えば、↓の場合、死亡の評価を 1/2 に、財産の評価を 2倍にする。
+#ARGS.damage_scale_filter = {'death': 0.5, 'property': 2}
+ARGS.damage_scale_filter = {}
+# 転居の際の基準の定数
+ARGS.moving_const_1 = 2.0
+ARGS.moving_const_2 = 0.1
+ARGS.moving_const_3 = 0.05
+ARGS.moving_const_4 = 0.10
+# 自由な転居の確率
+ARGS.free_move_rate = 0.005
+# 支配層の継承者がいないときに恨むかどうか
+ARGS.no_successor_resentment = False
+# 支配層の能力調整の基準値
+ARGS.dominator_adder = 0.1
+# ケガ・病気の障害として残る確率
+ARGS.permanent_injure_rate = 1/2
+# 予言の効果
+ARGS.prophecy_effect = 1.0
+
+# 死亡時の僧の取り分
+ARGS.priest_share = 0.1
+# 僧の人口に対する割合
+ARGS.priests_rate = 1/200
+ARGS.priests_rate_max = 1/100
+ARGS.priests_rate_min = 1/300
+# ランダムに発生する hating の人口に対する割合
+ARGS.nation_hating_rate = 1/100
+# 教化(education)で変化する宥められやすさ
+ARGS.soothe_hating_rate_max = 1/3
+ARGS.soothe_hating_rate_min = 1/6
+# 軽犯罪率
+ARGS.minor_offence_rate_max = 1/100
+ARGS.minor_offence_rate_min = 1/200
+# 重犯罪率
+ARGS.vicious_crime_rate_max = 2/10000
+ARGS.vicious_crime_rate_min = 1/10000
+# 軽犯罪逮捕率
+ARGS.minor_offence_arrest_rate_max = 1/10
+ARGS.minor_offence_arrest_rate_min = 1/12
+# 重犯罪逮捕率
+ARGS.vicious_crime_arrest_rate_max = 1/2
+ARGS.vicious_crime_arrest_rate_min = 1/2
+# 通常逮捕率
+ARGS.normal_arrest_rate_max = 1/300
+ARGS.normal_arrest_rate_min = 1/360
+# 監獄の基礎となる数
+ARGS.jail_num_base_max = 200
+ARGS.jail_num_base_min = 100
+# 現世での hating によって増える監獄の数の倍率
+ARGS.jail_num_sub_max = 1.2
+ARGS.jail_num_sub_min = 1.0
+# 軽犯罪による最大の収入
+ARGS.minor_offence_revenue = 100
+# 重犯罪による最大の収入
+ARGS.vicious_crime_revenue = 200
+# 刑期
+ARGS.jail_term_max = 15 * 12
+ARGS.jail_term_min = 1
+# カルマの自然減少の係数
+ARGS.karma_decay_1 = 0.01
+ARGS.karma_decay_2 = 1.8
+
 
 SAVED_ECONOMY = None
 
@@ -262,7 +379,8 @@ def parse_args (view_options=['none']):
 
     specials = set(['load', 'save', 'debug_on_error', 'debug_term',
                     'trials', 'population', 'min_birth',
-                    'view_1', 'view_2', 'view_3', 'view_4'])
+                    'view_1', 'view_2', 'view_3', 'view_4',
+                    'damage_scale_filter'])
     for p, v in vars(ARGS).items():
         if p not in specials:
             p2 = '--' + p.replace('_', '-')
@@ -299,14 +417,25 @@ def parse_args (view_options=['none']):
         ARGS.new_adulteries_pregnant_mag = calc_pregnant_mag(
             ARGS.new_adulteries_pregnant_rate, ARGS.worst_pregnant_rate
         )
+    if ARGS.rape_pregnant_mag is None:
+        ARGS.rape_pregnant_mag = calc_pregnant_mag(
+            ARGS.rape_pregnant_rate, ARGS.worst_pregnant_rate
+        )
+    if type(ARGS.damage_scale_filter) is str:
+        r = {}
+        for x in ARGS.damage_scale_filter.split(','):
+            if x:
+                y, z = x.split(':')
+                r[y] = float(z)
+        ARGS.damage_scale_filter = r
 
 
-class Person (PersonEC, PersonBT, PersonDT, PersonAD, PersonMA, PersonSUP):
+class Person (PersonEC, PersonBT, PersonDT, PersonAD, PersonMA, PersonSUP, PersonMV, PersonDM, PersonCR, PersonPR):
     pass
 
 base.Person = Person
 
-class Economy (EconomyDT, EconomyMA):
+class Economy (EconomyDT, EconomyMA, EconomyDM):
     pass
 
 class EconomyPlot (EconomyPlotEC, EconomyPlotBT,
@@ -338,6 +467,8 @@ def step (economy):
     print("\nTerm %d (%s):"
           % (economy.term, term_to_year_month(economy.term)),
           flush=True)
+    economy.year = math.floor((economy.term - 1) / 12) + 1
+    economy.month = (economy.term - 1) % 12 + 1
 
     for p in economy.people.values():
         p.age = (economy.term - p.birth_term) / 12
@@ -355,10 +486,16 @@ def step (economy):
         ARGS.debug_term = None
         import pdb; pdb.set_trace()
 
+    calc_moving_matrix(economy)
     update_eagerness(economy)
     update_education(economy)
     update_labor(economy)
     update_fertility(economy)
+    update_injured(economy)
+    update_dominators(economy)
+    update_calamities(economy)
+    update_priests(economy)
+    update_crimes(economy)
     update_death(economy)
     update_adulteries(economy)
     update_marriages(economy)
@@ -378,7 +515,7 @@ def step (economy):
             p.tmp_land_damage = 0
         l = []
         for p in economy.people.values():
-            if p.death is not None:
+            if p.is_dead():
                 l.append((p, recalc_inheritance_share(economy, p)))
         for p, q in l:
             p.death.inheritance_share = q
@@ -440,6 +577,8 @@ def main (eplot):
         economy.rand_state = None
 
     print("\nFinish", flush=True)
+    print("N_calamity:", economy.n_calamity)
+    print("D_calamity:", economy.d_calamity)
     if not ARGS.no_view:
         plt.show()
 

@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.21' # Time-stamp: <2021-08-16T23:04:34Z>
+__version__ = '0.0.22' # Time-stamp: <2021-08-16T23:59:57Z>
 ## Language: Japanese/UTF-8
 
 """結婚・不倫・扶養・相続などのマッチングのシミュレーション"""
@@ -2004,7 +2004,7 @@ def initialize (economy):
                     c = Child()
                     m.children.append(c)
                     p.children.append(c)
-                    if p.sex is 'M':
+                    if p.sex == 'M':
                         if random.random() < 0.8:
                             c.father = p.id
                     else:
@@ -2076,7 +2076,7 @@ def initialize (economy):
                     c = Child()
                     a.children.append(c)
                     p.children.append(c)
-                    if p.sex is 'M':
+                    if p.sex == 'M':
                         if random.random() < 0.8:
                             c.father = p.id
                     else:
@@ -2143,7 +2143,7 @@ def initialize (economy):
                 for i in range(q):
                     c = Child()
                     p.children.append(c)
-                    if p.sex is 'M':
+                    if p.sex == 'M':
                         if random.random() < 0.8:
                             c.father = p.id
                     else:
@@ -2395,7 +2395,7 @@ def update_adultery_hating (economy, person, adultery):
     p = person
     a = adultery
     success = True
-    if p.sex is 'M':
+    if p.sex == 'M':
         if a.spouse == '' or not economy.is_living(a.spouse):
             if a.begin == a.end:
                 hating = random.random() < 0.1
@@ -2454,7 +2454,7 @@ def update_adultery_hating (economy, person, adultery):
                             ss.hating_unknown += 0.1 * hating
                             ss.hating_unknown = np_clip(ss.hating_unknown,
                                                         0, 1)
-    else: # p.sex is 'F':
+    else: # p.sex == 'F':
         if a.spouse == '' or not economy.is_living(a.spouse):
             if a.begin == a.end:
                 hating = random.random() < 0.2
@@ -2525,7 +2525,7 @@ def update_marriage_hating (economy, person, relation):
     p = person
     m = relation
     success = True
-    if p.sex is 'M':
+    if p.sex == 'M':
         if m.spouse == '' or not economy.is_living(m.spouse):
             hating = random.random() < 0.5
             if hating:
@@ -2542,7 +2542,7 @@ def update_marriage_hating (economy, person, relation):
                 p.hating[s.id] = np_clip(p.hating[s.id] + 0.3, 0, 1)
             if s.id in p.hating and p.hating[s.id] > 0.3:
                 p.hating[s.id] = 0.3
-    else: # p.sex is 'F':
+    else: # p.sex == 'F':
         if m.spouse == '' or not economy.is_living(m.spouse):
             hating = random.random() < 0.5
             if hating:
@@ -4002,7 +4002,7 @@ def update_education (economy):
 
 def sigint_handler (signum, frame):
     global DEBUG_NEXT_TERM
-    print("SIGNAL", flush=True)
+    #print("SIGNAL", flush=True)
     DEBUG_NEXT_TERM = True
 
 

@@ -1,8 +1,8 @@
 #!/usr/bin/python3
-__version__ = '0.0.8' # Time-stamp: <2021-08-21T07:26:52Z>
+__version__ = '0.0.1' # Time-stamp: <2021-08-21T07:01:39Z>
 ## Language: Japanese/UTF-8
 
-"""Simulation Buddhism Prototype No.2 - Miscellaneous
+"""Simulation Buddhism Prototype No.3 - Miscellaneous
 
 その他雑他のルーチン
 """
@@ -31,14 +31,14 @@ __version__ = '0.0.8' # Time-stamp: <2021-08-21T07:26:52Z>
 import math
 import random
 
-from simbdp2.base import ARGS
-from simbdp2.common import np_clip
+from simbdp3.base import ARGS
+from simbdp3.common import np_clip
 
 
 def calc_with_support_asset_rank (economy):
     l = []
     for p in economy.people.values():
-        if p.marriage is not None or p.death is not None:
+        if p.marriage is not None or p.is_dead():
             l.append((p, p.asset_value()))
         else:
             sup = False
@@ -78,54 +78,17 @@ def calc_with_support_asset_rank (economy):
         l[i][0].tmp_asset_rank = (s - i) / s
 
 
-def reduce_tombs (economy):
-    n_t = 0
-    l = [t for t in economy.tombs.values()
-         if (economy.term - t.death_term) > 30 * 12]
-
-    r = len(economy.tombs) - sum(ARGS.population)
-    if r >= len(l):
-        n_t = len(l)
-        for t in l:
-            t.person.economy = None
-            del economy.tombs[t.person.id]
-    elif r > 0:
-        l = sorted(l,
-                   key=(lambda t: t.person.cum_donation *
-                        (0.98 ** (economy.term - t.death_term))))[0:r]
-        n_t = len(l)
-        for t in l:
-            t.person.economy = None
-            del economy.tombs[t.person.id]
-    print("Reduce Tombs:", n_t, flush=True)
-
-
-def update_tombs (economy):
-    print("\nTombs:...", flush=True)
-
-    reduce_tombs(economy)
-
-
-def update_education (economy):
-    print("\nEducation:...", flush=True)
-
-    for p in economy.people.values():
-        if p.death is None:
-            p.education += random.gauss(0, 0.1)
-            p.education = np_clip(p.education, 0, 1)
-
-
 def update_injured (economy):
     print("\nInjured:...", flush=True)
 
     for p in economy.people.values():
-        if p.death is None:
+        if not p.is_dead():
             p.tmp_injured = np_clip(p.tmp_injured - 0.1, 0, 1)
 
 
 def update_labor (economy):
     for p in economy.people.values():
-        if p.death is None:
+        if not p.is_dead():
             if p.age < 10:
                 continue
             elif p.age < 60:
@@ -142,18 +105,20 @@ def update_labor (economy):
 
 def calc_tmp_labor (economy):
     for p in economy.people.values():
-        if p.death is not None:
+        if p.is_dead():
             p.tmp_labor = 0
             continue
         p.tmp_labor = p.labor
         if p.pregnancy is not None:
             p.tmp_labor *= 0.2
+        if p.in_jail():
+            p.tmp_labor *= 0.3
         p.tmp_labor = np_clip(p.tmp_labor - p.tmp_injured - p.injured, 0, 1)
 
 
 def update_eagerness (economy):
     for p in economy.people.values():
-        if p.death is not None:
+        if p.is_dead():
             p.eagerness = 0.5
         else:
             p.eagerness = random.random()

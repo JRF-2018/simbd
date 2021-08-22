@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.2' # Time-stamp: <2021-07-23T07:23:20Z>
+__version__ = '0.0.3' # Time-stamp: <2021-08-16T23:43:41Z>
 ## Language: Japanese/UTF-8
 
 """転居のシミュレーション"""
@@ -239,15 +239,15 @@ class PersonDM (Person0):
         pos = p.dominator_position
         if pos is None:
             return None
-        elif pos is 'king':
+        elif pos == 'king':
             return nation.king
-        elif pos is 'governor':
+        elif pos == 'governor':
             return nation.districts[p.district].governor
-        elif pos is 'vassal':
+        elif pos == 'vassal':
             for d in nation.vassals:
                 if d.id == p.id:
                     return d
-        elif pos is 'cavalier':
+        elif pos == 'cavalier':
             for d in nation.districts[p.district].cavaliers:
                 if d.id == p.id:
                     return d

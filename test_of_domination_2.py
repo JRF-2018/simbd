@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.10' # Time-stamp: <2021-08-16T23:06:02Z>
+__version__ = '0.0.11' # Time-stamp: <2021-08-21T16:35:54Z>
 ## Language: Japanese/UTF-8
 
 """支配と災害のシミュレーション"""
@@ -164,6 +164,8 @@ ARGS.no_successor_resentment = False
 ARGS.dominator_adder = 0.1
 # ケガ・病気の障害として残る確率
 ARGS.permanent_injure_rate = 1/2
+# 予言の効果
+ARGS.prophecy_effect = 1.0
 
 
 SAVED_ECONOMY = None
@@ -478,15 +480,15 @@ class PersonDM (Person0):
         pos = p.dominator_position
         if pos is None:
             return None
-        elif pos is 'king':
+        elif pos == 'king':
             return nation.king
-        elif pos is 'governor':
+        elif pos == 'governor':
             return nation.districts[p.district].governor
-        elif pos is 'vassal':
+        elif pos == 'vassal':
             for d in nation.vassals:
                 if d.id == p.id:
                     return d
-        elif pos is 'cavalier':
+        elif pos == 'cavalier':
             for d in nation.districts[p.district].cavaliers:
                 if d.id == p.id:
                     return d
@@ -899,6 +901,7 @@ class Calamity (SerializableExEconomy):        # 「災害」＝「惨禍」
         self.damage_protected_max = 0 # 防御成功時の規模の概要値
         self.damage_protected_min = 0 # 予言で減らせる
                                            # 防御成功時の規模の概要値
+        self.challenge_mag = 1.0  # 成長機会の補正
 
         self.damage_coeff = {}   # ダメージの計算係数
         self.protected_damage_coeff = {}   # 防御成功時のダメージの計算係数
@@ -996,6 +999,7 @@ class Calamity (SerializableExEconomy):        # 「災害」＝「惨禍」
         th = np_clip(ARGS.faith_realization_power_threshold, 0.5, 1.0)
         q2 = (0.8 - 1.0) * ((th - 0.5) / (1.0 - 0.5)) + 1.0
         counter_prophecy = c.counter_prophecy * (q1 + q2) / 2
+        counter_prophecy *= ARGS.prophecy_effect
         protect = dist.protection_units[c.kind][c.unit_num] \
             + c.prophecy_protection * counter_prophecy
         if protect > ci.protection_max:
@@ -1050,6 +1054,7 @@ class Calamity (SerializableExEconomy):        # 「災害」＝「惨禍」
         th = np_clip(ARGS.faith_realization_power_threshold, 0.5, 1.0)
         q2 = (0.8 - 1.0) * ((th - 0.5) / (1.0 - 0.5)) + 1.0
         counter_prophecy = counter_prophecy * (q1 + q2) / 2
+        counter_prophecy *= ARGS.prophecy_effect
         protect = dist.protection_units[c.kind][c.unit_num] \
             + c.prophecy_protection * counter_prophecy
         if protect > ci.protection_max:
@@ -1805,6 +1810,7 @@ class Invasion (Calamity):        # 「蛮族の侵入」
 
         self.prophecy_protection = 1.0
         self.prophecy_training = 1.5
+        self.challenge_mag = 2.0
 
         self.terms = 0
         self.raid = 0
@@ -3160,7 +3166,8 @@ def prepare_for_calamities (economy):
     for did in work.keys():
         if 'prophecy' in work[did]:
             c = work[did]['prophecy']
-            c.prophecy_prepare(cavaliers[did], random.random() < 
+            c.prophecy_prepare(cavaliers[did], random.random() <
+                               c.challenge_mag * 
                                challengeable[cavaliers[did].district])
 
     # 寺院の建立。
@@ -3462,13 +3469,13 @@ def nominate_successors (economy):
             noml = [x for x in noml if economy.position_rank(x[2])
                     == economy.position_rank(nomm[2])]
             nom = random.choice(noml)
-        if ex is 'king':
+        if ex == 'king':
             l = ['from_vassals_or_governors',
                  'from_all_cavaliers',
                  'from_people']
             if nom is not None:
                 l = ['nominate'] + l
-        elif ex is 'governor' or ex is 'vassal':
+        elif ex == 'governor' or ex == 'vassal':
             l2 = [(3, 'king_nominate'),
                   (5, 'from_cavaliers'),
                   (1, 'from_people')]
@@ -3480,7 +3487,7 @@ def nominate_successors (economy):
                 else:
                     l2.append((5, 'nominate'))
             l = _random_scored_sort(l2)
-        elif ex is 'cavalier':
+        elif ex == 'cavalier':
             l2 = [(3, 'king_nominate'),
                   (2, 'vassal_nominate'),
                   (3, 'governor_nominate'),
@@ -3623,6 +3630,35 @@ def nominate_successors (economy):
     nation.nomination = []
 
 
+def print_dominators_average (economy):
+    nation = economy.nation
+    cavaliers = sum([dist.cavaliers for dist in nation.districts], [])
+    cset = set([d.id for d in cavaliers])
+    props = [
+        'people_trust',
+        'faith_realization',
+        'disaster_prophecy',
+        'disaster_strategy',
+        'disaster_tactics',
+        'combat_prophecy',
+        # 'combat_strategy',
+        'combat_tactics',
+        'hating_to_king',
+        'hating_to_governor',
+        'soothing_by_king',
+        'soothing_by_governor'
+    ]
+    r = {}
+    for n in props:
+        r[n] = np.mean([getattr(d, n) for d in nation.dominators()
+                        if d.id not in cset])
+    print("Non-Cavaliers Average:", r)
+    r = {}
+    for n in props:
+        r[n] = np.mean([getattr(d, n) for d in cavaliers])
+    print("Cavaliers Average:", r)
+
+
 def update_dominators (economy):
     print("\nNominate Dominators:...", flush=True)
 
@@ -3638,11 +3674,12 @@ def update_dominators (economy):
     nominate_successors(economy)
     for d in nation.dominators():
         d.update_hating()
+    print_dominators_average(economy)
 
 
 def sigint_handler (signum, frame):
     global DEBUG_NEXT_TERM
-    print("SIGNAL", flush=True)
+    #print("SIGNAL", flush=True)
     DEBUG_NEXT_TERM = True
 
 

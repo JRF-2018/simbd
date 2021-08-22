@@ -1,8 +1,8 @@
 #!/usr/bin/python3
-__version__ = '0.0.8' # Time-stamp: <2021-08-21T21:54:48Z>
+__version__ = '0.0.1' # Time-stamp: <2021-08-21T21:55:48Z>
 ## Language: Japanese/UTF-8
 
-"""Simulation Buddhism Prototype No.2 - Marriage
+"""Simulation Buddhism Prototype No.3 - Marriage
 
 結婚関連
 """
@@ -33,14 +33,14 @@ import math
 import random
 import numpy as np
 
-import simbdp2.base as base
-from simbdp2.base import ARGS, Person0, Economy0, EconomyPlot0
-from simbdp2.common import np_clip, np_random_choice,\
+import simbdp3.base as base
+from simbdp3.base import ARGS, Person0, Economy0, EconomyPlot0
+from simbdp3.common import np_clip, np_random_choice,\
     Adultery, Marriage, Wait
-from simbdp2.adultery import choose_from_districts, match_favor,\
+from simbdp3.adultery import choose_from_districts, match_favor,\
     update_adultery_hating
-from simbdp2.misc import calc_with_support_asset_rank
-from simbdp2.inherit import check_consanguineous_marriage
+from simbdp3.misc import calc_with_support_asset_rank
+from simbdp3.inherit import check_consanguineous_marriage
 
 
 class PersonMA (Person0):
@@ -65,9 +65,10 @@ class PersonMA (Person0):
 
         ast = 0.1 * p.tmp_asset_rank
         ed = 0.07 * p.education
+        pr = -0.02 if p.in_priesthood() else 0
         ij = -0.03 * p.injured
         
-        return np_clip(w + suit + pa + max([ast, ed]) + ij, 0.1, 0.3)
+        return np_clip(w + suit + pa + max([ast, ed]) + pr + ij, 0.1, 0.3)
 
     def marriage_favor (self, q):
         p = self
@@ -83,6 +84,8 @@ class PersonMA (Person0):
             t3 = ((7 - 2) / (60 - 12)) * (x - 12) + 2
             same = math.exp(- ((q.age + t1 - p.age) / t2) ** 2)
             suit = math.exp(- ((q.age - 24) / t3) ** 2)
+            if q.in_priesthood():
+                suit *= 0.8
             ed2 = 3 if p.education < 0.5 else ((4 - 3) / 0.5)\
                 * (p.education - 0.5) + 3
             if suit - 0.5 < 0:
@@ -92,6 +95,7 @@ class PersonMA (Person0):
             mar = -1.5 if p.marriage is None \
                 and q.marriage is not None else 0
             ht = -2.0 * p.hating[q.id] if q.id in p.hating else 0
+            jl = -1.0 if q.in_jail() else 0
             ij = -0.5 * q.injured
         else:
             ed1 = 0.5 if p.education > 0.5 else 0.5 + (0.5 - p.education)
@@ -105,6 +109,8 @@ class PersonMA (Person0):
             t3 = ((7 - 2) / (60 - 12)) * (x - 12) + 2
             same = math.exp(- ((q.age - t1 - p.age) / t2) ** 2)
             suit = math.exp(- ((q.age - 20) / t3) ** 2)
+            if q.in_priesthood():
+                suit *= 0.8
             ed2 = 2.5 if p.education < 0.5 else ((3.5 - 2.5) / 0.5)\
                 * (p.education - 0.5) + 2.5
             if suit - 0.5 < 0:
@@ -114,9 +120,10 @@ class PersonMA (Person0):
             mar = -1.0 if p.marriage is None \
                 and q.marriage is not None else 0
             ht = -2.0 * p.hating[q.id] if q.id in p.hating else 0
+            jl = -1.0 if q.in_jail() else 0
             ij = -0.5 * q.injured
 
-        return max([ed, ast]) + age + mar + ht + ij + 1 * q.tmp_luck
+        return max([ed, ast]) + age + mar + ht + jl + ij + 1 * q.tmp_luck
 
     def marriage_separability (self):
         p = self
@@ -284,7 +291,11 @@ class EconomyMA (Economy0):
         mm.begin = economy.term
         fm.init_favor = f.marriage_favor(m)
         mm.init_favor = m.marriage_favor(f)
-        
+
+        for p in [m, f]:
+            if p.in_priesthood():
+                p.renounce_priesthood()
+
         for p in [m, f]:
             pf = None
             pm = None
@@ -439,7 +450,7 @@ class EconomyPlotMA (EconomyPlot0):
         m = []
         m2 = []
         for p in economy.people.values():
-            if p.death is None and p.marriage is not None:
+            if not p.is_dead() and p.marriage is not None:
                 x = p.marriage
                 m.append(p.age - ((economy.term - x.begin) / 12))
                 m2.append(p.age)
@@ -476,13 +487,15 @@ def choose_marriers (economy):
     m_marriers = [0] * districts
     f_marriers = [0] * districts
     for p in economy.people.values():
-        if p.death is None:
+        if not p.is_dead():
             if ((p.sex == 'M' and p.age >= 15) 
                 or (p.sex == 'F' and p.age >= 13)) \
                and p.marriage is None \
                and p.marriage_wait is None \
                and (p.pregnancy is None
-                    or economy.term - p.pregnancy.begin < 8):
+                    or economy.term - p.pregnancy.begin < 8) \
+               and not p.in_jail() \
+               and not (p.in_priesthood() and p.sex == 'M'):
                 p.tmp_score = p.marriage_charm()
                 if p.sex == 'M':
                     m_district[p.district].append(p)
@@ -565,7 +578,7 @@ def update_marriage_hating (economy, person, relation):
 def elevate_some_to_marriages (economy):
     elevating = 0
     for p in economy.people.values():
-        if p.death is not None or p.marriage is not None \
+        if p.is_dead() or p.marriage is not None \
            or p.marriage_wait is not None:
             continue
         for a in p.adulteries:
@@ -580,6 +593,9 @@ def elevate_some_to_marriages (economy):
             if p.age < 24 and s.age < 24:
                 if ARGS.a24_adultery_elevate_rate > elevate_rate:
                     elevate_rate = ARGS.a24_adultery_elevate_rate
+            if (p.sex == 'M' and p.in_priesthood()) \
+               or (s.sex == 'M' and s.in_priesthood()):
+                elevate_rate = ARGS.male_priest_adultery_elevate_rate
             if not (random.random() < elevate_rate):
                 continue
             # if not (p.marriage_favor(s) >= ARGS.marriage_favor_threshold
@@ -616,7 +632,7 @@ def get_pregnant_marriages (economy):
     n_u = 0
     n_i = 0
     for p in economy.people.values():
-        if p.death is None and p.sex == 'F' and p.pregnancy is None:
+        if not p.is_dead() and p.sex == 'F' and p.pregnancy is None:
             if p.marriage is not None:
                 m = p.marriage
                 wc = p.want_child(m)
@@ -647,7 +663,7 @@ def get_pregnant_marriages (economy):
 def remove_naturally_some_marriages (economy):
     n_d = 0
     for p in economy.people.values():
-        if p.death is None and p.marriage is not None:
+        if not p.is_dead() and p.marriage is not None:
             ht = 0
             m = p.marriage
             mag = math.sqrt(2)
@@ -675,7 +691,7 @@ def remove_socially_some_marriages (economy):
     n_f = 0
     n_d = 0
     for p in economy.people.values():
-        if p.death is None:
+        if not p.is_dead():
             if ((p.sex == 'M' and p.age >= 15)
                 or (p.sex == 'F' and p.age >= 13)) \
                 and (p.pregnancy is None

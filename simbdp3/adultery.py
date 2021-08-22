@@ -1,8 +1,8 @@
 #!/usr/bin/python3
-__version__ = '0.0.8' # Time-stamp: <2021-08-21T21:56:00Z>
+__version__ = '0.0.1' # Time-stamp: <2021-08-21T21:56:13Z>
 ## Language: Japanese/UTF-8
 
-"""Simulation Buddhism Prototype No.2 - Adultery
+"""Simulation Buddhism Prototype No.3 - Adultery
 
 不倫関連
 """
@@ -33,9 +33,9 @@ import math
 import random
 import numpy as np
 
-import simbdp2.base as base
-from simbdp2.base import ARGS, Person0, Economy0, EconomyPlot0
-from simbdp2.common import np_clip, np_random_choice, Adultery, Marriage
+import simbdp3.base as base
+from simbdp3.base import ARGS, Person0, Economy0, EconomyPlot0
+from simbdp3.common import np_clip, np_random_choice, Adultery, Marriage
 
 
 class PersonAD (Person0):
@@ -84,8 +84,9 @@ class PersonAD (Person0):
                     x = np_clip(x, 1/3, 1.1)
                     ast = ((0.1 - 0) / (1/3 - 1.1)) * (x - 1.1) + 0
         ed = -0.3 * p.education
+        pr =  -0.05 if p.in_priesthood() else 0
         ij = -0.1 * p.injured
-        return np_clip(ma + suit + pa + ast + ed + ij, 0.0, 1.0)
+        return np_clip(ma + suit + pa + ast + ed + pr + ij, 0.0, 1.0)
 
     def adultery_favor (self, q):
         p = self
@@ -101,12 +102,15 @@ class PersonAD (Person0):
             t3 = ((7 - 2) / (60 - 12)) * (x - 12) + 2
             same = math.exp(- ((q.age + t1 - p.age) / t2) ** 2)
             suit = math.exp(- ((q.age - 24) / t3) ** 2)
+            if q.in_priesthood():
+                suit *= 0.8
             ed2 = 1 if p.education < 0.5 else ((2 - 1) / 0.5)\
                 * (p.education - 0.5) + 1
             age = max([ed2 * same, 2.5 * suit])
             mar = -0.5 if p.marriage is None \
                 and q.marriage is not None else 0
             ht = -2.0 * p.hating[q.id] if q.id in p.hating else 0
+            jl = -1.0 if q.in_jail() else 0
             ij = -0.5 * q.injured
         else:
             ed1 = 0 if p.education > 0.5 else (0.5 - p.education) / 0.5
@@ -120,14 +124,17 @@ class PersonAD (Person0):
             t3 = ((7 - 2) / (60 - 12)) * (x - 12) + 2
             same = math.exp(- ((q.age - t1 - p.age) / t2) ** 2)
             suit = math.exp(- ((q.age - 20) / t3) ** 2)
+            if q.in_priesthood():
+                suit *= 0.8
             ed2 = 1.5 if p.education < 0.5 else ((2.5 - 1.5) / 0.5)\
                 * (p.education - 0.5) + 1.5
             age = max([ed2 * same, 2 * suit])
             mar = -1 if p.marriage is None and q.marriage is not None else 0
             ht = -2.0 * p.hating[q.id] if q.id in p.hating else 0
+            jl = -1.0 if q.in_jail() else 0
             ij = -0.5 * q.injured
 
-        return ed + ast + age + mar + ht + ij + 4 * q.tmp_luck
+        return ed + ast + age + mar + ht + jl + ij + 4 * q.tmp_luck
 
     def adultery_separability (self, adultery):
         p = self
@@ -298,9 +305,10 @@ def choose_adulterers (economy):
     m_adulterers = [0] * districts
     f_adulterers = [0] * districts
     for p in economy.people.values():
-        if p.death is None:
+        if not p.is_dead():
             if p.age >= 12 and (p.pregnancy is None
-                                or economy.term - p.pregnancy.begin < 8):
+                                or economy.term - p.pregnancy.begin < 8) \
+               and not p.in_jail():
                 p.tmp_score = p.adultery_charm()
                 if p.sex == 'M':
                     m_district[p.district].append(p)
@@ -559,7 +567,7 @@ def remove_some_new_adulteries (economy, matches):
 def reboot_some_adulteries (economy):
     rebooting = 0
     for p in economy.people.values():
-        if p.death is not None:
+        if p.is_dead():
             continue
         reboot_rate = ARGS.adultery_reboot_rate
         if p.marriage is not None or p.adulteries:
@@ -624,7 +632,7 @@ def get_pregnant_adulteries (economy):
     n_u = 0
     n_i = 0
     for p in economy.people.values():
-        if p.death is None and p.sex == 'F' and p.pregnancy is None:
+        if not p.is_dead() and p.sex == 'F' and p.pregnancy is None:
             for a in p.adulteries:
                 wc = p.want_child(a)
                 if a.spouse == '' or not economy.is_living(a.spouse):
@@ -656,7 +664,7 @@ def remove_some_adulteries (economy):
     n_m = 0
     n_f = 0
     for p in economy.people.values():
-        if p.death is None:
+        if not p.is_dead():
             if p.age >= 12 and (p.pregnancy is None
                                 or economy.term - p.pregnancy.begin < 8):
                 if p.sex == 'M':

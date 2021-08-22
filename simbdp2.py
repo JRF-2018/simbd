@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.7' # Time-stamp: <2021-08-16T23:17:42Z>
+__version__ = '0.0.8' # Time-stamp: <2021-08-21T16:37:08Z>
 ## Language: Japanese/UTF-8
 
 """Simulation Buddhism Prototype No.2 - Main
@@ -303,6 +303,8 @@ ARGS.no_successor_resentment = False
 ARGS.dominator_adder = 0.1
 # ケガ・病気の障害として残る確率
 ARGS.permanent_injure_rate = 1/2
+# 予言の効果
+ARGS.prophecy_effect = 1.0
 
 
 SAVED_ECONOMY = None
@@ -395,7 +397,7 @@ class EconomyPlot (EconomyPlotEC, EconomyPlotBT,
 
 def sigint_handler (signum, frame):
     global DEBUG_NEXT_TERM
-    print("SIGNAL", flush=True)
+    #print("SIGNAL", flush=True)
     DEBUG_NEXT_TERM = True
 
 

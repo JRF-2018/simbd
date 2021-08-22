@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.5' # Time-stamp: <2021-08-16T23:06:45Z>
+__version__ = '0.0.6' # Time-stamp: <2021-08-16T23:44:38Z>
 ## Language: Japanese/UTF-8
 
 """支配層の代替わりのテスト

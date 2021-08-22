@@ -1,8 +1,8 @@
 #!/usr/bin/python3
-__version__ = '0.0.8' # Time-stamp: <2021-08-21T16:36:35Z>
+__version__ = '0.0.1' # Time-stamp: <2021-08-21T16:31:52Z>
 ## Language: Japanese/UTF-8
 
-"""Simulation Buddhism Prototype No.2 - Domination
+"""Simulation Buddhism Prototype No.3 - Domination
 
 災害関連
 """
@@ -34,9 +34,9 @@ import random
 import numpy as np
 import bisect
 
-import simbdp2.base as base
-from simbdp2.base import ARGS, SerializableExEconomy
-from simbdp2.common import np_clip, np_random_choice
+import simbdp3.base as base
+from simbdp3.base import ARGS, SerializableExEconomy
+from simbdp3.common import np_clip, np_random_choice
 
 
 class Calamity (SerializableExEconomy):        # 「災害」＝「惨禍」
@@ -336,7 +336,7 @@ class Calamity (SerializableExEconomy):        # 「災害」＝「惨禍」
         dnum = c.district
         people = []
         for p in economy.people.values():
-            if p.death is None and p.district == dnum:
+            if not p.is_dead() and p.district == dnum:
                 people.append(p)
         damage = math.floor(scale * (1000 / 1000) * (len(people) / 10000))
         if damage > len(people):
@@ -352,7 +352,7 @@ class Calamity (SerializableExEconomy):        # 「災害」＝「惨禍」
         dnum = c.district
         people = []
         for p in economy.people.values():
-            if p.death is None and p.district == dnum:
+            if not p.is_dead() and p.district == dnum:
                 people.append(p)
         damage = math.floor(scale * (300 / 30) * (len(people) / 10000))
         if damage > len(people):
@@ -370,7 +370,7 @@ class Calamity (SerializableExEconomy):        # 「災害」＝「惨禍」
         dpeople_len = 0
         l2 = []
         for p in economy.people.values():
-            if p.death is None and p.age >= 18 and p.age < 50 \
+            if not p.is_dead() and p.age >= 18 and p.age < 50 \
                and p.sex == 'M':
                 people.append(p)
                 if p.district == dnum:
@@ -395,7 +395,7 @@ class Calamity (SerializableExEconomy):        # 「災害」＝「惨禍」
         dnum = c.district
         people = []
         for p in economy.people.values():
-            if p.death is None and p.district == dnum:
+            if not p.is_dead() and p.district == dnum:
                 people.append(p)
         damage = math.floor(scale * (4000 / 100) * (len(people) / 10000))
         if damage > len(people):
@@ -417,7 +417,7 @@ class Calamity (SerializableExEconomy):        # 「災害」＝「惨禍」
             return
         people = []
         for p in economy.people.values():
-            if p.death is None and p.district == dnum:
+            if not p.is_dead() and p.district == dnum:
                 people.append(p)
         damage = math.floor(scale * (5000 / 100) * (len(people) / 10000))
         if damage > len(people):
@@ -470,7 +470,7 @@ class Calamity (SerializableExEconomy):        # 「災害」＝「惨禍」
         dpeople_len = 0
         l2 = []
         for p in economy.people.values():
-            if p.death is None and p.age >= 18 and p.age < 50 \
+            if not p.is_dead() and p.age >= 18 and p.age < 50 \
                and p.sex == 'M':
                 people.append(p)
                 if p.district == dnum:
@@ -495,7 +495,7 @@ class Calamity (SerializableExEconomy):        # 「災害」＝「惨禍」
         dnum = c.district
         people = []
         for p in economy.people.values():
-            if p.death is None and p.district == dnum \
+            if not p.is_dead() and p.district == dnum \
                and p.sex == 'F' and p.age >= 12 and p.age < 35:
                 people.append(p)
         damage = math.floor(scale * (300 / 30) * (len(people) / 10000))
@@ -543,7 +543,7 @@ class Calamity (SerializableExEconomy):        # 「災害」＝「惨禍」
         dpeople_len = 0
         l2 = []
         for p in economy.people.values():
-            if p.death is None and p.district == dnum:
+            if not p.is_dead() and p.district == dnum:
                 people.append(p)
                 l2.append(math.ceil(4 * (1 - p.tmp_asset_rank)))
 
@@ -565,7 +565,7 @@ class Calamity (SerializableExEconomy):        # 「災害」＝「惨禍」
         dpeople_len = 0
         l2 = []
         for p in economy.people.values():
-            if p.death is None and p.district == dnum:
+            if not p.is_dead() and p.district == dnum:
                 people.append(p)
                 l2.append(math.ceil(4 * (1 - p.tmp_asset_rank)))
 
@@ -864,7 +864,7 @@ class Famine (Disaster):           # 「作物の病気」または「日照り�
         dd = [0] * len(ARGS.population)
         dn = 0
         for p in economy.people.values():
-            if p.death is not None:
+            if p.is_dead():
                 continue
             nd[p.district] += 1
             nn += 1
@@ -1041,7 +1041,7 @@ def calc_nation_parameters (economy):
     edu = [0] * len(ARGS.population)
     ph = [0] * len(ARGS.population)
     for p in economy.people.values():
-        if p.death is not None:
+        if p.is_dead():
             continue
         pp[p.district] += 1
         if p.age < 18:
@@ -1129,7 +1129,7 @@ def prepare_for_calamities (economy):
                          key=lambda d: d.soothe_ability())
         for d in soother:
             ph = np.mean([p.political_hating for p in economy.people.values()
-                          if p.death is None and p.age >= 18
+                          if not p.is_dead() and p.age >= 18
                           and p.district == dnum])
             if 1 - ph > ARGS.soothe_threshold:
                 break

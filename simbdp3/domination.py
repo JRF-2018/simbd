@@ -1,8 +1,8 @@
 #!/usr/bin/python3
-__version__ = '0.0.8' # Time-stamp: <2021-08-19T05:04:07Z>
+__version__ = '0.0.1' # Time-stamp: <2021-08-19T23:04:58Z>
 ## Language: Japanese/UTF-8
 
-"""Simulation Buddhism Prototype No.2 - Domination
+"""Simulation Buddhism Prototype No.3 - Domination
 
 支配関連
 """
@@ -33,11 +33,11 @@ import math
 import random
 import numpy as np
 
-import simbdp2.base as base
-from simbdp2.base import ARGS, Person0, Economy0, \
+import simbdp3.base as base
+from simbdp3.base import ARGS, Person0, Economy0, \
     Serializable, SerializableExEconomy
-from simbdp2.random import negative_binominal_rand, half_normal_rand
-from simbdp2.common import np_clip, Child, Marriage, Rape
+from simbdp3.random import negative_binominal_rand, half_normal_rand
+from simbdp3.common import np_clip, Child, Marriage, Rape
 
 
 class PersonDM (Person0):
@@ -70,10 +70,10 @@ class PersonDM (Person0):
             sid = p.id
         
         qid = max([sid] + economy.people[sid].supporting_non_nil(),
-                  key=(lambda x: 0 if economy.people[x].death is not None
+                  key=(lambda x: 0 if economy.people[x].is_dead()
                        else economy.position_rank(economy.people[x]
                                                   .dominator_position)))
-        if economy.people[qid].death is not None:
+        if economy.people[qid].is_dead():
             return None
         return economy.people[qid].dominator_position
 
@@ -354,7 +354,7 @@ class Dominator (SerializableExEconomy):
 
         q = ((1/2) - (1/4)) * p + (1/4)
         for p in economy.people.values():
-            if p.death is None and p.age >= 18 \
+            if not p.is_dead() and p.age >= 18 \
                and p.district == d.district \
                and random.random() < q:
                 p.political_hating *= 0.5
@@ -528,6 +528,9 @@ class District (Serializable):
         self.prev_budget = []     # 過去10年の予算平均
         self.tmp_power = 1.0      # 国力
 
+        self.priests_share = 0    # 相続で得られた僧の収入
+        self.priests_share_log = []
+
 
 class Nation (Serializable):
     def __init__ (self):
@@ -564,7 +567,7 @@ def initialize_nation (economy):
 
     dpeople = [[] for dnum in range(len(ARGS.population))]
     for p in economy.people.values():
-        if p.death is not None:
+        if p.is_dead():
             continue
         if p.age >= 18 and p.age <= 50:
             dpeople[p.district].append(p)
@@ -627,7 +630,7 @@ def _random_scored_sort (paired_list):
 def _successor_check (economy, person, position, dnum):
     p = person
     pos = position
-    if p.death is not None:
+    if p.is_dead():
         return False
     if not (p.age >= 18 and p.age <= 50):
         return False
@@ -887,7 +890,7 @@ def nominate_successors (economy):
                 while n < 2 * len(l2):
                     n += 1
                     p = random.choice(l2)
-                    if p.death is None and _successor_check(economy, p, ex, exd):
+                    if not p.is_dead() and _successor_check(economy, p, ex, exd):
                         done = p
                         break
                 if done is not None:
