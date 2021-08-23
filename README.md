@@ -1,7 +1,7 @@
-# Buddhistic Philosophical Computer-Simulation of Society
-# 仏教的哲学的社会シミュレーション
+# シミュレーション仏教 - 仏教的哲学的社会シミュレーション
+# Simulation Buddhism - Buddhistic Philosophical Computer-Simulation of Society
 
-<!-- Time-stamp: "2021-08-22T00:47:48Z" -->
+<!-- Time-stamp: "2021-08-22T07:31:59Z" -->
 
 ## このプロジェクトについて
 

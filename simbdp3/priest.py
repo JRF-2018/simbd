@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.1' # Time-stamp: <2021-08-22T02:28:08Z>
+__version__ = '0.0.2' # Time-stamp: <2021-08-23T11:35:33Z>
 ## Language: Japanese/UTF-8
 
 """Simulation Buddhism Prototype No.3 - Priesthood
@@ -83,7 +83,7 @@ def reduce_tombs (economy):
     l = [t for t in economy.tombs.values()
          if (economy.term - t.death_term) > 30 * 12]
 
-    r = len(economy.tombs) - sum(ARGS.population)
+    r = len(economy.tombs) - ARGS.tombs_population
     if r >= len(l):
         n_t = len(l)
         for t in l:
@@ -141,14 +141,16 @@ def update_education (economy):
         pr = len(prs[dnum]) / pp[dnum]
         if pr >= ARGS.priests_rate:
             pr = np_clip(pr, ARGS.priests_rate, ARGS.priests_rate_max)
-            y = interpolate(ARGS.priests_rate, 0.5,
-                            ARGS.priests_rate_max, 0.65, pr)
-            m1 = interpolate(0.5, 0, 0.65, -0.01, y)
+            y = interpolate(ARGS.priests_rate, ARGS.education_goal,
+                            ARGS.priests_rate_max, ARGS.education_goal_max, pr)
+            m1 = interpolate(ARGS.education_goal, 0,
+                             ARGS.education_goal_max, -0.01, y)
         else:
             pr = np_clip(pr, ARGS.priests_rate_min, ARGS.priests_rate)
-            y = interpolate(ARGS.priests_rate, 0.5,
-                            ARGS.priests_rate_min, 0.35, pr)
-            m1 = interpolate(0.5, 0, 0.35, 0.02, y)
+            y = interpolate(ARGS.priests_rate, ARGS.education_goal,
+                            ARGS.priests_rate_min, ARGS.education_goal_min, pr)
+            m1 = interpolate(ARGS.education_goal, 0,
+                             ARGS.education_goal_min, 0.02, y)
         x = edup[dnum]
         m1p = 0
         if x < 0.8:
@@ -164,6 +166,10 @@ def update_education (economy):
         else:
             p.education += random.gauss(m[p.district], 0.1)
         p.education = np_clip(p.education, 0, 1)
+
+    a = np.mean([p.education for p in economy.people.values()
+                 if not p.is_dead()])
+    print("Education Average:", a)
 
 
 def recruit_priests (economy):

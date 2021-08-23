@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.11' # Time-stamp: <2021-08-21T16:35:54Z>
+__version__ = '0.0.12' # Time-stamp: <2021-08-23T09:10:30Z>
 ## Language: Japanese/UTF-8
 
 """支配と災害のシミュレーション"""
@@ -133,8 +133,10 @@ ARGS.not_challenging_beta = 1.0
 # 成長するときの増分
 ARGS.challenging_growth = 0.01
 # 次の蛮族の侵入までの平均期。
-ARGS.invasion_average_term = 15.0 * 12
-#ARGS.invasion_average_term = 5.0 * 12
+ARGS.invasion_average_term_min = 15.0 * 12
+ARGS.invasion_average_term_max = 15.0 * 12
+#ARGS.invasion_average_term_min = 5.0 * 12
+#ARGS.invasion_average_term_max = 5.0 * 12
 # 洪水の頻度の目安
 #ARGS.flood_rate = 1.0 / 7
 ARGS.flood_rate = 1.0 / 14
@@ -802,7 +804,7 @@ class Dominator (SerializableExEconomy):
         if fr < 0.5:
             p = 0.8 * (fr / 0.5)
         else:
-            p = 0.8 + ((fr - 0.5) / 0.5)
+            p = 0.8 + 0.2 * ((fr - 0.5) / 0.5)
         return 0.70 * d.combat_tactics + 0.15 * d.people_trust \
             + 0.15 * p
 
@@ -1820,7 +1822,11 @@ class Invasion (Calamity):        # 「蛮族の侵入」
         ci = cls
         if [c for c in economy.calamities if c.kind == 'invasion']:
             return
-        if not (random.random() < 1 / ARGS.invasion_average_term):
+        pp = len([p for p in economy.people.values() if p.death is None])
+        x = np_clip(pp / sum(ARGS.population), 0.5, 1.0)
+        y = interpolate(0.5, ARGS.invasion_average_term_max,
+                        1.0, ARGS.invasion_average_term_min, x)
+        if not (random.random() < 1 / y):
             return
         terms = random.uniform(1, 2 * 12)
         l1 = list(range(len(ARGS.population)))
@@ -2267,6 +2273,8 @@ class EconomyPlotBT (EconomyPlot0):
                 bins=ARGS.bins)
         mb = 0
         md = 0
+        n_m = 0
+        n_f = 0
         dp = [0] * len(ARGS.population)
         for p in economy.people.values():
             if p.death is not None and p.death.term == economy.term:
@@ -2274,10 +2282,14 @@ class EconomyPlotBT (EconomyPlot0):
             if p.birth_term == economy.term:
                 mb += 1
             if p.death is None:
+                if p.sex == 'M':
+                    n_m += 1
+                else:
+                    n_f += 1
                 dp[p.district] += 1
         print("New Birth:", mb, "New Death:", md,
               "WantChildMag:", economy.want_child_mag)
-        print("District Population:", dp)
+        print("District Population:", dp, "Male:Female:", n_m, ":", n_f)
 
     def view_children (self, ax, economy):
         x = []
@@ -2460,6 +2472,13 @@ def np_random_choice (a, size=None, replace=True, p=None):
     # p2 = p + ((np.max(p) - np.min(p)) / 2) * np.random.normal(size=len(p))
     # l = sorted(list(zip(a, p2)), key=lambda x: x[1], reverse=True)[0:size]
     # return [x for x, q in l]
+
+def interpolate (x1, y1, x2, y2, x):
+    return ((y2 - y1) / (x2 - x1)) * (x - x1) + y1
+
+def interpolate_with_clip (x1, y1, x2, y2, x):
+    x = np_clip(x, x1, x2)
+    return ((y2 - y1) / (x2 - x1)) * (x - x1) + y1
 
 def half_normal_rand (mu, sigma, size=None): # 半正規分布
     z = np.random.normal(0, sigma, size=size)
@@ -3067,7 +3086,7 @@ def calc_nation_parameters (economy):
         if ed < 0.5:
             pow4 = 0.8 * (ed / 0.5)
         else:
-            pow4 = 0.8 + ((ed - 0.5) / 0.5)
+            pow4 = 0.8 + 0.2 * ((ed - 0.5) / 0.5)
         dist.tmp_power = (pow1 + pow2 + pow3 + pow4) / 4
 
     print("National Power:", [dist.tmp_power for dist in nation.districts])

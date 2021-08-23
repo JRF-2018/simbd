@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.1' # Time-stamp: <2021-08-21T18:24:45Z>
+__version__ = '0.0.2' # Time-stamp: <2021-08-23T08:39:10Z>
 ## Language: Japanese/UTF-8
 
 """Simulation Buddhism Prototype No.3 - Main
@@ -97,6 +97,8 @@ ARGS.view_4 = 'pregnancy'
 # 各地域の人口
 #ARGS.population = [10, 10, 5]
 ARGS.population = [10000, 10000, 5000]
+# 墓の数
+ARGS.tombs_population = 25000
 # 新生児誕生の最小値
 ARGS.min_birth = None
 # 経済の更新間隔
@@ -277,8 +279,10 @@ ARGS.not_challenging_beta = 1.0
 # 成長するときの増分
 ARGS.challenging_growth = 0.01
 # 次の蛮族の侵入までの平均期。
-ARGS.invasion_average_term = 15.0 * 12
-#ARGS.invasion_average_term = 5.0 * 12
+ARGS.invasion_average_term_min = 15.0 * 12
+ARGS.invasion_average_term_max = 15.0 * 12
+#ARGS.invasion_average_term_min = 5.0 * 12
+#ARGS.invasion_average_term_max = 5.0 * 12
 # 洪水の頻度の目安
 #ARGS.flood_rate = 1.0 / 7
 ARGS.flood_rate = (1.0 / 14) * (1/4)
@@ -353,6 +357,12 @@ ARGS.jail_term_min = 1
 # カルマの自然減少の係数
 ARGS.karma_decay_1 = 0.01
 ARGS.karma_decay_2 = 1.8
+# 僧の人口により変化する教化の目標値
+ARGS.education_goal = 0.5
+ARGS.education_goal_max = 0.65
+ARGS.education_goal_min = 0.35
+# 犯罪率の計算の際に現世の教化を死者の怨念に対してどれだけ重視するか。
+ARGS.education_against_hating_rate = 0.3
 
 
 SAVED_ECONOMY = None

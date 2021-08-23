@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.7' # Time-stamp: <2021-08-16T23:21:26Z>
+__version__ = '0.0.9' # Time-stamp: <2021-08-22T07:50:51Z>
 ## Language: Japanese/UTF-8
 
 """Simulation Buddhism Prototype No.2 - Common
@@ -116,3 +116,10 @@ def np_random_choice (a, size=None, replace=True, p=None):
     # return [x for x, q in l]
 
 
+def interpolate (x1, y1, x2, y2, x):
+    return ((y2 - y1) / (x2 - x1)) * (x - x1) + y1
+
+
+def interpolate_with_clip (x1, y1, x2, y2, x):
+    x = np_clip(x, x1, x2)
+    return ((y2 - y1) / (x2 - x1)) * (x - x1) + y1

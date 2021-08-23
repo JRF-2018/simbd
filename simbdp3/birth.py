@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.1' # Time-stamp: <2021-08-20T16:59:14Z>
+__version__ = '0.0.2' # Time-stamp: <2021-08-23T07:47:40Z>
 ## Language: Japanese/UTF-8
 
 """Simulation Buddhism Prototype No.3 - Birth
@@ -350,6 +350,8 @@ class EconomyPlotBT (EconomyPlot0):
                 bins=ARGS.bins)
         mb = 0
         md = 0
+        n_m = 0
+        n_f = 0
         dp = [0] * len(ARGS.population)
         for p in economy.people.values():
             if p.is_dead() and p.death.term == economy.term:
@@ -357,10 +359,14 @@ class EconomyPlotBT (EconomyPlot0):
             if p.birth_term == economy.term:
                 mb += 1
             if not p.is_dead():
+                if p.sex == 'M':
+                    n_m += 1
+                else:
+                    n_f += 1
                 dp[p.district] += 1
         print("New Birth:", mb, "New Death:", md,
               "WantChildMag:", economy.want_child_mag)
-        print("District Population:", dp)
+        print("District Population:", dp, "Male:Female:", n_m, ":", n_f)
 
     def view_children (self, ax, economy):
         x = []

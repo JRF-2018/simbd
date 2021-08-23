@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.1' # Time-stamp: <2021-08-19T23:04:58Z>
+__version__ = '0.0.2' # Time-stamp: <2021-08-23T09:07:37Z>
 ## Language: Japanese/UTF-8
 
 """Simulation Buddhism Prototype No.3 - Domination
@@ -503,7 +503,7 @@ class Dominator (SerializableExEconomy):
         if fr < 0.5:
             p = 0.8 * (fr / 0.5)
         else:
-            p = 0.8 + ((fr - 0.5) / 0.5)
+            p = 0.8 + 0.2 * ((fr - 0.5) / 0.5)
         return 0.70 * d.combat_tactics + 0.15 * d.people_trust \
             + 0.15 * p
 

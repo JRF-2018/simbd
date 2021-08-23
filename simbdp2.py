@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.8' # Time-stamp: <2021-08-21T16:37:08Z>
+__version__ = '0.0.9' # Time-stamp: <2021-08-22T07:48:14Z>
 ## Language: Japanese/UTF-8
 
 """Simulation Buddhism Prototype No.2 - Main
@@ -272,8 +272,10 @@ ARGS.not_challenging_beta = 1.0
 # 成長するときの増分
 ARGS.challenging_growth = 0.01
 # 次の蛮族の侵入までの平均期。
-ARGS.invasion_average_term = 15.0 * 12
-#ARGS.invasion_average_term = 5.0 * 12
+ARGS.invasion_average_term_min = 15.0 * 12
+ARGS.invasion_average_term_max = 15.0 * 12
+#ARGS.invasion_average_term_min = 5.0 * 12
+#ARGS.invasion_average_term_max = 5.0 * 12
 # 洪水の頻度の目安
 #ARGS.flood_rate = 1.0 / 7
 ARGS.flood_rate = (1.0 / 14) * (1/4)

@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.1' # Time-stamp: <2021-08-22T02:38:17Z>
+__version__ = '0.0.2' # Time-stamp: <2021-08-23T08:04:31Z>
 ## Language: Japanese/UTF-8
 
 """Simulation Buddhism Prototype No.3 - Crime
@@ -260,14 +260,21 @@ def calc_crime_params (economy):
     if l:
         real_hating = np.mean(l)
 
-    x = np_clip(virtual_hating, 0.2, 0.5)
-    minor_offence_rate = interpolate(0.2, ARGS.minor_offence_rate_min,
-                                     0.5, ARGS.minor_offence_rate_max, x)
-    vicious_crime_rate = interpolate(0.2, ARGS.vicious_crime_rate_min,
-                                     0.5, ARGS.vicious_crime_rate_max, x)
+    average_education = np.mean([p.education for p in economy.people.values()
+                                 if not p.is_dead()])
+    x1 = np_clip(virtual_hating, 0.2, 0.5)
+    x2 = np_clip(average_education, 0.4, 0.75)
+    x = ((1 - ARGS.education_against_hating_rate)
+         * interpolate(0.2, 0.0, 0.5, 1.0, x1)) \
+         + (ARGS.education_against_hating_rate
+            * interpolate(0.4, 1.0, 0.75, 0.0, x2))
+    minor_offence_rate = interpolate(0.0, ARGS.minor_offence_rate_min,
+                                     1.0, ARGS.minor_offence_rate_max, x)
+    vicious_crime_rate = interpolate(0.0, ARGS.vicious_crime_rate_min,
+                                     1.0, ARGS.vicious_crime_rate_max, x)
     y = np_clip(real_hating, 0.3, 0.7)
-    jail_num = (interpolate(0.2, ARGS.jail_num_base_min,
-                            0.5, ARGS.jail_num_base_max, x)
+    jail_num = (interpolate(0.0, ARGS.jail_num_base_min,
+                            1.0, ARGS.jail_num_base_max, x)
                 * interpolate(0.3, ARGS.jail_num_sub_min,
                               0.7, ARGS.jail_num_sub_max, y))
     jail_num = math.ceil(jail_num)
@@ -303,11 +310,13 @@ def update_minor_offences (economy, minor_offence_rate,
     l3 = np_random_choice(l1, n1, replace=False, p=l2/np.sum(l2))
     n_o = len(l3)
     l4 = []
+    a_k = 0.0
     for p in l3:
         if p.karma > 0.3 and random.random() < 0.5:
             k = random.uniform(0.1, p.karma)
         else:
             k = random.uniform(0.1, 0.3)
+        a_k += k
         p.karma = max([p.karma, k]) + 0.1 * min([p.karma, k])
         p.karma = np_clip(p.karma, 0.0, 1.0)
         if random.random() < minor_offence_arrest_rate:
@@ -316,7 +325,7 @@ def update_minor_offences (economy, minor_offence_rate,
             x = ((k - 0.1) / 0.2) + random.gauss(0, 0.5)
             x = np_clip(x, 0.0, 1.0)
             p.prop += x * ARGS.minor_offence_revenue
-    print("Minor Offences:", n_o, len(l4))
+    print("Minor Offences:", n_o, len(l4), a_k / n_o if n_o else 0)
     return l4
 
 
@@ -336,7 +345,6 @@ def update_vicious_crimes (economy, vicious_crime_rate,
     l2 = np.array(l2).astype(np.longdouble)
     l3 = np_random_choice(l1, n1, replace=False, p=l2/np.sum(l2))
     criminals = l3
-    n_v = len(l3)
     l1 = []
     l2 = []
     for p in economy.people.values():
@@ -348,6 +356,10 @@ def update_vicious_crimes (economy, vicious_crime_rate,
     l2 = np.array(l2).astype(np.longdouble)
 
     l4 = []
+    n_c = 0
+    n_v = 0
+    n_i = 0
+    a_k = 0.0
     for p in criminals:
         if p.is_dead():
             continue
@@ -369,6 +381,7 @@ def update_vicious_crimes (economy, vicious_crime_rate,
         l5 = []
         if k > 0.95:
             l5.append(victim)
+            n_v += 1
             sid = victim.supported
             if sid is None:
                 sid = victim.id
@@ -384,12 +397,15 @@ def update_vicious_crimes (economy, vicious_crime_rate,
                         continue
                     if random.random() < math.sqrt(k):
                         l5.append(q)
+                        n_v += 1
                     elif random.random() < math.sqrt(k):
                         q.injured = np_clip(q.injured + random.random(),
                                             0, 1.0)
+                        n_i += 1
                 s.supporting = s.supporting_non_nil()
         elif k > 0.8:
             l5.append(victim)
+            n_v += 1
             sid = victim.supported
             if sid is None:
                 sid = victim.id
@@ -406,11 +422,13 @@ def update_vicious_crimes (economy, vicious_crime_rate,
                     if random.random() < math.sqrt(k):
                         q.injured = np_clip(q.injured + random.random(),
                                             0, 1.0)
+                        n_i += 1
         else:
             q = victim
             if random.random() < math.sqrt(k):
                 q.injured = np_clip(q.injured + random.random(),
                                     0, 1.0)
+                n_i += 1
             sid = victim.supported
             if sid is None:
                 sid = victim.id
@@ -427,12 +445,15 @@ def update_vicious_crimes (economy, vicious_crime_rate,
                     if random.random() < math.sqrt(k):
                         q.injured = np_clip(q.injured + random.random(),
                                             0, 1.0)
+                        n_i += 1
         for qid in vfamily:
             if economy.is_living(qid):
                 q = economy.people[qid]
                 if p.id not in q.hating:
                     q.hating[p.id] = 0
                 q.hating[p.id] = np_clip(q.hating[p.id] + k, 0, 1.0)
+        n_c += 1
+        a_k += k
         if l5:
             economy.die(l5)
         if random.random() < vicious_crime_arrest_rate:
@@ -440,7 +461,7 @@ def update_vicious_crimes (economy, vicious_crime_rate,
         else:
             p.prop += random.random() * ARGS.vicious_crime_revenue
 
-    print("Vicious Crimes:", n_v, len(l4))
+    print("Vicious Crimes:", n_c, len(l4), n_v, n_i, a_k / n_c if n_c else 0)
     return l4
 
 

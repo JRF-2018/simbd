@@ -1,8 +1,8 @@
 #!/usr/bin/python3
-__version__ = '0.0.8' # Time-stamp: <2021-08-21T16:36:35Z>
+__version__ = '0.0.9' # Time-stamp: <2021-08-23T09:08:57Z>
 ## Language: Japanese/UTF-8
 
-"""Simulation Buddhism Prototype No.2 - Domination
+"""Simulation Buddhism Prototype No.2 - Calamity
 
 災害関連
 """
@@ -36,7 +36,7 @@ import bisect
 
 import simbdp2.base as base
 from simbdp2.base import ARGS, SerializableExEconomy
-from simbdp2.common import np_clip, np_random_choice
+from simbdp2.common import np_clip, np_random_choice, interpolate
 
 
 class Calamity (SerializableExEconomy):        # 「災害」＝「惨禍」
@@ -1008,7 +1008,11 @@ class Invasion (Calamity):        # 「蛮族の侵入」
         ci = cls
         if [c for c in economy.calamities if c.kind == 'invasion']:
             return
-        if not (random.random() < 1 / ARGS.invasion_average_term):
+        pp = len([p for p in economy.people.values() if not p.death is None])
+        x = np_clip(pp / sum(ARGS.population), 0.5, 1.0)
+        y = interpolate(0.5, ARGS.invasion_average_term_max,
+                        1.0, ARGS.invasion_average_term_min, x)
+        if not (random.random() < 1 / y):
             return
         terms = random.uniform(1, 2 * 12)
         l1 = list(range(len(ARGS.population)))
@@ -1081,7 +1085,7 @@ def calc_nation_parameters (economy):
         if ed < 0.5:
             pow4 = 0.8 * (ed / 0.5)
         else:
-            pow4 = 0.8 + ((ed - 0.5) / 0.5)
+            pow4 = 0.8 + 0.2 * ((ed - 0.5) / 0.5)
         dist.tmp_power = (pow1 + pow2 + pow3 + pow4) / 4
 
     print("National Power:", [dist.tmp_power for dist in nation.districts])
