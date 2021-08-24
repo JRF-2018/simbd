@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.2' # Time-stamp: <2021-08-23T11:35:33Z>
+__version__ = '0.0.3' # Time-stamp: <2021-08-24T02:59:45Z>
 ## Language: Japanese/UTF-8
 
 """Simulation Buddhism Prototype No.3 - Priesthood
@@ -137,24 +137,33 @@ def update_education (economy):
     edup = [np.mean([p.education for x in l]) for l in prs]
     m = []
     mp = []
+    gls = []
     for dnum, dist in enumerate(economy.nation.districts):
         pr = len(prs[dnum]) / pp[dnum]
         if pr >= ARGS.priests_rate:
             pr = np_clip(pr, ARGS.priests_rate, ARGS.priests_rate_max)
-            y = interpolate(ARGS.priests_rate, ARGS.education_goal,
-                            ARGS.priests_rate_max, ARGS.education_goal_max, pr)
-            m1 = interpolate(ARGS.education_goal, 0,
-                             ARGS.education_goal_max, -0.01, y)
+            gl = interpolate(ARGS.priests_rate, ARGS.education_goal,
+                             ARGS.priests_rate_max, ARGS.education_goal_max,
+                             pr)
         else:
             pr = np_clip(pr, ARGS.priests_rate_min, ARGS.priests_rate)
-            y = interpolate(ARGS.priests_rate, ARGS.education_goal,
-                            ARGS.priests_rate_min, ARGS.education_goal_min, pr)
-            m1 = interpolate(ARGS.education_goal, 0,
-                             ARGS.education_goal_min, 0.02, y)
+            gl = interpolate(ARGS.priests_rate, ARGS.education_goal,
+                             ARGS.priests_rate_min, ARGS.education_goal_min,
+                             pr)
+        gls.append(gl)
+        x = edu[dnum]
+        np_clip(x, gl - 0.2, gl + 0.2)
+        if x >= gl:
+            m1 = interpolate(gl, 0, gl + 0.2, -0.01, x)
+        else:
+            m1 = interpolate(gl, 0, gl - 0.2, 0.02, x)
+
+        gl = 0.8
         x = edup[dnum]
+        np_clip(x, gl - 0.4, gl + 0.4)
         m1p = 0
-        if x < 0.8:
-            m1p = interpolate(0, 0.05, 0.8, 0, x)
+        if x < gl:
+            m1p = interpolate(gl, 0, gl - 0.4, 0.03, x)
         m.append(m1)
         mp.append(m1p)
     
@@ -169,6 +178,7 @@ def update_education (economy):
 
     a = np.mean([p.education for p in economy.people.values()
                  if not p.is_dead()])
+    print("Education Goal:", gls)
     print("Education Average:", a)
 
 
@@ -204,18 +214,18 @@ def recruit_priests (economy):
             m1 = 1
         if m2 == 0:
             m2 = 1
-        q = np_clip((m1 - m2) / m2, -0.2, 0.2)
+        q = np_clip((m1 - m2) / m2, -0.8, 0.8)
         if q >= 0:
             q1 = interpolate(0, ARGS.priests_rate,
-                             0.2, ARGS.priests_rate_max, q)
+                             0.8, ARGS.priests_rate_max, q)
         else:
             q1 = interpolate(0, ARGS.priests_rate,
-                             -0.2, ARGS.priests_rate_min, q)
+                             -0.8, ARGS.priests_rate_min, q)
         n = math.ceil(len(pp[dnum]) * q1)
         if len(prs[dnum]) == n:
             print("Recruit Priests", dnum, ": 0")
         elif len(prs[dnum]) > n:
-            n1 = len(prs[dnum]) - n
+            n1 = math.ceil((len(prs[dnum]) - n) / 3)
             l1 = pprs[dnum]
             l2 = []
             for p in l1:
@@ -229,7 +239,7 @@ def recruit_priests (economy):
                 p.renounce_priesthood()
             print("Renouncing Priests", dnum, ":", n1, len(prs[dnum]) - n)
         else: # len(prs[dnum]) < n:
-            n1 = n - len(prs[dnum])
+            n1 = math.ceil((n - len(prs[dnum])) / 3)
             l1 = nprs[dnum]
             l2 = []
             for p in l1:

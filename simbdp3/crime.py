@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.2' # Time-stamp: <2021-08-23T08:04:31Z>
+__version__ = '0.0.3' # Time-stamp: <2021-08-24T02:59:38Z>
 ## Language: Japanese/UTF-8
 
 """Simulation Buddhism Prototype No.3 - Crime
@@ -379,6 +379,7 @@ def update_vicious_crimes (economy, vicious_crime_rate,
         p.karma = max([p.karma, k]) + 0.1 * min([p.karma, k])
         p.karma = np_clip(p.karma, 0.0, 1.0)
         l5 = []
+        li = []
         if k > 0.95:
             l5.append(victim)
             n_v += 1
@@ -399,8 +400,7 @@ def update_vicious_crimes (economy, vicious_crime_rate,
                         l5.append(q)
                         n_v += 1
                     elif random.random() < math.sqrt(k):
-                        q.injured = np_clip(q.injured + random.random(),
-                                            0, 1.0)
+                        li.append(q)
                         n_i += 1
                 s.supporting = s.supporting_non_nil()
         elif k > 0.8:
@@ -420,14 +420,12 @@ def update_vicious_crimes (economy, vicious_crime_rate,
                     if q.is_dead() or q.in_jail():
                         continue
                     if random.random() < math.sqrt(k):
-                        q.injured = np_clip(q.injured + random.random(),
-                                            0, 1.0)
+                        li.append(q)
                         n_i += 1
         else:
             q = victim
             if random.random() < math.sqrt(k):
-                q.injured = np_clip(q.injured + random.random(),
-                                    0, 1.0)
+                li.append(q)
                 n_i += 1
             sid = victim.supported
             if sid is None:
@@ -443,8 +441,7 @@ def update_vicious_crimes (economy, vicious_crime_rate,
                     if q.is_dead() or q.in_jail():
                         continue
                     if random.random() < math.sqrt(k):
-                        q.injured = np_clip(q.injured + random.random(),
-                                            0, 1.0)
+                        li.append(q)
                         n_i += 1
         for qid in vfamily:
             if economy.is_living(qid):
@@ -454,6 +451,8 @@ def update_vicious_crimes (economy, vicious_crime_rate,
                 q.hating[p.id] = np_clip(q.hating[p.id] + k, 0, 1.0)
         n_c += 1
         a_k += k
+        if li:
+            economy.injure(li, 0.5, 0.5)
         if l5:
             economy.die(l5)
         if random.random() < vicious_crime_arrest_rate:

@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.12' # Time-stamp: <2021-08-23T09:10:30Z>
+__version__ = '0.0.13' # Time-stamp: <2021-08-23T18:09:22Z>
 ## Language: Japanese/UTF-8
 
 """支配と災害のシミュレーション"""
@@ -658,23 +658,30 @@ class Dominator (SerializableExEconomy):
             checked.update(s2)
             distance += 1
             s = s2
-        k_id = economy.nation.king.id
+        k_id = None
+        if economy.nation.king is None:
+            k_id = None
+        else:
+            k_id = economy.nation.king.id
         k_distance = ARGS.max_family_distance + 1
-        if k_id in r:
+        if k_id is not None and k_id in r:
             k_distance = r[k_id]
-        g_id = economy.nation.districts[p.district].governor.id
+        if economy.nation.districts[p.district].governor is None:
+            g_id = None
+        else:
+            g_id = economy.nation.districts[p.district].governor.id
         g_distance = ARGS.max_family_distance + 1
-        if g_id in r:
+        if g_id is not None and g_id in r:
             g_distance = r[g_id]
 
         hk = 0
         hg = 0
         for q_id, d in r.items():
-            if d < k_distance:
+            if k_id is not None and d < k_distance:
                 q = economy.get_person(q_id)
                 if q is not None and k_id in q.hating and q.hating[k_id] > hk:
                     hk = q.hating[k_id]
-            if d < g_distance:
+            if g_id is not None and d < g_distance:
                 q =  economy.get_person(q_id)
                 if q is not None and g_id in q.hating and q.hating[g_id] > hg:
                     hg = q.hating[g_id]
@@ -760,6 +767,14 @@ class Dominator (SerializableExEconomy):
                         getattr(d, n) + (ARGS.challenging_growth * v / k),
                         0, 1))
         return x
+
+    def soothed_hating_to_king (self):
+        d = self
+        return np_clip(d.hating_to_king - d.soothing_by_king, 0, 1)
+
+    def soothed_hating_to_governor (self):
+        d = self
+        return np_clip(d.hating_to_governor - d.soothing_by_governor, 0, 1)
 
     def general_ability (self):
         d = self
@@ -2115,21 +2130,21 @@ class EconomyDM (Economy0):
 
         a_king = f(nation.king)
         vab = [f(d) for d in nation.vassals]
-        vht = np.mean([d.hating_to_king for d in nation.vassals])
+        vht = np.mean([d.soothed_hating_to_king() for d in nation.vassals])
         a_vassals = (0.5 + 0.5 * (1 - vht)) \
             * ((1/3) * max(vab) + (2/3) * np.mean(vab))
-        a_governor = (0.75 + 0.25 * (1 - dist.governor.hating_to_king)) \
+        a_governor = (0.75 + 0.25 * (1 - dist.governor.soothed_hating_to_king())) \
             * f(dist.governor)
         a_cavalier = f(d)
-        r_king = 0.5 + 0.5 * (1 - d.hating_to_king)
+        r_king = 0.5 + 0.5 * (1 - d.soothed_hating_to_king())
         r_vassals = 3
-        r_governor = 0.5 + 0.5 * (1 - d.hating_to_governor)
+        r_governor = 0.5 + 0.5 * (1 - d.soothed_hating_to_governor())
         r_cavalier = 5
         p = (r_king * a_king + r_vassals * a_vassals \
             + r_governor * a_governor + r_cavalier * a_cavalier) \
             / (r_king + r_vassals + r_governor + r_cavalier)
         p *= 0.75 + 0.25 \
-            * (1 - max([d.hating_to_king, d.hating_to_governor]))
+            * (1 - max([d.soothed_hating_to_king(), d.soothed_hating_to_governor()]))
         p *= dist.tmp_power
 
         return p
@@ -3623,6 +3638,21 @@ def nominate_successors (economy):
                     l.append((pos, dnum, pos2, pid))
             nation.nomination = l
         p = done
+        if ex == 'king':
+            cs = set()
+            if p.dominator_position == 'governor' and ex == 'king':
+                cs.update([d.id for d
+                           in nation.districts[p.district].cavaliers])
+            for d in nation.dominators():
+                if d.id in cs:
+                    d.soothing_by_king = d.soothing_by_governor
+                    d.soothing_by_governor = 0
+                else:
+                    d.soothing_by_king = 0
+        elif ex == 'governor':
+            for d in nation.dominators():
+                if d.district == exd:
+                    d.soothing_by_governor = 0
         if p.dominator_position is not None:
             p.get_dominator().resign()
         sid = p.supported
@@ -3632,6 +3662,16 @@ def nominate_successors (economy):
             economy.people[qid].change_district(exd)
         economy.new_dominator(ex, p, adder=adder)
         new_nomination.append((ex, exd, p.id))
+        d = p.get_dominator()
+        d.update_hating()
+        if ex == 'cavalier':
+            d.soothing_by_governor += \
+                np_clip(d.hating_to_governor - d.soothing_by_governor,
+                        0, 1) / 2
+        else:
+            d.soothing_by_king += \
+                np_clip(d.hating_to_king - d.soothing_by_king,
+                        0, 1) / 2
 
     for pos, dnum, pos2, pid in nation.nomination:
         p = economy.get_person(pid)
