@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.9' # Time-stamp: <2021-08-16T23:11:14Z>
+__version__ = '0.0.11' # Time-stamp: <2021-08-30T16:20:59Z>
 ## Language: Japanese/UTF-8
 
 """Simulation Buddhism Prototype No.1 - Miscellaneous
@@ -151,3 +151,24 @@ def update_eagerness (economy):
             p.eagerness = random.random()
 
 
+def print_population (economy):
+    print("\nPopulation:...", flush=True)
+    mb = 0
+    md = 0
+    n_m = 0
+    n_f = 0
+    dp = [0] * len(ARGS.population)
+    for p in economy.people.values():
+        if p.death is not None and p.death.term == economy.term:
+            md += 1
+        if p.birth_term == economy.term:
+            mb += 1
+        if p.death is None:
+            if p.sex == 'M':
+                n_m += 1
+            else:
+                n_f += 1
+            dp[p.district] += 1
+    print("New Birth:", mb, "New Death:", md,
+          "WantChildMag:", economy.want_child_mag)
+    print("District Population:", dp, "Male:Female:", n_m, ":", n_f)

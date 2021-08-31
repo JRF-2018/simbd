@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.3' # Time-stamp: <2021-08-23T18:08:11Z>
+__version__ = '0.0.4' # Time-stamp: <2021-08-24T03:09:25Z>
 ## Language: Japanese/UTF-8
 
 """Simulation Buddhism Prototype No.3 - Domination
@@ -958,6 +958,9 @@ def nominate_successors (economy):
         if ex == 'cavalier':
             d.soothing_by_governor += \
                 np_clip(d.hating_to_governor - d.soothing_by_governor,
+                        0, 1) / 2
+            d.soothing_by_king += \
+                np_clip(d.hating_to_king - d.soothing_by_king,
                         0, 1) / 2
         else:
             d.soothing_by_king += \

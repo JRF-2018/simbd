@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.3' # Time-stamp: <2021-08-23T17:31:06Z>
+__version__ = '0.0.4' # Time-stamp: <2021-08-30T16:13:14Z>
 ## Language: Japanese/UTF-8
 
 """Simulation Buddhism Prototype No.3 - Main
@@ -52,12 +52,12 @@ from simbdp3.marriage import PersonMA, EconomyMA, EconomyPlotMA,\
 from simbdp3.support import PersonSUP, update_support, check_support_consistent
 from simbdp3.moving import PersonMV, calc_moving_matrix
 from simbdp3.domination import PersonDM, EconomyDM, update_dominators
-from simbdp3.calamity import update_calamities
+from simbdp3.calamity import update_calamities, Invasion
 from simbdp3.crime import PersonCR, update_crimes
 from simbdp3.priest import PersonPR, update_priests, \
     update_education, update_tombs
 from simbdp3.misc import update_labor, update_eagerness,\
-    calc_tmp_labor, update_injured
+    calc_tmp_labor, update_injured, update_ambition, print_population
 from simbdp3.inherit import recalc_inheritance_share
 
 
@@ -73,6 +73,8 @@ ARGS.save = False
 ARGS.pickle = 'simbdp3.pickle'
 # 途中エラーなどがある場合に備えてセーブする間隔
 ARGS.save_period = 120
+# ロード時にランダムシードをロードしない場合 True
+ARGS.change_random_seed = False
 # エラー時にデバッガを起動
 ARGS.debug_on_error = False
 # デバッガを起動する期
@@ -271,7 +273,7 @@ ARGS.calamity_damage_threshold = 10.0
 #ARGS.challengeable_mag = 10.0
 ARGS.challengeable_mag = 1.0
 # 寺院を立てる確率
-ARGS.construct_temple_rate = 0.001
+ARGS.construct_temple_rate = 0.02
 # 成長機会があるときのベータ関数のパラメータ
 ARGS.challenging_beta = 0.5
 # 成長機会がないときのベータ関数のパラメータ
@@ -283,6 +285,8 @@ ARGS.invasion_average_term_min = 15.0 * 12
 ARGS.invasion_average_term_max = 15.0 * 12
 #ARGS.invasion_average_term_min = 5.0 * 12
 #ARGS.invasion_average_term_max = 5.0 * 12
+# 蛮族の侵入の被害の大きさ。
+ARGS.invasion_mag = 2.0
 # 洪水の頻度の目安
 #ARGS.flood_rate = 1.0 / 7
 ARGS.flood_rate = (1.0 / 14) * (1/4)
@@ -363,6 +367,10 @@ ARGS.education_goal_max = 0.65
 ARGS.education_goal_min = 0.35
 # 犯罪率の計算の際に現世の教化を死者の怨念に対してどれだけ重視するか。
 ARGS.education_against_hating_rate = 0.3
+# 上昇指向を変化させるようにする。
+ARGS.change_ambition = False
+# 上昇指向を変化させる場合の目標値
+ARGS.ambition_goal = 0.5
 
 
 SAVED_ECONOMY = None
@@ -376,8 +384,12 @@ def parse_args (view_options=['none']):
     parser = argparse.ArgumentParser()
 
     parser.add_argument("-L", "--load", action="store_true")
+    parser.add_argument("-L-", "--no-load", action="store_false", dest="load")
     parser.add_argument("-S", "--save", action="store_true")
+    parser.add_argument("-S-", "--no-save", action="store_false", dest="save")
     parser.add_argument("-d", "--debug-on-error", action="store_true")
+    parser.add_argument("-d-", "--no-debug-on-error", action="store_false",
+                        dest="debug_on_error")
     parser.add_argument("--debug-term", type=int)
     parser.add_argument("-t", "--trials", type=int)
     parser.add_argument("-p", "--population", type=str)
@@ -394,8 +406,12 @@ def parse_args (view_options=['none']):
     for p, v in vars(ARGS).items():
         if p not in specials:
             p2 = '--' + p.replace('_', '-')
-            if v is False:
+            np2 = '--no-' + p.replace('_', '-')
+            if np2.startswith('--no-no-'):
+                np2 = np2.replace('--no-no-', '--with-', 1)
+            if v is False or v is True:
                 parser.add_argument(p2, action="store_true")
+                parser.add_argument(np2, action="store_false", dest=p)
             elif v is None:
                 parser.add_argument(p2, type=float)
             else:
@@ -438,6 +454,10 @@ def parse_args (view_options=['none']):
                 y, z = x.split(':')
                 r[y] = float(z)
         ARGS.damage_scale_filter = r
+
+
+def update_classes ():
+    Invasion.damage_unit *= ARGS.invasion_mag
 
 
 class Person (PersonEC, PersonBT, PersonDT, PersonAD, PersonMA, PersonSUP, PersonMV, PersonDM, PersonCR, PersonPR):
@@ -499,6 +519,7 @@ def step (economy):
     calc_moving_matrix(economy)
     update_eagerness(economy)
     update_education(economy)
+    update_ambition(economy)
     update_labor(economy)
     update_fertility(economy)
     update_injured(economy)
@@ -513,6 +534,7 @@ def step (economy):
     calc_tmp_labor(economy)
     update_support(economy)
     update_tombs(economy)
+    print_population(economy)
 
     for p in economy.people.values():
         for n in p.mlog:
@@ -554,8 +576,9 @@ def main (eplot):
         eplot.plot(economy)
         if not ARGS.no_view:
             plt.pause(1.0)
-        random.setstate(economy.rand_state)
-        np.random.set_state(economy.rand_state_np)
+        if not ARGS.change_random_seed:
+            random.setstate(economy.rand_state)
+            np.random.set_state(economy.rand_state_np)
         economy.rand_state_np = None
         economy.rand_state = None
 
@@ -596,6 +619,7 @@ def main (eplot):
 if __name__ == '__main__':
     eplot = EconomyPlot()
     parse_args(view_options=['none'] + list(eplot.options.keys()))
+    update_classes()
     signal.signal(signal.SIGINT, sigint_handler)
     if ARGS.debug_on_error:
         sys.excepthook = debug_hook

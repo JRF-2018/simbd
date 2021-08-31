@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.3' # Time-stamp: <2021-08-24T02:59:45Z>
+__version__ = '0.0.4' # Time-stamp: <2021-08-28T09:27:09Z>
 ## Language: Japanese/UTF-8
 
 """Simulation Buddhism Prototype No.3 - Priesthood
@@ -200,6 +200,8 @@ def recruit_priests (economy):
              and not p.in_jail():
             nprs[p.district].append(p)
 
+    n_p = []
+    n_p2 = []
     for dnum, dist in enumerate(economy.nation.districts):
         dist.priests_share_log.append(dist.priests_share)
         dist.priests_share = 0
@@ -223,7 +225,8 @@ def recruit_priests (economy):
                              -0.8, ARGS.priests_rate_min, q)
         n = math.ceil(len(pp[dnum]) * q1)
         if len(prs[dnum]) == n:
-            print("Recruit Priests", dnum, ": 0")
+            n_p.append(0)
+            n_p2.append(0)
         elif len(prs[dnum]) > n:
             n1 = math.ceil((len(prs[dnum]) - n) / 3)
             l1 = pprs[dnum]
@@ -237,7 +240,8 @@ def recruit_priests (economy):
                                   p=l2/np.sum(l2))
             for p in l3:
                 p.renounce_priesthood()
-            print("Renouncing Priests", dnum, ":", n1, len(prs[dnum]) - n)
+            n_p.append(-n1)
+            n_p2.append(- (len(prs[dnum]) - n))
         else: # len(prs[dnum]) < n:
             n1 = math.ceil((n - len(prs[dnum])) / 3)
             l1 = nprs[dnum]
@@ -251,7 +255,9 @@ def recruit_priests (economy):
                                   p=l2/np.sum(l2))
             for p in l3:
                 p.accept_priesthood()
-            print("Accepting Priests", dnum, ":", n1, n - len(prs[dnum]))
+            n_p.append(n1)
+            n_p2.append(n - len(prs[dnum]))
+    print("Recruit Priests:", n_p, n_p2)
 
 
 def update_nation_hating (economy):

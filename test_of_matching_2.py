@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.22' # Time-stamp: <2021-08-16T23:59:57Z>
+__version__ = '0.0.23' # Time-stamp: <2021-08-30T16:20:19Z>
 ## Language: Japanese/UTF-8
 
 """結婚・不倫・扶養・相続などのマッチングのシミュレーション"""
@@ -44,6 +44,8 @@ ARGS.save = False
 ARGS.pickle = 'test_of_matching_2.pickle'
 # 途中エラーなどがある場合に備えてセーブする間隔
 ARGS.save_period = 120
+# ロード時にランダムシードをロードしない場合 True
+ARGS.change_random_seed = False
 # エラー時にデバッガを起動
 ARGS.debug_on_error = False
 # デバッガを起動する期
@@ -193,8 +195,12 @@ def parse_args (view_options=['none']):
     parser = argparse.ArgumentParser()
 
     parser.add_argument("-L", "--load", action="store_true")
+    parser.add_argument("-L-", "--no-load", action="store_false", dest="load")
     parser.add_argument("-S", "--save", action="store_true")
+    parser.add_argument("-S-", "--no-save", action="store_false", dest="save")
     parser.add_argument("-d", "--debug-on-error", action="store_true")
+    parser.add_argument("-d-", "--no-debug-on-error", action="store_false",
+                        dest="debug_on_error")
     parser.add_argument("--debug-term", type=int)
     parser.add_argument("-t", "--trials", type=int)
     parser.add_argument("-p", "--population", type=str)
@@ -210,8 +216,12 @@ def parse_args (view_options=['none']):
     for p, v in vars(ARGS).items():
         if p not in specials:
             p2 = '--' + p.replace('_', '-')
-            if v is False:
+            np2 = '--no-' + p.replace('_', '-')
+            if np2.startswith('--no-no-'):
+                np2 = np2.replace('--no-no-', '--with-', 1)
+            if v is False or v is True:
                 parser.add_argument(p2, action="store_true")
+                parser.add_argument(np2, action="store_false", dest=p)
             elif v is None:
                 parser.add_argument(p2, type=float)
             else:
@@ -1699,19 +1709,6 @@ class EconomyPlotBT (EconomyPlot0):
     def view_population (self, ax, economy):
         ax.hist([x.age for x in economy.people.values() if x.death is None],
                 bins=ARGS.bins)
-        mb = 0
-        md = 0
-        dp = [0] * len(ARGS.population)
-        for p in economy.people.values():
-            if p.death is not None and p.death.term == economy.term:
-                md += 1
-            if p.birth_term == economy.term:
-                mb += 1
-            if p.death is None:
-                dp[p.district] += 1
-        print("New Birth:", mb, "New Death:", md,
-              "WantChildMag:", economy.want_child_mag)
-        print("District Population:", dp)
 
     def view_children (self, ax, economy):
         x = []
@@ -3991,6 +3988,29 @@ def update_economy (economy):
                 * 0.05
 
 
+def print_population (economy):
+    print("\nPopulation:...", flush=True)
+    mb = 0
+    md = 0
+    n_m = 0
+    n_f = 0
+    dp = [0] * len(ARGS.population)
+    for p in economy.people.values():
+        if p.death is not None and p.death.term == economy.term:
+            md += 1
+        if p.birth_term == economy.term:
+            mb += 1
+        if p.death is None:
+            if p.sex == 'M':
+                n_m += 1
+            else:
+                n_f += 1
+            dp[p.district] += 1
+    print("New Birth:", mb, "New Death:", md,
+          "WantChildMag:", economy.want_child_mag)
+    print("District Population:", dp, "Male:Female:", n_m, ":", n_f)
+
+
 def update_education (economy):
     print("\nEducation:...", flush=True)
 
@@ -4049,6 +4069,7 @@ def step (economy):
     update_birth(economy)
     update_support(economy)
     update_tombs(economy)
+    print_population(economy)
 
     if economy.term % ARGS.economy_period == 0:
         update_economy(economy)
@@ -4080,8 +4101,9 @@ def main (eplot):
         eplot.plot(economy)
         if not ARGS.no_view:
             plt.pause(1.0)
-        random.setstate(economy.rand_state)
-        np.random.set_state(economy.rand_state_np)
+        if not ARGS.change_random_seed:
+            random.setstate(economy.rand_state)
+            np.random.set_state(economy.rand_state_np)
         economy.rand_state_np = None
         economy.rand_state = None
 

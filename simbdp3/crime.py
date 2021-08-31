@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.3' # Time-stamp: <2021-08-24T02:59:38Z>
+__version__ = '0.0.4' # Time-stamp: <2021-08-30T23:18:35Z>
 ## Language: Japanese/UTF-8
 
 """Simulation Buddhism Prototype No.3 - Crime
@@ -260,12 +260,14 @@ def calc_crime_params (economy):
     if l:
         real_hating = np.mean(l)
 
+    print("Virtual/Real Hating:", virtual_hating, "/", real_hating)
+
     average_education = np.mean([p.education for p in economy.people.values()
                                  if not p.is_dead()])
-    x1 = np_clip(virtual_hating, 0.2, 0.5)
+    x1 = np_clip(virtual_hating, 0.3, 0.5)
     x2 = np_clip(average_education, 0.4, 0.75)
     x = ((1 - ARGS.education_against_hating_rate)
-         * interpolate(0.2, 0.0, 0.5, 1.0, x1)) \
+         * interpolate(0.3, 0.0, 0.5, 1.0, x1)) \
          + (ARGS.education_against_hating_rate
             * interpolate(0.4, 1.0, 0.75, 0.0, x2))
     minor_offence_rate = interpolate(0.0, ARGS.minor_offence_rate_min,
@@ -528,15 +530,7 @@ def update_jails (economy, jail_num, arrested):
         p.jail.end = economy.term + math.floor(t)
     print("Put in Jail:", len(l3))
 
-    n_j = 0
-    for p in economy.people.values():
-        if p.is_dead():
-            continue
-        if p.in_jail():
-            n_j += 1
-    print("Jail:", n_j, "/", jail_num)
-
-
+    
 def update_karma (economy):
     for p in economy.people.values():
         if p.is_dead() or p.in_jail():
@@ -579,6 +573,13 @@ def update_crimes (economy):
     arrested = set(l1 + l2 + l3)
     print("Arrested:", len(arrested))
     update_jails(economy, jail_num, arrested)
+    n_j = 0
+    for p in economy.people.values():
+        if p.is_dead():
+            continue
+        if p.in_jail():
+            n_j += 1
+    print("Jail:", n_j, "/", jail_num)
 
     ak = np.mean([p.karma for p in economy.people.values()
                   if not p.is_dead()])

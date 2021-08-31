@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.1' # Time-stamp: <2021-08-19T21:36:06Z>
+__version__ = '0.0.4' # Time-stamp: <2021-08-30T14:59:04Z>
 ## Language: Japanese/UTF-8
 
 """Simulation Buddhism Prototype No.3 - Moving
@@ -64,7 +64,7 @@ def calc_moving_matrix (economy):
             pp[p.district] += 1
     relp = [pp[dnum] / ARGS.population[dnum]
             for dnum in range(len(ARGS.population))]
-    print(relp)
+    print("Relative Population:", relp)
     for i in range(len(ARGS.population)):
         for j in range(len(ARGS.population)):
             q = np_clip(relp[i] / relp[j], 1.0/ARGS.moving_const_1,
@@ -82,7 +82,7 @@ def move_freely_some_people (economy):
             pp[p.district] += 1
     relp = [pp[dnum] / ARGS.population[dnum]
             for dnum in range(len(ARGS.population))]
-    print(relp)
+    print("Relative Population:", relp)
     for i in range(len(ARGS.population)):
         for j in range(len(ARGS.population)):
             q = np_clip(relp[i] / relp[j], 1.0/ARGS.moving_const_1,
@@ -148,7 +148,7 @@ def move_some_people (economy):
             pp[p.district] += 1
     relp = [pp[dnum] / ARGS.population[dnum]
             for dnum in range(len(ARGS.population))]
-    print(relp)
+    print("Relative Population:", relp)
     for i in range(len(ARGS.population)):
         for j in range(len(ARGS.population)):
             q = np_clip(relp[i] / relp[j], 1.0/ARGS.moving_const_1,

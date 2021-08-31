@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.2' # Time-stamp: <2021-08-23T09:08:09Z>
+__version__ = '0.0.4' # Time-stamp: <2021-08-28T10:16:35Z>
 ## Language: Japanese/UTF-8
 
 """Simulation Buddhism Prototype No.3 - Calamity
@@ -981,8 +981,7 @@ class Invasion (Calamity):        # 「蛮族の侵入」
     }
 
     damage_max_level = 6
-    # damage_unit = 30
-    damage_unit = 60
+    damage_unit = 30 # *= ARGS.invasion_mag (in update_classes())
     protected_damage_rate = 1/5
     training_anti_level = 2
     protected_prophecy_anti_level = 2
@@ -1188,12 +1187,17 @@ def prepare_for_calamities (economy):
                                challengeable[cavaliers[did].district])
 
     # 寺院の建立。
+    n_t = 0
     for did in work.keys():
         d = cavaliers[did]
-        x = np_clip(d.faith_realization, 0, 0.5)
+        x = np_clip(d.faith_realization, 0,
+                    ARGS.faith_realization_power_threshold)
+        r = interpolate(0, 0, 1.0, ARGS.construct_temple_rate, x)
         if len(work[did]) < ARGS.works_per_dominator \
-           and random.random() < (x / 0.5) * ARGS.construct_temple_rate:
+           and random.random() < r:
             work[did]['temple'] = True
+            n_t += 1
+    print("Build Temple:", n_t)
 
     # 災害のための建設。
     for dnum, dist in enumerate(nation.districts):

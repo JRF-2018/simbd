@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.7' # Time-stamp: <2021-08-23T18:15:51Z>
+__version__ = '0.0.8' # Time-stamp: <2021-08-28T08:35:48Z>
 ## Language: Japanese/UTF-8
 
 """支配層の代替わりのテスト
@@ -173,8 +173,12 @@ def parse_args ():
     for p, v in vars(ARGS).items():
         if p not in specials:
             p2 = '--' + p.replace('_', '-')
-            if v is False:
+            np2 = '--no-' + p.replace('_', '-')
+            if np2.startswith('--no-no-'):
+                np2 = np2.replace('--no-no-', '--with-', 1)
+            if v is False or v is True:
                 parser.add_argument(p2, action="store_true")
+                parser.add_argument(np2, action="store_false", dest=p)
             elif v is None:
                 parser.add_argument(p2, type=float)
             else:
@@ -1747,6 +1751,9 @@ def nominate_successors (economy):
         if ex == 'cavalier':
             d.soothing_by_governor += \
                 np_clip(d.hating_to_governor - d.soothing_by_governor,
+                        0, 1) / 2
+            d.soothing_by_king += \
+                np_clip(d.hating_to_king - d.soothing_by_king,
                         0, 1) / 2
         else:
             d.soothing_by_king += \

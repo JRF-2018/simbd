@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.13' # Time-stamp: <2021-08-23T18:09:22Z>
+__version__ = '0.0.14' # Time-stamp: <2021-08-30T16:17:51Z>
 ## Language: Japanese/UTF-8
 
 """支配と災害のシミュレーション"""
@@ -24,10 +24,10 @@ import math
 import random
 import numpy as np
 import bisect
-# This is needed for scipy of Windows if you need Ctrl-C debugging.
-import os
-os.environ['FOR_DISABLE_CONSOLE_CTRL_HANDLER'] = '1'
-from scipy.special import gamma, factorial
+# # This is needed for scipy of Windows if you need Ctrl-C debugging.
+# import os
+# os.environ['FOR_DISABLE_CONSOLE_CTRL_HANDLER'] = '1'
+# from scipy.special import gamma, factorial
 import matplotlib.pyplot as plt
 import sys
 import pickle
@@ -49,6 +49,8 @@ ARGS.save = False
 ARGS.pickle = 'test_of_domination_2.pickle'
 # 途中エラーなどがある場合に備えてセーブする間隔
 ARGS.save_period = 120
+# ロード時にランダムシードをロードしない場合 True
+ARGS.change_random_seed = False
 # エラー時にデバッガを起動
 ARGS.debug_on_error = False
 # デバッガを起動する期
@@ -125,7 +127,7 @@ ARGS.calamity_damage_threshold = 10.0
 #ARGS.challengeable_mag = 10.0
 ARGS.challengeable_mag = 1.0
 # 寺院を立てる確率
-ARGS.construct_temple_rate = 0.001
+ARGS.construct_temple_rate = 0.02
 # 成長機会があるときのベータ関数のパラメータ
 ARGS.challenging_beta = 0.5
 # 成長機会がないときのベータ関数のパラメータ
@@ -137,6 +139,8 @@ ARGS.invasion_average_term_min = 15.0 * 12
 ARGS.invasion_average_term_max = 15.0 * 12
 #ARGS.invasion_average_term_min = 5.0 * 12
 #ARGS.invasion_average_term_max = 5.0 * 12
+# 蛮族の侵入の被害の大きさ。
+ARGS.invasion_mag = 2.0
 # 洪水の頻度の目安
 #ARGS.flood_rate = 1.0 / 7
 ARGS.flood_rate = 1.0 / 14
@@ -184,8 +188,12 @@ def parse_args (view_options=['none']):
     parser = argparse.ArgumentParser()
 
     parser.add_argument("-L", "--load", action="store_true")
+    parser.add_argument("-L-", "--no-load", action="store_false", dest="load")
     parser.add_argument("-S", "--save", action="store_true")
+    parser.add_argument("-S-", "--no-save", action="store_false", dest="save")
     parser.add_argument("-d", "--debug-on-error", action="store_true")
+    parser.add_argument("-d-", "--no-debug-on-error", action="store_false",
+                        dest="debug_on_error")
     parser.add_argument("--debug-term", type=int)
     parser.add_argument("-t", "--trials", type=int)
     parser.add_argument("-p", "--population", type=str)
@@ -203,8 +211,12 @@ def parse_args (view_options=['none']):
     for p, v in vars(ARGS).items():
         if p not in specials:
             p2 = '--' + p.replace('_', '-')
-            if v is False:
+            np2 = '--no-' + p.replace('_', '-')
+            if np2.startswith('--no-no-'):
+                np2 = np2.replace('--no-no-', '--with-', 1)
+            if v is False or v is True:
                 parser.add_argument(p2, action="store_true")
+                parser.add_argument(np2, action="store_false", dest=p)
             elif v is None:
                 parser.add_argument(p2, type=float)
             else:
@@ -231,6 +243,11 @@ def parse_args (view_options=['none']):
                 y, z = x.split(':')
                 r[y] = float(z)
         ARGS.damage_scale_filter = r
+
+
+def update_classes ():
+    Invasion.damage_unit *= ARGS.invasion_mag
+
 
 ## class 'Frozen' from:
 ## 《How to freeze Python classes « Python recipes « ActiveState Code》  
@@ -1811,7 +1828,7 @@ class Invasion (Calamity):        # 「蛮族の侵入」
     }
 
     damage_max_level = 6
-    damage_unit = 30
+    damage_unit = 30 # *= ARGS.invasion_mag (in update_classes())
     protected_damage_rate = 1/5
     training_anti_level = 2
     protected_prophecy_anti_level = 2
@@ -1887,6 +1904,9 @@ class Economy0 (Frozen):
 
         self.cur_forfeit_prop = 0
         self.cur_forfeit_land = 0
+
+        self.rand_state = None
+        self.rand_state_np = None
 
 
 class EconomyBT (Economy0):
@@ -2286,25 +2306,6 @@ class EconomyPlotBT (EconomyPlot0):
     def view_population (self, ax, economy):
         ax.hist([x.age for x in economy.people.values() if x.death is None],
                 bins=ARGS.bins)
-        mb = 0
-        md = 0
-        n_m = 0
-        n_f = 0
-        dp = [0] * len(ARGS.population)
-        for p in economy.people.values():
-            if p.death is not None and p.death.term == economy.term:
-                md += 1
-            if p.birth_term == economy.term:
-                mb += 1
-            if p.death is None:
-                if p.sex == 'M':
-                    n_m += 1
-                else:
-                    n_f += 1
-                dp[p.district] += 1
-        print("New Birth:", mb, "New Death:", md,
-              "WantChildMag:", economy.want_child_mag)
-        print("District Population:", dp, "Male:Female:", n_m, ":", n_f)
 
     def view_children (self, ax, economy):
         x = []
@@ -2815,7 +2816,7 @@ def calc_moving_matrix (economy):
             pp[p.district] += 1
     relp = [pp[dnum] / ARGS.population[dnum]
             for dnum in range(len(ARGS.population))]
-    print(relp)
+    print("Relative Population:", relp)
     for i in range(len(ARGS.population)):
         for j in range(len(ARGS.population)):
             q = np_clip(relp[i] / relp[j], 1.0/ARGS.moving_const_1,
@@ -2833,7 +2834,7 @@ def move_freely_some_people (economy):
             pp[p.district] += 1
     relp = [pp[dnum] / ARGS.population[dnum]
             for dnum in range(len(ARGS.population))]
-    print(relp)
+    print("Relative Population:", relp)
     for i in range(len(ARGS.population)):
         for j in range(len(ARGS.population)):
             q = np_clip(relp[i] / relp[j], 1.0/ARGS.moving_const_1,
@@ -2899,7 +2900,7 @@ def move_some_people (economy):
             pp[p.district] += 1
     relp = [pp[dnum] / ARGS.population[dnum]
             for dnum in range(len(ARGS.population))]
-    print(relp)
+    print("Relative Population:", relp)
     for i in range(len(ARGS.population)):
         for j in range(len(ARGS.population)):
             q = np_clip(relp[i] / relp[j], 1.0/ARGS.moving_const_1,
@@ -3205,12 +3206,17 @@ def prepare_for_calamities (economy):
                                challengeable[cavaliers[did].district])
 
     # 寺院の建立。
+    n_t = 0
     for did in work.keys():
         d = cavaliers[did]
-        x = np_clip(d.faith_realization, 0, 0.5)
+        x = np_clip(d.faith_realization, 0,
+                    ARGS.faith_realization_power_threshold)
+        r = interpolate(0, 0, 1.0, ARGS.construct_temple_rate, x)
         if len(work[did]) < ARGS.works_per_dominator \
-           and random.random() < (x / 0.5) * ARGS.construct_temple_rate:
+           and random.random() < r:
             work[did]['temple'] = True
+            n_t += 1
+    print("Build Temple:", n_t)
 
     # 災害のための建設。
     for dnum, dist in enumerate(nation.districts):
@@ -3668,6 +3674,9 @@ def nominate_successors (economy):
             d.soothing_by_governor += \
                 np_clip(d.hating_to_governor - d.soothing_by_governor,
                         0, 1) / 2
+            d.soothing_by_king += \
+                np_clip(d.hating_to_king - d.soothing_by_king,
+                        0, 1) / 2
         else:
             d.soothing_by_king += \
                 np_clip(d.hating_to_king - d.soothing_by_king,
@@ -3716,6 +3725,29 @@ def print_dominators_average (economy):
     for n in props:
         r[n] = np.mean([getattr(d, n) for d in cavaliers])
     print("Cavaliers Average:", r)
+
+
+def print_population (economy):
+    print("\nPopulation:...", flush=True)
+    mb = 0
+    md = 0
+    n_m = 0
+    n_f = 0
+    dp = [0] * len(ARGS.population)
+    for p in economy.people.values():
+        if p.death is not None and p.death.term == economy.term:
+            md += 1
+        if p.birth_term == economy.term:
+            mb += 1
+        if p.death is None:
+            if p.sex == 'M':
+                n_m += 1
+            else:
+                n_f += 1
+            dp[p.district] += 1
+    print("New Birth:", mb, "New Death:", md,
+          "WantChildMag:", economy.want_child_mag)
+    print("District Population:", dp, "Male:Female:", n_m, ":", n_f)
 
 
 def update_dominators (economy):
@@ -3782,6 +3814,7 @@ def step (economy):
     update_birth(economy)
     update_support(economy)
     update_tombs(economy)
+    print_population(economy)
 
     if economy.term % ARGS.economy_period == 0:
         update_economy(economy)
@@ -3808,21 +3841,29 @@ def main (eplot):
         economy = Economy()
         print("Initializing...", flush=True)
         initialize(economy)
+        eplot.plot(economy)
+        if not ARGS.no_view:
+            plt.pause(1.0)
+        # hating のテスト。
+        for x in ['K', 'Q', 'G', 'H', 'A', 'B', 'C']:
+            p = globals()[x]
+            d = p.get_dominator()
+            if d is not None:
+                d.update_hating()
+                print(x, d.hating_to_king, d.hating_to_governor)
+        # 支配者の死のテスト。
+        economy.die([H, B])
     else:
         economy = SAVED_ECONOMY
-    eplot.plot(economy)
-    if not ARGS.no_view:
-        plt.pause(1.0)
+        eplot.plot(economy)
+        if not ARGS.no_view:
+            plt.pause(1.0)
+        if not ARGS.change_random_seed:
+            random.setstate(economy.rand_state)
+            np.random.set_state(economy.rand_state_np)
+        economy.rand_state_np = None
+        economy.rand_state = None
 
-    # hating のテスト。
-    for x in ['K', 'Q', 'G', 'H', 'A', 'B', 'C']:
-        p = globals()[x]
-        d = p.get_dominator()
-        if d is not None:
-            d.update_hating()
-            print(x, d.hating_to_king, d.hating_to_governor)
-    # 支配者の死のテスト。
-    economy.die([H, B])
 
     saved_last = False
     for trial in range(ARGS.trials):
@@ -3834,14 +3875,22 @@ def main (eplot):
             plt.pause(0.5)
         if ARGS.save and (trial % ARGS.save_period) == ARGS.save_period - 1:
             print("\nSaving...", flush=True)
+            economy.rand_state_np = np.random.get_state()
+            economy.rand_state = random.getstate()
             with open(ARGS.pickle, 'wb') as f:
                 pickle.dump((ARGS, economy), f)
+            economy.rand_state_np = None
+            economy.rand_state = None
             saved_last = True
 
     if ARGS.save and not saved_last:
         print("\nSaving...", flush=True)
+        economy.rand_state_np = np.random.get_state()
+        economy.rand_state = random.getstate()
         with open(ARGS.pickle, 'wb') as f:
             pickle.dump((ARGS, economy), f)
+        economy.rand_state_np = None
+        economy.rand_state = None
 
     print("\nFinish", flush=True)
     print("N_calamity:", N_calamity)
@@ -3853,6 +3902,7 @@ def main (eplot):
 if __name__ == '__main__':
     eplot = EconomyPlot()
     parse_args(view_options=['none'] + list(eplot.options.keys()))
+    update_classes()
     signal.signal(signal.SIGINT, sigint_handler)
     if ARGS.debug_on_error:
         sys.excepthook = debug_hook
