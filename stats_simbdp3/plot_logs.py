@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.1' # Time-stamp: <2021-08-30T23:44:02Z>
+__version__ = '0.0.2' # Time-stamp: <2021-09-01T03:11:33Z>
 ## Language: Japanese/UTF-8
 
 """Statistics for Simulation Buddhism Prototype No.3
@@ -35,6 +35,7 @@ import math
 import random
 import numpy as np
 import pandas as pd
+from scipy import stats
 import re
 import glob
 
@@ -46,6 +47,7 @@ ARGS.context = 'talk'
 ARGS.save = None
 ARGS.aspect = 1.5
 ARGS.height = None
+ARGS.dpi = None
 
 def parse_args ():
     parser = argparse.ArgumentParser()
@@ -53,15 +55,18 @@ def parse_args ():
     parser.add_argument("prefix", nargs='+')
     parser.add_argument("-p", "--parameter", choices=[
         'Population', 'AccDeath', 'Karma', 'NewKarma', 'AccKarma',
-        'AccTemple', 'Breakup', 'AccBreakup'
+        'AccTemple', 'Abortion', 'AccAbortion', 'Education',
+        'AccEducation', 'Priests',
+        'Breakup', 'AccBreakup'
     ])
     parser.add_argument("--context", choices=[
         'talk', 'paper', 'notebook', 'poster'
     ])
     parser.add_argument("--save", type=str)
     parser.add_argument("--height", type=float)
+    parser.add_argument("--dpi", type=float)
 
-    specials = set(['parameter', 'context', 'save', 'height'])
+    specials = set(['parameter', 'context', 'save', 'height', 'dpi'])
     
     for p, v in vars(ARGS).items():
         if p not in specials:
@@ -284,6 +289,36 @@ def main ():
     print(l[0][-1])
     print()
 
+    d_calamities = []
+    sum_calamities = []
+    print("D_calamity:")
+    for i in range(len(ps)):
+        prefix = ps[i]
+        l = ls[i]
+        dsum = []
+        dsum2 = []
+        d_cals = {}
+        for l0 in l:
+            d0 = l0[-1]
+            d = d0['D_calamity'][0]
+            for n, v in d.items():
+                if n not in d_cals:
+                    d_cals[n] = 0
+                d_cals[n] += v
+            dsum.append(sum(list(d.values())))
+            dsum2.append(sum([v for n, v in d.items() if n != "invasion"]))
+        print()
+        mn = np.mean(dsum)
+        interval = stats.t.interval(alpha=0.95, df=len(dsum) - 1,
+                                    loc=mn, scale=stats.sem(dsum))
+        print(prefix, ":", mn, interval)
+        mn = np.mean(dsum2)
+        interval = stats.t.interval(alpha=0.95, df=len(dsum2) - 1,
+                                    loc=mn, scale=stats.sem(dsum2))
+        print("excluding invasion:", mn, interval)
+        print(dict(sorted([(n, v/len(l)) for n, v in d_cals.items()],
+                          key=lambda x: x[0])))
+
     r = []
     r2 = []
     for i in range(len(ps)):
@@ -294,6 +329,8 @@ def main ():
             acc_karma = 0
             acc_temple = 0
             acc_brk = 0
+            acc_abort = 0
+            acc_edu = 0
             for d0 in l0:
                 term = d0['Term'][0]
                 if term is None or term == -1:
@@ -315,8 +352,13 @@ def main ():
                 acc_death += n_death
                 n_temple = d0['Calamities']['Build Temple'][0]
                 acc_temple += n_temple
+                abort = sum(d0['Birth']['Social Abortion'])
+                acc_abort += abort
+                edu = d0['Education']['Education Average'][0]
+                acc_edu += edu
+                prst = sum(d0['Priests']['Num of Priests'][4])
                 r.append([i, term, pp, acc_death, karma, a_karma, acc_karma,
-                          acc_temple])
+                          acc_temple, abort, acc_abort, edu, acc_edu, prst])
                 if 'Economy' in d0:
                     n_brk = d0['Economy']['Breakup of Family'][0]
                     acc_brk += n_brk
@@ -332,6 +374,11 @@ def main ():
         'NewKarma': r[:,5],
         'AccKarma': r[:,6],
         'AccTemple': r[:,7],
+        'Abortion': r[:,8],
+        'AccAbortion': r[:,9],
+        'Education': r[:,10],
+        'AccEducation': r[:,11],
+        'Priests': r[:,12],
     })
     r2 = np.array(r2)
     df2 = pd.DataFrame({
@@ -351,12 +398,20 @@ def main ():
     else:
         g = sns.relplot(x='Term', y=ARGS.parameter, hue='prefix', kind="line", data=df2, **d)
     # g._legend.set_title('Test')
-    g._legend.texts[0].set_text('')
+    
+    q = (len(ps) == len(g._legend.texts))
+    if q:
+        g._legend.set_title('')
+    else:
+        g._legend.texts[0].set_text('')
     for i, prefix in enumerate(ps):
-       g._legend.texts[i + 1].set_text(prefix)
+       g._legend.texts[i + int(not q)].set_text(prefix)
     g.set_xticklabels(rotation=45, horizontalalignment='right')
     if ARGS.save is not None:
-        plt.savefig(ARGS.save)
+        d = {}
+        if ARGS.dpi is not None:
+            d['dpi'] = ARGS.dpi
+        plt.savefig(ARGS.save, **d)
     else:
         plt.show()
 
