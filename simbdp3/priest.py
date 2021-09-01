@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.4' # Time-stamp: <2021-08-28T09:27:09Z>
+__version__ = '0.0.5' # Time-stamp: <2021-09-01T13:08:31Z>
 ## Language: Japanese/UTF-8
 
 """Simulation Buddhism Prototype No.3 - Priesthood
@@ -142,14 +142,20 @@ def update_education (economy):
         pr = len(prs[dnum]) / pp[dnum]
         if pr >= ARGS.priests_rate:
             pr = np_clip(pr, ARGS.priests_rate, ARGS.priests_rate_max)
-            gl = interpolate(ARGS.priests_rate, ARGS.education_goal,
-                             ARGS.priests_rate_max, ARGS.education_goal_max,
-                             pr)
+            if ARGS.priests_rate >= ARGS.priests_rate_max:
+                gl = ARGS.education_goal
+            else:
+                gl = interpolate(ARGS.priests_rate, ARGS.education_goal,
+                                 ARGS.priests_rate_max,
+                                 ARGS.education_goal_max, pr)
         else:
             pr = np_clip(pr, ARGS.priests_rate_min, ARGS.priests_rate)
-            gl = interpolate(ARGS.priests_rate, ARGS.education_goal,
-                             ARGS.priests_rate_min, ARGS.education_goal_min,
-                             pr)
+            if ARGS.priests_rate <= ARGS.priests_rate_min:
+                gl = ARGS.education_goal
+            else:
+                gl = interpolate(ARGS.priests_rate, ARGS.education_goal,
+                                 ARGS.priests_rate_min,
+                                 ARGS.education_goal_min, pr)
         gls.append(gl)
         x = edu[dnum]
         np_clip(x, gl - 0.2, gl + 0.2)
@@ -346,11 +352,17 @@ def update_priests (economy):
                  / sum(pp)
     x = np_clip(x, ARGS.priests_rate_min, ARGS.priests_rate_max)
     if x > ARGS.priests_rate:
-        y = interpolate(ARGS.priests_rate, 0.5,
-                        ARGS.priests_rate_max, 0.6, x)
+        if ARGS.priests_rate >= ARGS.priests_rate_max:
+            y = 0.5
+        else:
+            y = interpolate(ARGS.priests_rate, 0.5,
+                            ARGS.priests_rate_max, 0.6, x)
     else:
-        y = interpolate(ARGS.priests_rate, 0.5,
-                        ARGS.priests_rate_min, 0.4, x)
+        if ARGS.priests_rate <= ARGS.priests_rate_min:
+            y = 0.5
+        else:
+            y = interpolate(ARGS.priests_rate, 0.5,
+                            ARGS.priests_rate_min, 0.4, x)
 
     n_s = 0
     while True:

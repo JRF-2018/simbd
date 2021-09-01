@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.2' # Time-stamp: <2021-09-01T03:11:33Z>
+__version__ = '0.0.3' # Time-stamp: <2021-09-01T19:51:25Z>
 ## Language: Japanese/UTF-8
 
 """Statistics for Simulation Buddhism Prototype No.3
@@ -319,6 +319,8 @@ def main ():
         print(dict(sorted([(n, v/len(l)) for n, v in d_cals.items()],
                           key=lambda x: x[0])))
 
+    rp = []
+    rp2 = []
     r = []
     r2 = []
     for i in range(len(ps)):
@@ -357,36 +359,31 @@ def main ():
                 edu = d0['Education']['Education Average'][0]
                 acc_edu += edu
                 prst = sum(d0['Priests']['Num of Priests'][4])
-                r.append([i, term, pp, acc_death, karma, a_karma, acc_karma,
+                rp.append(prefix)
+                r.append([term, pp, acc_death, karma, a_karma, acc_karma,
                           acc_temple, abort, acc_abort, edu, acc_edu, prst])
                 if 'Economy' in d0:
                     n_brk = d0['Economy']['Breakup of Family'][0]
                     acc_brk += n_brk
-                    r2.append([i, term, n_brk, acc_brk])
+                    rp2.append(prefix)
+                    r2.append([term, n_brk, acc_brk])
 
     r = np.array(r)
-    df = pd.DataFrame({
-        'prefix': r[:,0],
-        'Term': r[:,1],
-        'Population': r[:,2],
-        'AccDeath': r[:,3],
-        'Karma': r[:,4],
-        'NewKarma': r[:,5],
-        'AccKarma': r[:,6],
-        'AccTemple': r[:,7],
-        'Abortion': r[:,8],
-        'AccAbortion': r[:,9],
-        'Education': r[:,10],
-        'AccEducation': r[:,11],
-        'Priests': r[:,12],
-    })
+    x = {'prefix': rp}
+    for i, n in enumerate([
+        'Term', 'Population', 'AccDeath', 'Karma', 'NewKarma',
+        'AccKarma', 'AccTemple', 'Abortion', 'AccAbortion',
+        'Education', 'AccEducation', 'Priests'
+    ]):
+        x[n] = r[:, i]
+    df = pd.DataFrame(x)
     r2 = np.array(r2)
-    df2 = pd.DataFrame({
-        'prefix': r2[:,0],
-        'Term': r2[:,1],
-        'Breakup': r2[:,2],
-        'AccBreakup': r2[:,3],
-    })
+    x = {'prefix': rp2}
+    for i, n in enumerate([
+        'Term', 'Breakup', 'AccBreakup'
+    ]):
+        x[n] = r2[:, i]
+    df2 = pd.DataFrame(x)
 
     sns.set(style='darkgrid')
     sns.set_context(ARGS.context)
@@ -397,15 +394,6 @@ def main ():
         g = sns.relplot(x='Term', y=ARGS.parameter, hue='prefix', kind="line", data=df, **d)
     else:
         g = sns.relplot(x='Term', y=ARGS.parameter, hue='prefix', kind="line", data=df2, **d)
-    # g._legend.set_title('Test')
-    
-    q = (len(ps) == len(g._legend.texts))
-    if q:
-        g._legend.set_title('')
-    else:
-        g._legend.texts[0].set_text('')
-    for i, prefix in enumerate(ps):
-       g._legend.texts[i + int(not q)].set_text(prefix)
     g.set_xticklabels(rotation=45, horizontalalignment='right')
     if ARGS.save is not None:
         d = {}

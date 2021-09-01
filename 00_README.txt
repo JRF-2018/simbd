@@ -1,7 +1,7 @@
 
 
     仏教的哲学的社会シミュレーション
-    (Created: 2021-02-27, Time-stamp: <2021-08-22T00:39:08Z>)
+    (Created: 2021-02-27, Time-stamp: <2021-09-01T03:50:46Z>)
 
 
 ** このファイルについて
@@ -184,6 +184,26 @@ test_of_domination_2.py の成果を取り入れている。
 
 Simulation Buddhism Prototype No.3。「シミュレーション仏教」プロトタイ
 プ 3号。simbdp2.py に僧と犯罪のモデルを足したもの。
+
+
+
+** 統計処理
+
+  * stats_simbdp3/run_simbdp3.sh
+
+複数回 simbdp3.py を実行してログを取るプログラム。
+
+run_simbdp3.sh PREFIX NUM OPTIONS
+
+…と指定する。NUM に回数 OPTIONS に simbdp3.py に渡すオプションを指定
+する。PREFIX-01.log ... といったファイルができる。
+
+
+  * stats_simbdp3/plot_logs.py
+
+ログの結果をグラフに描くプログラム。run_simbdp3.sh の PREFIX を(複数)
+引数として取る。-p AccDeath を付けると累積死亡数のグラフを表示。それ以
+外のオプションについてはソースを読むなりしていただきたい。
 
 
 
