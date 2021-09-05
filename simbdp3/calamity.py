@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.4' # Time-stamp: <2021-08-28T10:16:35Z>
+__version__ = '0.0.6' # Time-stamp: <2021-09-05T03:33:31Z>
 ## Language: Japanese/UTF-8
 
 """Simulation Buddhism Prototype No.3 - Calamity
@@ -180,9 +180,9 @@ class Calamity (SerializableExEconomy):        # 「災害」＝「惨禍」
         nation = economy.nation
         dist = nation.districts[c.district]
         th = np_clip(ARGS.nation_education_power_threshold, 0.5, 1.0)
-        q1 = (0.8 - 1.0) * ((th - 0.5) / (1.0 - 0.5)) + 1.0
+        q1 = interpolate(0.5, 1.0, 1.0, 0.2, th)
         th = np_clip(ARGS.faith_realization_power_threshold, 0.5, 1.0)
-        q2 = (0.8 - 1.0) * ((th - 0.5) / (1.0 - 0.5)) + 1.0
+        q2 = interpolate(0.5, 1.0, 1.0, 0.2, th)
         counter_prophecy = c.counter_prophecy * (q1 + q2) / 2
         counter_prophecy *= ARGS.prophecy_effect
         protect = dist.protection_units[c.kind][c.unit_num] \
@@ -235,9 +235,9 @@ class Calamity (SerializableExEconomy):        # 「災害」＝「惨禍」
         nation = economy.nation
         dist = nation.districts[c.district]
         th = np_clip(ARGS.nation_education_power_threshold, 0.5, 1.0)
-        q1 = (0.8 - 1.0) * ((th - 0.5) / (1.0 - 0.5)) + 1.0
+        q1 = interpolate(0.5, 1.0, 1.0, 0.2, th)
         th = np_clip(ARGS.faith_realization_power_threshold, 0.5, 1.0)
-        q2 = (0.8 - 1.0) * ((th - 0.5) / (1.0 - 0.5)) + 1.0
+        q2 = interpolate(0.5, 1.0, 1.0, 0.2, th)
         counter_prophecy = counter_prophecy * (q1 + q2) / 2
         counter_prophecy *= ARGS.prophecy_effect
         protect = dist.protection_units[c.kind][c.unit_num] \
@@ -1078,13 +1078,20 @@ def calc_nation_parameters (economy):
         pow2 = np_clip(dist.tmp_budget / pbm, 0, 1.0)
         pow2 = (pow2 + pow2n) / 2
         pow3 = dist.tmp_fidelity
-        ed = dist.tmp_education
-        if ed > ARGS.nation_education_power_threshold:
-            ed = ARGS.nation_education_power_threshold
-        if ed < 0.5:
-            pow4 = 0.8 * (ed / 0.5)
+        ed = np_clip(dist.tmp_education, ARGS.education_goal_standard_min,
+                     ARGS.education_goal_standard_max)
+        if ed >= ARGS.education_goal_standard:
+            y = interpolate(ARGS.education_goal_standard, 0.5,
+                            ARGS.education_goal_standard_max, 1.0, ed)
         else:
-            pow4 = 0.8 + 0.2 * ((ed - 0.5) / 0.5)
+            y = interpolate(ARGS.education_goal_standard, 0.5,
+                            ARGS.education_goal_standard_min, 0.0, ed)
+        if y > ARGS.nation_education_power_threshold:
+            y = ARGS.nation_education_power_threshold
+        if y < 0.5:
+            pow4 = interpolate(0.0, 0.0, 0.5, 0.8, y)
+        else:
+            pow4 = interpolate(0.5, 0.8, 1.0, 1.0, y)
         dist.tmp_power = (pow1 + pow2 + pow3 + pow4) / 4
 
     print("National Power:", [dist.tmp_power for dist in nation.districts])

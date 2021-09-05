@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.5' # Time-stamp: <2021-09-01T12:45:47Z>
+__version__ = '0.0.6' # Time-stamp: <2021-09-05T03:42:51Z>
 ## Language: Japanese/UTF-8
 
 """Simulation Buddhism Prototype No.3 - Main
@@ -325,6 +325,10 @@ ARGS.priest_share = 0.1
 ARGS.priests_rate = 1/200
 ARGS.priests_rate_max = 1/100
 ARGS.priests_rate_min = 1/300
+# 僧の人口を判定に使うときに使う割合
+ARGS.priests_standard_rate = 1/200
+ARGS.priests_standard_rate_max = 1/100
+ARGS.priests_standard_rate_min = 1/300
 # ランダムに発生する hating の人口に対する割合
 ARGS.nation_hating_rate = 1/100
 # 教化(education)で変化する宥められやすさ
@@ -365,6 +369,21 @@ ARGS.karma_decay_2 = 1.8
 ARGS.education_goal = 0.5
 ARGS.education_goal_max = 0.65
 ARGS.education_goal_min = 0.35
+# 教化の目標値を判定に使うときの値
+ARGS.education_goal_standard = 0.5
+ARGS.education_goal_standard_max = 0.65
+ARGS.education_goal_standard_min = 0.20
+# 教化の変時に参照する値
+#ARGS.education_up_mu = 0.02
+#ARGS.education_down_mu = -0.01
+#ARGS.education_sigma = 0.1
+#ARGS.education_priest_up_mu = 0.03
+#ARGS.education_priest_sigma = 0.1
+ARGS.education_up_mu = 0.1
+ARGS.education_down_mu = -0.05
+ARGS.education_sigma = 0.2
+ARGS.education_priest_up_mu = 0.1
+ARGS.education_priest_sigma = 0.2
 # 犯罪率の計算の際に現世の教化を死者の怨念に対してどれだけ重視するか。
 ARGS.education_against_hating_rate = 0.3
 # 上昇指向を変化させるようにする。

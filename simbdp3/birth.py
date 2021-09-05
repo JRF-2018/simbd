@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.4' # Time-stamp: <2021-08-30T16:10:59Z>
+__version__ = '0.0.6' # Time-stamp: <2021-09-02T12:22:31Z>
 ## Language: Japanese/UTF-8
 
 """Simulation Buddhism Prototype No.3 - Birth
@@ -151,6 +151,9 @@ class PersonBT (Person0):
         if p.in_priesthood():
             p.renounce_priesthood()
         m = p
+        f = None
+        if rel.spouse != '':
+            f = economy.get_person(rel.spouse)
 
         p = base.Person()
         p.economy = economy
@@ -164,7 +167,10 @@ class PersonBT (Person0):
         p.land = 0
         p.consumption = ARGS.consumption * 0.1
         p.ambition = random.random()
-        p.education = random.random()
+        if f is None:
+            p.education = (m.education + random.random()) / 2
+        else:
+            p.education = (m.education + f.education) / 2
         p.adult_success = np.random.geometric(0.5) - 1
         p.want_child_base = random.uniform(2, 12)
         p.cum_donation = 0

@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.3' # Time-stamp: <2021-09-01T19:51:25Z>
+__version__ = '0.0.4' # Time-stamp: <2021-09-05T05:22:14Z>
 ## Language: Japanese/UTF-8
 
 """Statistics for Simulation Buddhism Prototype No.3
@@ -44,7 +44,7 @@ ARGS = argparse.Namespace()
 
 ARGS.parameter = 'Population'
 ARGS.context = 'talk'
-ARGS.save = None
+ARGS.output = None
 ARGS.aspect = 1.5
 ARGS.height = None
 ARGS.dpi = None
@@ -54,19 +54,20 @@ def parse_args ():
 
     parser.add_argument("prefix", nargs='+')
     parser.add_argument("-p", "--parameter", choices=[
-        'Population', 'AccDeath', 'Karma', 'NewKarma', 'AccKarma',
-        'AccTemple', 'Abortion', 'AccAbortion', 'Education',
-        'AccEducation', 'Priests',
+        'Population', 'Death', 'AccDeath', 'Karma', 'NewKarma', 'AccKarma',
+        'VKarma', 'AccVKarma', 'NVKarma', 'AccNVKarma',
+        'AccTemple', 'Abortion', 'AccAbortion',
+        'Education', 'AccEducation', 'Priests',
         'Breakup', 'AccBreakup'
     ])
     parser.add_argument("--context", choices=[
         'talk', 'paper', 'notebook', 'poster'
     ])
-    parser.add_argument("--save", type=str)
+    parser.add_argument("-o", "--output", type=str)
     parser.add_argument("--height", type=float)
     parser.add_argument("--dpi", type=float)
 
-    specials = set(['parameter', 'context', 'save', 'height', 'dpi'])
+    specials = set(['parameter', 'context', 'output', 'height', 'dpi'])
     
     for p, v in vars(ARGS).items():
         if p not in specials:
@@ -278,6 +279,8 @@ def main ():
         for fn in glob.glob(prefix + '-*.log'):
             l0 = load_and_parse_log(fn)
             l.append(l0)
+        if not l:
+            raise ValueError("No " + prefix + "-*.log")
         ls.append(l)
 
     l = ls[0]
@@ -292,9 +295,7 @@ def main ():
     d_calamities = []
     sum_calamities = []
     print("D_calamity:")
-    for i in range(len(ps)):
-        prefix = ps[i]
-        l = ls[i]
+    for prefix, l in zip(ps, ls):
         dsum = []
         dsum2 = []
         d_cals = {}
@@ -323,12 +324,12 @@ def main ():
     rp2 = []
     r = []
     r2 = []
-    for i in range(len(ps)):
-        prefix = ps[i]
-        l = ls[i]
+    for prefix, l in zip(ps, ls):
         for l0 in l:
             acc_death = 0
             acc_karma = 0
+            acc_v_karma = 0
+            acc_n_v_karma = 0
             acc_temple = 0
             acc_brk = 0
             acc_abort = 0
@@ -350,6 +351,8 @@ def main ():
                         / pp
                 acc_karma += a_karma
                 karma = d0['Crimes']['Karma Average'][0]
+                acc_v_karma += vc_karma
+                acc_n_v_karma += vc_n
                 n_death = d0['Population']['New Birth'][3]
                 acc_death += n_death
                 n_temple = d0['Calamities']['Build Temple'][0]
@@ -360,7 +363,9 @@ def main ():
                 acc_edu += edu
                 prst = sum(d0['Priests']['Num of Priests'][4])
                 rp.append(prefix)
-                r.append([term, pp, acc_death, karma, a_karma, acc_karma,
+                r.append([term, pp, n_death, acc_death,
+                          karma, a_karma, acc_karma, vc_karma, acc_v_karma,
+                          vc_n, acc_n_v_karma,
                           acc_temple, abort, acc_abort, edu, acc_edu, prst])
                 if 'Economy' in d0:
                     n_brk = d0['Economy']['Breakup of Family'][0]
@@ -371,16 +376,17 @@ def main ():
     r = np.array(r)
     x = {'prefix': rp}
     for i, n in enumerate([
-        'Term', 'Population', 'AccDeath', 'Karma', 'NewKarma',
-        'AccKarma', 'AccTemple', 'Abortion', 'AccAbortion',
-        'Education', 'AccEducation', 'Priests'
+            'Term', 'Population', 'Death', 'AccDeath', 'Karma', 'NewKarma',
+            'AccKarma', 'VKarma', 'AccVKarma', 'NVKarma', 'AccNVKarma',
+            'AccTemple', 'Abortion', 'AccAbortion',
+            'Education', 'AccEducation', 'Priests'
     ]):
         x[n] = r[:, i]
     df = pd.DataFrame(x)
     r2 = np.array(r2)
     x = {'prefix': rp2}
     for i, n in enumerate([
-        'Term', 'Breakup', 'AccBreakup'
+            'Term', 'Breakup', 'AccBreakup'
     ]):
         x[n] = r2[:, i]
     df2 = pd.DataFrame(x)
@@ -395,11 +401,11 @@ def main ():
     else:
         g = sns.relplot(x='Term', y=ARGS.parameter, hue='prefix', kind="line", data=df2, **d)
     g.set_xticklabels(rotation=45, horizontalalignment='right')
-    if ARGS.save is not None:
+    if ARGS.output is not None:
         d = {}
         if ARGS.dpi is not None:
             d['dpi'] = ARGS.dpi
-        plt.savefig(ARGS.save, **d)
+        plt.savefig(ARGS.output, **d)
     else:
         plt.show()
 

@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.4' # Time-stamp: <2021-08-30T23:18:35Z>
+__version__ = '0.0.6' # Time-stamp: <2021-09-05T03:34:32Z>
 ## Language: Japanese/UTF-8
 
 """Simulation Buddhism Prototype No.3 - Crime
@@ -265,11 +265,13 @@ def calc_crime_params (economy):
     average_education = np.mean([p.education for p in economy.people.values()
                                  if not p.is_dead()])
     x1 = np_clip(virtual_hating, 0.3, 0.5)
-    x2 = np_clip(average_education, 0.4, 0.75)
+    x2 = np_clip(average_education, ARGS.education_goal_standard_min,
+                 ARGS.education_goal_standard_max)
     x = ((1 - ARGS.education_against_hating_rate)
          * interpolate(0.3, 0.0, 0.5, 1.0, x1)) \
          + (ARGS.education_against_hating_rate
-            * interpolate(0.4, 1.0, 0.75, 0.0, x2))
+            * interpolate(ARGS.education_goal_standard_min, 1.0,
+                          ARGS.education_goal_standard_max, 0.0, x2))
     minor_offence_rate = interpolate(0.0, ARGS.minor_offence_rate_min,
                                      1.0, ARGS.minor_offence_rate_max, x)
     vicious_crime_rate = interpolate(0.0, ARGS.vicious_crime_rate_min,

@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.5' # Time-stamp: <2021-09-01T13:08:31Z>
+__version__ = '0.0.6' # Time-stamp: <2021-09-05T03:22:41Z>
 ## Language: Japanese/UTF-8
 
 """Simulation Buddhism Prototype No.3 - Priesthood
@@ -140,36 +140,41 @@ def update_education (economy):
     gls = []
     for dnum, dist in enumerate(economy.nation.districts):
         pr = len(prs[dnum]) / pp[dnum]
-        if pr >= ARGS.priests_rate:
-            pr = np_clip(pr, ARGS.priests_rate, ARGS.priests_rate_max)
-            if ARGS.priests_rate >= ARGS.priests_rate_max:
+        if pr >= ARGS.priests_standard_rate:
+            pr = np_clip(pr, ARGS.priests_standard_rate,
+                         ARGS.priests_standard_rate_max)
+            if ARGS.priests_standard_rate >= ARGS.priests_standard_rate_max:
                 gl = ARGS.education_goal
             else:
-                gl = interpolate(ARGS.priests_rate, ARGS.education_goal,
-                                 ARGS.priests_rate_max,
+                gl = interpolate(ARGS.priests_standard_rate,
+                                 ARGS.education_goal,
+                                 ARGS.priests_standard_rate_max,
                                  ARGS.education_goal_max, pr)
         else:
-            pr = np_clip(pr, ARGS.priests_rate_min, ARGS.priests_rate)
-            if ARGS.priests_rate <= ARGS.priests_rate_min:
+            pr = np_clip(pr, ARGS.priests_standard_rate_min,
+                         ARGS.priests_standard_rate)
+            if ARGS.priests_standard_rate <= ARGS.priests_standard_rate_min:
                 gl = ARGS.education_goal
             else:
-                gl = interpolate(ARGS.priests_rate, ARGS.education_goal,
-                                 ARGS.priests_rate_min,
+                gl = interpolate(ARGS.priests_standard_rate,
+                                 ARGS.education_goal,
+                                 ARGS.priests_standard_rate_min,
                                  ARGS.education_goal_min, pr)
         gls.append(gl)
         x = edu[dnum]
         np_clip(x, gl - 0.2, gl + 0.2)
         if x >= gl:
-            m1 = interpolate(gl, 0, gl + 0.2, -0.01, x)
+            m1 = interpolate(gl, 0, gl + 0.2, ARGS.education_down_mu, x)
         else:
-            m1 = interpolate(gl, 0, gl - 0.2, 0.02, x)
+            m1 = interpolate(gl, 0, gl - 0.2, ARGS.education_up_mu, x)
 
         gl = 0.8
         x = edup[dnum]
         np_clip(x, gl - 0.4, gl + 0.4)
         m1p = 0
         if x < gl:
-            m1p = interpolate(gl, 0, gl - 0.4, 0.03, x)
+            m1p = interpolate(gl, 0, gl - 0.4,
+                              ARGS.education_priest_up_mu, x)
         m.append(m1)
         mp.append(m1p)
     
@@ -177,9 +182,10 @@ def update_education (economy):
         if p.is_dead():
             continue
         if p.in_priesthood():
-            p.education += random.gauss(mp[p.district], 0.1)
+            p.education += random.gauss(mp[p.district],
+                                        ARGS.education_priest_sigma)
         else:
-            p.education += random.gauss(m[p.district], 0.1)
+            p.education += random.gauss(m[p.district], ARGS.education_sigma)
         p.education = np_clip(p.education, 0, 1)
 
     a = np.mean([p.education for p in economy.people.values()
@@ -307,8 +313,8 @@ def soothe_nation_hating (economy):
     for p in economy.people.values():
         if p.is_dead():
             continue
-        y = ((ARGS.soothe_hating_rate_max - ARGS.soothe_hating_rate_min) /
-             (1.0 - 0.0)) * (p.education - 0) + ARGS.soothe_hating_rate_min
+        y = interpolate(0.0, ARGS.soothe_hating_rate_min,
+                        1.0, ARGS.soothe_hating_rate_max, p.education)
         for n, v in p.hating.items():
             if random.random() < y:
                 p.hating[n] *= 0.5
@@ -350,19 +356,20 @@ def update_priests (economy):
     x = sum([len(prs[dnum])
              for dnum, dist in enumerate(economy.nation.districts)]) \
                  / sum(pp)
-    x = np_clip(x, ARGS.priests_rate_min, ARGS.priests_rate_max)
-    if x > ARGS.priests_rate:
-        if ARGS.priests_rate >= ARGS.priests_rate_max:
+    x = np_clip(x, ARGS.priests_standard_rate_min,
+                ARGS.priests_standard_rate_max)
+    if x > ARGS.priests_standard_rate:
+        if ARGS.priests_standard_rate >= ARGS.priests_standard_rate_max:
             y = 0.5
         else:
-            y = interpolate(ARGS.priests_rate, 0.5,
-                            ARGS.priests_rate_max, 0.6, x)
+            y = interpolate(ARGS.priests_standard_rate, 0.5,
+                            ARGS.priests_standard_rate_max, 0.6, x)
     else:
-        if ARGS.priests_rate <= ARGS.priests_rate_min:
+        if ARGS.priests_standard_rate <= ARGS.priests_standard_rate_min:
             y = 0.5
         else:
-            y = interpolate(ARGS.priests_rate, 0.5,
-                            ARGS.priests_rate_min, 0.4, x)
+            y = interpolate(ARGS.priests_standard_rate, 0.5,
+                            ARGS.priests_standard_rate_min, 0.4, x)
 
     n_s = 0
     while True:
