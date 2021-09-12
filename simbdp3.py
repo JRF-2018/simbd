@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.6' # Time-stamp: <2021-09-05T03:42:51Z>
+__version__ = '0.0.7' # Time-stamp: <2021-09-05T15:38:57Z>
 ## Language: Japanese/UTF-8
 
 """Simulation Buddhism Prototype No.3 - Main
@@ -369,6 +369,7 @@ ARGS.karma_decay_2 = 1.8
 ARGS.education_goal = 0.5
 ARGS.education_goal_max = 0.65
 ARGS.education_goal_min = 0.35
+ARGS.education_priest_goal = 0.8
 # 教化の目標値を判定に使うときの値
 ARGS.education_goal_standard = 0.5
 ARGS.education_goal_standard_max = 0.65

@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.4' # Time-stamp: <2021-08-30T16:10:39Z>
+__version__ = '0.0.7' # Time-stamp: <2021-09-09T15:52:38Z>
 ## Language: Japanese/UTF-8
 
 """Simulation Buddhism Prototype No.3 - Miscellaneous
@@ -85,9 +85,15 @@ def update_injured (economy):
     for p in economy.people.values():
         if not p.is_dead():
             p.tmp_injured = np_clip(p.tmp_injured - 0.1, 0, 1)
+    a_i = np.mean([p.injured for p in economy.people.values()
+                   if not p.is_dead()])
+    a_t = np.mean([p.tmp_injured for p in economy.people.values()
+                   if not p.is_dead()])
+    print("Average Injured:", a_i, a_t)
 
 
 def update_labor (economy):
+    print("\nLabor:...", flush=True)
     for p in economy.people.values():
         if not p.is_dead():
             if p.age < 10:
@@ -102,6 +108,10 @@ def update_labor (economy):
                     continue
                 if random.random() < ARGS.a60_labor_lower_rate:
                     p.labor = np_clip(p.labor - 0.01, 0.2, 1)
+    a_l = np.mean([p.labor for p in economy.people.values()
+                   if not p.is_dead()])
+    print("Average Labor:", a_l)
+
 
 def update_ambition (economy):
     if not ARGS.change_ambition:
@@ -141,6 +151,7 @@ def update_ambition (economy):
     
 
 def calc_tmp_labor (economy):
+    print("\nTmp Labor:...", flush=True)
     for p in economy.people.values():
         if p.is_dead():
             p.tmp_labor = 0
@@ -152,13 +163,22 @@ def calc_tmp_labor (economy):
             p.tmp_labor *= 0.3
         p.tmp_labor = np_clip(p.tmp_labor - p.tmp_injured - p.injured, 0, 1)
 
+    a_l = np.mean([p.tmp_labor for p in economy.people.values()
+                   if not p.is_dead()])
+    print("Average Tmp Labor:", a_l)
+
 
 def update_eagerness (economy):
+    print("\nEagerness:...", flush=True)
     for p in economy.people.values():
         if p.is_dead():
             p.eagerness = 0.5
         else:
             p.eagerness = random.random()
+    a_e = np.mean([p.eagerness for p in economy.people.values()
+                   if not p.is_dead()])
+    print("Average Eagerness:", a_e)
+
 
 def print_population (economy):
     print("\nPopulation:...", flush=True)

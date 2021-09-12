@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.6' # Time-stamp: <2021-09-05T03:22:41Z>
+__version__ = '0.0.7' # Time-stamp: <2021-09-05T15:39:04Z>
 ## Language: Japanese/UTF-8
 
 """Simulation Buddhism Prototype No.3 - Priesthood
@@ -168,7 +168,7 @@ def update_education (economy):
         else:
             m1 = interpolate(gl, 0, gl - 0.2, ARGS.education_up_mu, x)
 
-        gl = 0.8
+        gl = ARGS.education_priest_goal
         x = edup[dnum]
         np_clip(x, gl - 0.4, gl + 0.4)
         m1p = 0

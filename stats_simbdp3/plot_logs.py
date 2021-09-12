@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.4' # Time-stamp: <2021-09-05T05:22:14Z>
+__version__ = '0.0.5' # Time-stamp: <2021-09-10T16:44:32Z>
 ## Language: Japanese/UTF-8
 
 """Statistics for Simulation Buddhism Prototype No.3
@@ -54,11 +54,13 @@ def parse_args ():
 
     parser.add_argument("prefix", nargs='+')
     parser.add_argument("-p", "--parameter", choices=[
-        'Population', 'Death', 'AccDeath', 'Karma', 'NewKarma', 'AccKarma',
+        'Population', 'Death', 'AccDeath', 'DeathRate', 'AccDeathRate',
+        'Karma', 'NewKarma', 'AccKarma',
         'VKarma', 'AccVKarma', 'NVKarma', 'AccNVKarma',
         'AccTemple', 'Abortion', 'AccAbortion',
-        'Education', 'AccEducation', 'Priests',
-        'Breakup', 'AccBreakup'
+        'Education', 'AccEducation', 'Priests', 'Power', 'Protection',
+        'Labor', 'Injured', 'PoliticalHating',
+        'Breakup', 'AccBreakup', 'Budget'
     ])
     parser.add_argument("--context", choices=[
         'talk', 'paper', 'notebook', 'poster'
@@ -292,6 +294,13 @@ def main ():
     print(l[0][-1])
     print()
 
+    log_ver = 1
+    for prefix, l in zip(ps, ls):
+        for l0 in l:
+            d0 = l0[1]
+            if 'Average Political Hating' not in d0['Calamities']:
+                log_ver = min([0, log_ver])
+
     d_calamities = []
     sum_calamities = []
     print("D_calamity:")
@@ -327,6 +336,7 @@ def main ():
     for prefix, l in zip(ps, ls):
         for l0 in l:
             acc_death = 0
+            acc_d_rate = 0
             acc_karma = 0
             acc_v_karma = 0
             acc_n_v_karma = 0
@@ -355,6 +365,8 @@ def main ():
                 acc_n_v_karma += vc_n
                 n_death = d0['Population']['New Birth'][3]
                 acc_death += n_death
+                d_rate = n_death / pp
+                acc_d_rate += d_rate
                 n_temple = d0['Calamities']['Build Temple'][0]
                 acc_temple += n_temple
                 abort = sum(d0['Birth']['Social Abortion'])
@@ -362,32 +374,68 @@ def main ():
                 edu = d0['Education']['Education Average'][0]
                 acc_edu += edu
                 prst = sum(d0['Priests']['Num of Priests'][4])
+                npow = np.mean(d0['Calamities']['National Power'][0])
+                prot = sum([sum(l1) for d in d0['Protection&Training']
+                            for l1 in d.values()])
                 rp.append(prefix)
-                r.append([term, pp, n_death, acc_death,
-                          karma, a_karma, acc_karma, vc_karma, acc_v_karma,
-                          vc_n, acc_n_v_karma,
-                          acc_temple, abort, acc_abort, edu, acc_edu, prst])
+                r1 = [term, pp, n_death, acc_death, d_rate, acc_d_rate,
+                      karma, a_karma, acc_karma, vc_karma, acc_v_karma,
+                      vc_n, acc_n_v_karma,
+                      acc_temple, abort, acc_abort, edu, acc_edu, prst,
+                      npow, prot]
+                if log_ver >= 1:
+                    lb = d0['Tmp Labor']['Average Tmp Labor'][0]
+                    ij = sum(d0['Injured']['Average Injured'])
+                    ph = d0['Calamities']['Average Political Hating'][0]
+                    r1.extend([lb, ij, ph])
+                r.append(r1)
                 if 'Economy' in d0:
                     n_brk = d0['Economy']['Breakup of Family'][0]
                     acc_brk += n_brk
+                    bud = sum(d0['Economy']['Budget'][0])
                     rp2.append(prefix)
-                    r2.append([term, n_brk, acc_brk])
+                    r1 = [term, n_brk, acc_brk, bud]
+                    if log_ver >= 1:
+                        pass
+                    r2.append(r1)
 
-    r = np.array(r)
-    x = {'prefix': rp}
-    for i, n in enumerate([
-            'Term', 'Population', 'Death', 'AccDeath', 'Karma', 'NewKarma',
+    pl1 = [
+        [
+            'Term', 'Population', 'Death', 'AccDeath', 'DeathRate',
+            'AccDeathRate', 'Karma', 'NewKarma',
             'AccKarma', 'VKarma', 'AccVKarma', 'NVKarma', 'AccNVKarma',
             'AccTemple', 'Abortion', 'AccAbortion',
-            'Education', 'AccEducation', 'Priests'
-    ]):
+            'Education', 'AccEducation', 'Priests', 'Power', 'Protection'
+        ],
+        [
+            'Labor', 'Injured', 'PoliticalHating'
+        ]
+    ]
+    pl2 = [
+        [
+            'Term', 'Breakup', 'AccBreakup', 'Budget'
+        ],
+        []
+    ]
+    pl = []
+    for i in range(log_ver + 1):
+        pl.extend(pl1[i] + pl2[i])
+    if ARGS.parameter not in pl:
+        raise ValueError("The logs don't support " + ARGS.parameter + ".")
+    pl = []
+    for i in range(log_ver + 1):
+        pl.extend(pl1[i])
+    r = np.array(r)
+    x = {'prefix': rp}
+    for i, n in enumerate(pl):
         x[n] = r[:, i]
     df = pd.DataFrame(x)
+    pl = []
+    for i in range(log_ver + 1):
+        pl.extend(pl2[i])
     r2 = np.array(r2)
     x = {'prefix': rp2}
-    for i, n in enumerate([
-            'Term', 'Breakup', 'AccBreakup'
-    ]):
+    for i, n in enumerate(pl):
         x[n] = r2[:, i]
     df2 = pd.DataFrame(x)
 

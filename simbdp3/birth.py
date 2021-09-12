@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.6' # Time-stamp: <2021-09-02T12:22:31Z>
+__version__ = '0.0.7' # Time-stamp: <2021-09-09T16:11:44Z>
 ## Language: Japanese/UTF-8
 
 """Simulation Buddhism Prototype No.3 - Birth
@@ -382,7 +382,6 @@ class EconomyPlotBT (EconomyPlot0):
         n0 = len([True for x in l if x == 0])
         l2 = [x for x in l if x != 0]
         ax.hist(l2, bins=ARGS.bins)
-        print("Fertility 0:", n0, "/", len(l), "Other Mean:", np.mean(l2))
 
     def view_female_fertility (self, ax, economy):
         l = [x.fertility for x in economy.people.values()
@@ -390,7 +389,6 @@ class EconomyPlotBT (EconomyPlot0):
         n0 = len([True for x in l if x == 0])
         l2 = [x for x in l if x != 0]
         ax.hist(l2, bins=ARGS.bins)
-        print("Fertility 0:", n0, "/", len(l), "Other Mean:", np.mean(l2))
 
 
 def update_birth (economy):
@@ -507,7 +505,6 @@ def update_birth (economy):
     economy.die(dying)
     print("Social Abortion:", n_a, n_b)
 
-
 def update_fertility (economy):
     print("\nFertility:...", flush=True)
 
@@ -526,3 +523,32 @@ def update_fertility (economy):
                     p.fertility -= p.fertility / ((50 - p.age) * 12)
                     if p.fertility < 0.1:
                         p.fertility = 0
+
+    n_m = 0
+    l_m = []
+    n_f = 0
+    l_f = []
+    l_mf = []
+    n_mnf = 0
+    l_ff = []
+    n_fnf = 0
+    for p in economy.people.values():
+        if p.is_dead():
+            continue
+        if p.sex == 'M':
+            l_m.append(p.fertility)
+            if p.fertility == 0:
+                n_mnf += 1
+            else:
+                l_mf.append(p.fertility)
+        else:
+            l_f.append(p.fertility)
+            if p.fertility == 0:
+                n_fnf += 1
+            else:
+                l_ff.append(p.fertility)
+    print("Average Fertility:", np.mean(l_m + l_f), np.mean(l_m), np.mean(l_f))
+    print("Male Fertility 0:", n_mnf, "/", len(l_m), "Other Mean:",
+          np.mean(l_mf))
+    print("Female Fertility 0:", n_fnf, "/", len(l_f), "Other Mean:",
+          np.mean(l_ff))

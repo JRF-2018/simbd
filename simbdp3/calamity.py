@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.6' # Time-stamp: <2021-09-05T03:33:31Z>
+__version__ = '0.0.7' # Time-stamp: <2021-09-10T04:03:35Z>
 ## Language: Japanese/UTF-8
 
 """Simulation Buddhism Prototype No.3 - Calamity
@@ -1134,6 +1134,7 @@ def prepare_for_calamities (economy):
                  for d in dist.cavaliers])
 
     # 慰撫する。
+    phs = []
     for dnum, dist in enumerate(nation.districts):
         soother = sorted(dist.cavaliers, reverse=True,
                          key=lambda d: d.soothe_ability())
@@ -1146,6 +1147,10 @@ def prepare_for_calamities (economy):
             work[d.id]['soothe'] = True
             d.soothe_district()
             print("Soothe:", dnum, d.id)
+            
+    ph = np.mean([p.political_hating for p in economy.people.values()
+                  if not p.is_dead() and p.age >= 18])
+    print("Average Political Hating:", ph)
 
     calc_nation_parameters(economy)
     calc_district_brains(economy)
