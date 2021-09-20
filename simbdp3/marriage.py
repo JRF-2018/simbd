@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.1' # Time-stamp: <2021-08-21T21:55:48Z>
+__version__ = '0.0.8' # Time-stamp: <2021-09-13T17:13:36Z>
 ## Language: Japanese/UTF-8
 
 """Simulation Buddhism Prototype No.3 - Marriage
@@ -340,6 +340,15 @@ class EconomyMA (Economy0):
                                          / (p.land + al)
                 p.land += al
                 p.prop += ap
+            else:
+                if p.father == '' \
+                   or economy.is_living(p.father):
+                    p.add_hating(p.father, mag * 0.15)
+                if p.father != p.biological_father:
+                    if p.biological_father == '' \
+                       or economy.is_living(p.biological_father):
+                        if random.random() < 0.3:
+                            p.add_hating(p.biological_father, mag * 0.15)
 
             ex = False
             if pm is not None:
@@ -364,6 +373,15 @@ class EconomyMA (Economy0):
                                          / (p.land + al)
                 p.land += al
                 p.prop += ap
+            else:
+                if p.mother == '' \
+                   or economy.is_living(p.mother):
+                    p.add_hating(p.mother, mag * 0.15)
+                if p.mother != p.biological_mother:
+                    if p.biological_mother == '' \
+                       or economy.is_living(p.biological_mother):
+                        if random.random() < 0.3:
+                            p.add_hating(p.biological_mother, mag * 0.15)
 
         for p in [m, f]:
             l = []
@@ -538,16 +556,13 @@ def update_marriage_hating (economy, person, relation):
             hating = random.random() < 0.5
             if hating:
                 success = False
-                p.hating_unknown += 0.1 * 0.3
-                p.hating_unknown = np_clip(p.hating_unknown, 0, 1)
+                p.add_hating('', 0.3)
         else:
             s = economy.people[m.spouse]
             hating = random.random() < 0.5
             if hating:
                 success = False
-                if s.id not in p.hating:
-                    p.hating[s.id] = 0
-                p.hating[s.id] = np_clip(p.hating[s.id] + 0.3, 0, 1)
+                p.add_hating(s.id, 0.3)
             if s.id in p.hating and p.hating[s.id] > 0.3:
                 p.hating[s.id] = 0.3
     else: # p.sex == 'F':
@@ -555,16 +570,13 @@ def update_marriage_hating (economy, person, relation):
             hating = random.random() < 0.5
             if hating:
                 success = False
-                p.hating_unknown += 0.1 * 0.3
-                p.hating_unknown = np_clip(p.hating_unknown, 0, 1)
+                p.add_hating('', 0.3)
         else:
             s = economy.people[m.spouse]
             hating = random.random() < 0.5
             if hating:
                 success = False
-                if s.id not in p.hating:
-                    p.hating[s.id] = 0
-                p.hating[s.id] = np_clip(p.hating[s.id] + 0.3, 0, 1)
+                p.add_hating(s.id, 0.3)
             if s.id in p.hating and p.hating[s.id] > 0.3:
                 p.hating[s.id] = 0.3
     if success:

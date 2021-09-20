@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.1' # Time-stamp: <2021-08-21T21:56:13Z>
+__version__ = '0.0.8' # Time-stamp: <2021-09-13T16:25:32Z>
 ## Language: Japanese/UTF-8
 
 """Simulation Buddhism Prototype No.3 - Adultery
@@ -378,8 +378,7 @@ def update_adultery_hating (economy, person, adultery):
                 hating = random.random() < 0.5
             if hating:
                 success = False
-                p.hating_unknown += 0.1 * 0.5
-                p.hating_unknown = np_clip(p.hating_unknown, 0, 1)
+                p.add_hating('', 0.5)
         else:
             s = economy.people[a.spouse]
             if a.begin == a.end:
@@ -388,9 +387,7 @@ def update_adultery_hating (economy, person, adultery):
                 hating = random.random() < 0.5
             if hating:
                 success = False
-                if s.id not in p.hating:
-                    p.hating[s.id] = 0
-                p.hating[s.id] = np_clip(p.hating[s.id] + 0.5, 0, 1)
+                p.add_hating(s.id, 0.5)
             if s.marriage is not None \
                and economy.is_living(s.marriage.spouse):
                 ss = economy.people[s.marriage.spouse]
@@ -405,13 +402,9 @@ def update_adultery_hating (economy, person, adultery):
                     known = random.random() < 0.3
                     if known:
                         success = False
-                        if p.id not in ss.hating:
-                            ss.hating[p.id] = 0
-                        ss.hating[p.id] = np_clip(ss.hating[p.id]
-                                                  + hating, 0, 1)
+                        ss.add_hating(p.id, hating)
                     else:
-                        ss.hating_unknown += 0.1 * hating
-                        ss.hating_unknown = np_clip(ss.hating_unknown, 0, 1)
+                        ss.add_hating('', hating)
             for a in s.adulteries:
                 if economy.is_living(a.spouse):
                     ss = economy.people[a.spouse]
@@ -421,14 +414,9 @@ def update_adultery_hating (economy, person, adultery):
                         known = random.random() < 0.3
                         if known:
                             success = False
-                            if p.id not in ss.hating:
-                                ss.hating[p.id] = 0
-                            ss.hating[p.id] = np_clip(ss.hating[p.id]
-                                                      + hating, 0, 1)
+                            ss.add_hating(p.id, hating)
                         else:
-                            ss.hating_unknown += 0.1 * hating
-                            ss.hating_unknown = np_clip(ss.hating_unknown,
-                                                        0, 1)
+                            ss.add_hating('', hating)
     else: # p.sex == 'F':
         if a.spouse == '' or not economy.is_living(a.spouse):
             if a.begin == a.end:
@@ -437,8 +425,7 @@ def update_adultery_hating (economy, person, adultery):
                 hating = random.random() < 0.5
             if hating:
                 success = False
-                p.hating_unknown += 0.1 * 0.5
-                p.hating_unknown = np_clip(p.hating_unknown, 0, 1)
+                p.add_hating('', 0.5)
         else:
             s = economy.people[a.spouse]
             if a.begin == a.end:
@@ -447,9 +434,7 @@ def update_adultery_hating (economy, person, adultery):
                 hating = random.random() < 0.5
             if hating:
                 success = False
-                if s.id not in p.hating:
-                    p.hating[s.id] = 0
-                p.hating[s.id] = np_clip(p.hating[s.id] + 0.5, 0, 1)
+                p.add_hating(s.id, 0.5)
             if s.marriage is not None \
                and economy.is_living(s.marriage.spouse):
                 ss = economy.people[s.marriage.spouse]
@@ -464,13 +449,9 @@ def update_adultery_hating (economy, person, adultery):
                     known = random.random() < 0.7
                     if known:
                         success = False
-                        if p.id not in ss.hating:
-                            ss.hating[p.id] = 0
-                        ss.hating[p.id] = np_clip(ss.hating[p.id]
-                                                  + hating, 0, 1)
+                        ss.add_hating(p.id, hating)
                     else:
-                        ss.hating_unknown += 0.1 * hating
-                        ss.hating_unknown = np_clip(ss.hating_unknown, 0, 1)
+                        ss.add_hating('', hating)
             for a in s.adulteries:
                 if economy.is_living(a.spouse):
                     ss = economy.people[a.spouse]
@@ -480,14 +461,9 @@ def update_adultery_hating (economy, person, adultery):
                         known = random.random() < 0.7
                         if known:
                             success = False
-                            if p.id not in ss.hating:
-                                ss.hating[p.id] = 0
-                            ss.hating[p.id] = np_clip(ss.hating[p.id]
-                                                      + hating, 0, 1)
+                            ss.add_hating(p.id, hating)
                         else:
-                            ss.hating_unknown += 0.1 * hating
-                            ss.hating_unknown = np_clip(ss.hating_unknown,
-                                                        0, 1)
+                            ss.add_hating('', hating)
     if success:
         p.adult_success += 1
     else:

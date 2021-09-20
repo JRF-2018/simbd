@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.7' # Time-stamp: <2021-09-09T16:11:44Z>
+__version__ = '0.0.8' # Time-stamp: <2021-09-13T16:31:23Z>
 ## Language: Japanese/UTF-8
 
 """Simulation Buddhism Prototype No.3 - Birth
@@ -325,17 +325,11 @@ class PersonBT (Person0):
                and m.marriage.spouse != '' \
                and economy.is_living(m.marriage.spouse):
                 f = economy.people[m.marriage.spouse]
-                if m.id not in f.hating:
-                    f.hating[m.id] = 0
-                f.hating[m.id] += np_clip(f.hating[m.id] + 0.3, 0, 1)
+                f.add_hating(m.id, 0.3)
                 if random.random() < 0.5 or rel.spouse == '':
-                    f.hating_unknown += 0.1 * 0.6
-                    f.hating_unknown = np_clip(p.hating_unknown, 0, 1)
+                    f.add_hating('', 0.6)
                 else:
-                    if rel.spouse not in f.hating:
-                        f.hating[rel.spouse] = 0
-                    f.hating[rel.spouse] = np_clip(f.hating[rel.spouse]
-                                                   + 0.6, 0, 1)
+                    f.add_hating(rel.spouse, 0.6)
         p.initial_father = p.father
         p.initial_mother = p.mother
 
@@ -461,9 +455,7 @@ def update_birth (economy):
                     p.fertility = np_clip(p.fertility, 0, 1)
             else:
                 sp = p.pregnancy.relation.spouse
-                if sp not in p.hating:
-                    p.hating[sp] = 0
-                p.hating[sp] = np_clip(p.hating[sp] + 0.3, 0, 1)
+                p.add_hating(sp, 0.3)
                 p.abort_pregnancy()
                 n_b += 1
                 if p.fertility != 0:
@@ -478,9 +470,7 @@ def update_birth (economy):
                 l2.append(p)
             else:
                 sp = p.pregnancy.relation.spouse
-                if sp not in p.hating:
-                    p.hating[sp] = 0
-                p.hating[sp] = np_clip(p.hating[sp] + 0.3, 0, 1)
+                p.add_hating(sp, 0.3)
                 p.abort_pregnancy()
                 n_b += 1
                 if p.fertility != 0:
@@ -494,8 +484,7 @@ def update_birth (economy):
                     p.fertility += 0.1
                     p.fertility = np_clip(p.fertility, 0, 1)
             else:
-                p.political_hating = np_clip(p.political_hating + 0.1,
-                                             0, 1)
+                p.add_hating('P', 0.1)
                 p.abort_pregnancy()
                 n_a += 1
                 if p.fertility != 0:

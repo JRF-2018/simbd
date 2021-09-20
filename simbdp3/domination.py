@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.4' # Time-stamp: <2021-08-24T03:09:25Z>
+__version__ = '0.0.8' # Time-stamp: <2021-09-13T16:38:52Z>
 ## Language: Japanese/UTF-8
 
 """Simulation Buddhism Prototype No.3 - Domination
@@ -169,7 +169,8 @@ class EconomyDM (Economy0):
         vht = np.mean([d.soothed_hating_to_king() for d in nation.vassals])
         a_vassals = (0.5 + 0.5 * (1 - vht)) \
             * ((1/3) * max(vab) + (2/3) * np.mean(vab))
-        a_governor = (0.75 + 0.25 * (1 - dist.governor.soothed_hating_to_king())) \
+        a_governor = (0.75 + 0.25 *
+                      (1 - dist.governor.soothed_hating_to_king())) \
             * f(dist.governor)
         a_cavalier = f(d)
         r_king = 0.5 + 0.5 * (1 - d.soothed_hating_to_king())
@@ -180,7 +181,8 @@ class EconomyDM (Economy0):
             + r_governor * a_governor + r_cavalier * a_cavalier) \
             / (r_king + r_vassals + r_governor + r_cavalier)
         p *= 0.75 + 0.25 \
-            * (1 - max([d.soothed_hating_to_king(), d.soothed_hating_to_governor()]))
+            * (1 - max([d.soothed_hating_to_king(),
+                        d.soothed_hating_to_governor()]))
         p *= dist.tmp_power
 
         return p
@@ -236,6 +238,7 @@ class EconomyDM (Economy0):
                 if random.random() < ARGS.rape_pregnant_rate \
                    * (ft ** ARGS.rape_pregnant_mag):
                     f.get_pregnant(af)
+                    f.add_hating('', 0.5)
                     n_p += 1
         return n_p
 
@@ -977,9 +980,7 @@ def nominate_successors (economy):
         for pos3, dnum3, pid3 in new_nomination:
             if pos3 == pos and dnum == dnum3 and p.id != pid3:
                 print("hate:", p.id, "->", pid3)
-                if pid3 not in p.hating:
-                    p.hating[pid3] = 0
-                p.hating[pid3] = np_clip(p.hating[pid3] + 0.1, 0.0, 1.0)
+                p.add_hating(pid3, 0.1)
     nation.nomination = []
 
 

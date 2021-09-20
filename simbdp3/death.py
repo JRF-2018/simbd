@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.1' # Time-stamp: <2021-08-20T16:48:58Z>
+__version__ = '0.0.8' # Time-stamp: <2021-09-14T10:47:01Z>
 ## Language: Japanese/UTF-8
 
 """Simulation Buddhism Prototype No.3 - Death
@@ -33,7 +33,7 @@ import random
 
 import simbdp3.base as base
 from simbdp3.base import ARGS, Person0, Economy0
-from simbdp3.common import Death, Tomb
+from simbdp3.common import Death, Tomb, np_clip
 from simbdp3.inherit import calc_inheritance_share
 
 
@@ -169,6 +169,7 @@ class EconomyDT (Economy0):
             tomb.death_term = economy.term
             tomb.person = p
             tomb.death_hating = p.hating.copy()
+            tomb.death_hating_unknown = p.hating_unknown
             tomb.death_political_hating = p.political_hating
             tomb.death_merchant_hating = p.merchant_hating
             tomb.death_merchant_hated = p.merchant_hated
@@ -294,7 +295,8 @@ def update_death (economy):
                     threshold = ARGS.a60_death_rate
                 elif p.age >= 0 and p.age <= 3:
                     threshold = ARGS.infant_death_rate
-                threshold2 = ARGS.injured_death_rate * p.injured
+                ij = np_clip(p.injured + p.tmp_injured, 0, 1)
+                threshold2 = ARGS.injured_death_rate * ij
                 if random.random() < max([threshold, threshold2]):
                     l.append(p)
     economy.die(l)

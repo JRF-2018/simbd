@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.7' # Time-stamp: <2021-09-05T15:39:04Z>
+__version__ = '0.0.8' # Time-stamp: <2021-09-19T23:53:36Z>
 ## Language: Japanese/UTF-8
 
 """Simulation Buddhism Prototype No.3 - Priesthood
@@ -317,7 +317,15 @@ def soothe_nation_hating (economy):
                         1.0, ARGS.soothe_hating_rate_max, p.education)
         for n, v in p.hating.items():
             if random.random() < y:
-                p.hating[n] *= 0.5
+                p.hating[n] *= ARGS.soothe_hating_decay
+        if random.random() < y * ARGS.soothe_hating_unknown_rate_mag:
+            p.hating_unknown *= ARGS.soothe_hating_unknown_decay
+        if random.random() < y * ARGS.soothe_political_hating_rate_mag:
+            p.political_hating *= ARGS.soothe_political_hating_decay
+        if random.random() < y * ARGS.soothe_merchant_hating_rate_mag:
+            p.merchant_hating *= ARGS.soothe_merchant_hating_decay
+        if random.random() < y * ARGS.soothe_merchant_hated_rate_mag:
+            p.merchant_hated *= ARGS.soothe_merchant_hated_decay
 
 
 def clean_nation_hating (economy):
@@ -360,16 +368,20 @@ def update_priests (economy):
                 ARGS.priests_standard_rate_max)
     if x > ARGS.priests_standard_rate:
         if ARGS.priests_standard_rate >= ARGS.priests_standard_rate_max:
-            y = 0.5
+            y = ARGS.soothe_nation_threshold
         else:
-            y = interpolate(ARGS.priests_standard_rate, 0.5,
-                            ARGS.priests_standard_rate_max, 0.6, x)
+            y = interpolate(ARGS.priests_standard_rate,
+                            ARGS.soothe_nation_threshold,
+                            ARGS.priests_standard_rate_max,
+                            ARGS.soothe_nation_threshold_max, x)
     else:
         if ARGS.priests_standard_rate <= ARGS.priests_standard_rate_min:
-            y = 0.5
+            y = ARGS.soothe_nation_threshold
         else:
-            y = interpolate(ARGS.priests_standard_rate, 0.5,
-                            ARGS.priests_standard_rate_min, 0.4, x)
+            y = interpolate(ARGS.priests_standard_rate,
+                            ARGS.soothe_nation_threshold,
+                            ARGS.priests_standard_rate_min,
+                            ARGS.soothe_nation_threshold_min, x)
 
     n_s = 0
     while True:
@@ -377,7 +389,7 @@ def update_priests (economy):
         for p in economy.people.values():
             if p.is_dead():
                 continue
-            l.append(max([0] + list(p.hating.values())))
+            l.append(max([p.hating_unknown] + list(p.hating.values())))
         m = np.mean(l)
         if m > y:
             n_s += 1

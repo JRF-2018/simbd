@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.1' # Time-stamp: <2021-08-21T21:18:44Z>
+__version__ = '0.0.8' # Time-stamp: <2021-09-13T17:15:58Z>
 ## Language: Japanese/UTF-8
 
 """Simulation Buddhism Prototype No.3 - Support
@@ -520,6 +520,15 @@ def update_become_adult (economy):
                                      / (p.land + al)
             p.land += al
             p.prop += ap
+        else:
+            if p.father == '' \
+               or economy.is_living(p.father):
+                p.add_hating(p.father, 0.15)
+            if p.father != p.biological_father:
+                if p.biological_father == '' \
+                   or economy.is_living(p.biological_father):
+                    if random.random() < 0.3:
+                        p.add_hating(p.biological_father, 0.15)
 
         ex = False
         if pm is not None:
@@ -544,6 +553,15 @@ def update_become_adult (economy):
                                      / (p.land + al)
             p.land += al
             p.prop += ap
+        else:
+            if p.mother == '' \
+               or economy.is_living(p.mother):
+                p.add_hating(p.mother, 0.15)
+            if p.mother != p.biological_mother:
+                if p.biological_mother == '' \
+                   or economy.is_living(p.biological_mother):
+                    if random.random() < 0.3:
+                        p.add_hating(p.biological_mother, 0.15)
 
         p.remove_supported()
 

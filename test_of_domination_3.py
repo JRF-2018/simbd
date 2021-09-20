@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.8' # Time-stamp: <2021-08-28T08:35:48Z>
+__version__ = '0.0.9' # Time-stamp: <2021-09-18T10:24:32Z>
 ## Language: Japanese/UTF-8
 
 """支配層の代替わりのテスト
@@ -348,6 +348,7 @@ class Person0 (SerializableExEconomy):
         self.tmp_score = None  # スコア
         self.tmp_asset_rank = None  # 資産順位 / 総人口
         self.tmp_land = None   # 一時的な土地
+        self.tmp_max_hated = 0 # 憎まれてる最大値
 
         self.mlog = {}         # 月別経済指標ログ
         for n in ['prop', 'education', 'ambition', 'tmp_labor',
@@ -592,6 +593,7 @@ class Tomb (Serializable):
         self.person = None
         self.priest = None
         self.death_hating = {}
+        self.death_hating_unknown = None
         self.death_political_hating = None
         self.death_merchant_hating = None
         self.death_merchant_hated = None

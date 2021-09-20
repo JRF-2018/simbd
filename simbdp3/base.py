@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.1' # Time-stamp: <2021-08-20T16:48:03Z>
+__version__ = '0.0.8' # Time-stamp: <2021-09-13T16:07:23Z>
 ## Language: Japanese/UTF-8
 
 """Simulation Buddhism Prototype No.3 - Base
@@ -180,6 +180,7 @@ class Person0 (Serializable):
         self.tmp_score = None  # スコア
         self.tmp_asset_rank = None  # 資産順位 / 総人口
         self.tmp_land = None   # 一時的な土地
+        self.tmp_max_hated = 0 # 憎まれてる最大値
 
         self.mlog = {}         # 月別経済指標ログ
         for n in ['prop', 'education', 'ambition', 'tmp_labor',

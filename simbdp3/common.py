@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.1' # Time-stamp: <2021-08-21T16:09:19Z>
+__version__ = '0.0.8' # Time-stamp: <2021-09-13T16:07:51Z>
 ## Language: Japanese/UTF-8
 
 """Simulation Buddhism Prototype No.3 - Common
@@ -94,6 +94,7 @@ class Tomb (Serializable):
         self.person = None
         self.priest = None
         self.death_hating = {}
+        self.death_hating_unknown = None
         self.death_political_hating = None
         self.death_merchant_hating = None
         self.death_merchant_hated = None

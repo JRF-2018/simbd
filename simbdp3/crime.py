@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.6' # Time-stamp: <2021-09-05T03:34:32Z>
+__version__ = '0.0.8' # Time-stamp: <2021-09-13T16:16:08Z>
 ## Language: Japanese/UTF-8
 
 """Simulation Buddhism Prototype No.3 - Crime
@@ -40,6 +40,25 @@ from simbdp3.misc import calc_with_support_asset_rank
 
 
 class PersonCR (Person0):
+    def add_hating (self, person_id, adder):
+        p = self
+        qid = person_id
+        if qid is None or qid == '':
+            p.hating_unknown = max([p.hating_unknown, adder]) + \
+                0.1 * min([p.hating_unknown, adder])
+            p.hating_unknown = np_clip(p.hating_unknown, 0.0, 1.0)
+        elif qid == 'M' or qid == 'merchant':
+            p.merchant_hating += adder
+            p.merchant_hating = np_clip(p.merchant_hating, 0.0, 1.0)
+        elif qid == 'P' or qid == 'political':
+            p.political_hating += adder
+            p.political_hating = np_clip(p.political_hating, 0.0, 1.0)
+        else:
+            if qid not in p.hating:
+                p.hating[qid] = 0.0
+            p.hating[qid] += adder
+            p.hating[qid] = np_clip(p.hating[qid], 0.0, 1.0)
+
     def in_jail (self):
         return self.jail is not None
 
@@ -75,10 +94,12 @@ class PersonCR (Person0):
             kr = 0
         else:
             kr = 0.3 * p.karma
-        ht = 0.2 * max([p.political_hating, p.merchant_hating]
+        ht = 0.2 * max([p.political_hating, p.merchant_hating,
+                        p.hating_unknown]
                        + [v for v in p.hating.values()])
 
-        return np_clip(0.5 + ch + ast + lb + ed + pr + kr + ht, 0.1, 1.2)
+        return np_clip(0.5 + ch + ast + lb + ed + pr + kr + ht, 0.1, 1.2) \
+            + ARGS.minor_offence_slack
 
     def vicious_crime_tendency (self):
         p = self
@@ -94,10 +115,14 @@ class PersonCR (Person0):
             kr = 0.3 * p.karma
         else:
             kr = 0
-        ht = 0.3 * max([p.political_hating, p.merchant_hating]
+        ht = 0.3 * max([p.political_hating, p.merchant_hating,
+                        p.hating_unknown]
                        + [v for v in p.hating.values()])
+        mf = 1.2 if p.sex == 'M' else 1.0
+        
 
-        return np_clip(0.5 + ch + ast + lb + ed + pr + kr + ht, 0.1, 1.4)
+        return np_clip(0.5 + ch + ast + lb + ed + pr + kr + ht, 0.1, 1.4) \
+            * mf + ARGS.vicious_crime_slack
 
     def crime_victim_tendency (self):
         p = self
@@ -112,9 +137,10 @@ class PersonCR (Person0):
         ed = - 0.1 * p.education
         pr = - 0.1 if p.in_priesthood() else 0
         kr = 0.2 * p.karma
-        ht = 0.2 * p.merchant_hated
+        ht = 0.2 * max([p.merchant_hated, p.tmp_max_hated])
 
-        return np_clip(0.3 + ch + ast + ed + pr + kr + ht, 0.1, 0.8)
+        return np_clip(0.3 + ch + ast + ed + pr + kr + ht, 0.1, 0.8) \
+            + ARGS.crime_victim_slack
 
     def normal_arrest_tendency (self):
         p = self
@@ -241,7 +267,7 @@ def calc_crime_params (economy):
     for t in economy.tombs.values():
         p = t.person
         if t.priest is not None and economy.is_living(t.priest):
-            k = max([0] + list(p.hating.values()))
+            k = max([p.hating_unknown] + list(p.hating.values()))
             if k > 0.5:
                 k = 0.5
             l.append(k)
@@ -254,7 +280,7 @@ def calc_crime_params (economy):
     for p in economy.people.values():
         if p.is_dead():
             continue
-        k = max([0] + list(p.hating.values()))
+        k = max([p.hating_unknown] + list(p.hating.values()))
         l.append(k)
     real_hating = 0
     if l:
@@ -541,6 +567,18 @@ def update_karma (economy):
         p.karma = np_clip(p.karma - dk, 0.0, 1.0)
 
 
+def calc_tmp_max_hated (economy):
+    for p in economy.people.values():
+        p.tmp_max_hated = 0
+    for p in economy.people.values():
+        if p.is_dead():
+            continue
+        for qid, v in p.hating.items():
+            if qid in economy.people:
+                q = economy.people[qid]
+                q.tmp_max_hated = max([q.tmp_max_hated, v])
+
+
 def update_crimes (economy):
     print("\nCrimes:...", flush=True)
 
@@ -559,6 +597,8 @@ def update_crimes (economy):
 
     # for p in economy.people.values():
     #    p.tmp_luck = random.random()
+
+    calc_tmp_max_hated(economy)
 
     update_karma(economy)
     

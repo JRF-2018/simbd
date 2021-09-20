@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.7' # Time-stamp: <2021-09-05T15:38:57Z>
+__version__ = '0.0.8' # Time-stamp: <2021-09-19T23:49:39Z>
 ## Language: Japanese/UTF-8
 
 """Simulation Buddhism Prototype No.3 - Main
@@ -40,7 +40,7 @@ import argparse
 
 import simbdp3.base as base
 from simbdp3.base import ARGS, calc_increase_rate, calc_pregnant_mag,\
-    term_to_year_month
+    term_to_year_month, Frozen
 from simbdp3.init import initialize
 from simbdp3.economy import PersonEC, EconomyPlotEC, update_economy
 from simbdp3.birth import PersonBT, EconomyPlotBT, update_birth,\
@@ -79,6 +79,8 @@ ARGS.change_random_seed = False
 ARGS.debug_on_error = False
 # デバッガを起動する期
 ARGS.debug_term = None
+# Frozen の効果を消す場合 True
+ARGS.no_frozen = False
 # 試行数
 ARGS.trials = 50
 # ID のランダムに決める部分の長さ
@@ -331,9 +333,31 @@ ARGS.priests_standard_rate_max = 1/100
 ARGS.priests_standard_rate_min = 1/300
 # ランダムに発生する hating の人口に対する割合
 ARGS.nation_hating_rate = 1/100
+# 僧の数で変化する宥めが必要になる threshold
+ARGS.soothe_nation_threshold = 0.5
+ARGS.soothe_nation_threshold_min = 0.4
+ARGS.soothe_nation_threshold_max = 0.6
 # 教化(education)で変化する宥められやすさ
 ARGS.soothe_hating_rate_max = 1/3
 ARGS.soothe_hating_rate_min = 1/6
+ARGS.soothe_hating_unknown_rate_mag = 1.5
+ARGS.soothe_political_hating_rate_mag = 1.0
+ARGS.soothe_merchant_hating_rate_mag = 1.0
+ARGS.soothe_merchant_hated_rate_mag = 0.75
+# 成功した場合に宥められる度合
+ARGS.soothe_hating_decay = 0.5
+ARGS.soothe_hating_unknown_decay = 0.75
+ARGS.soothe_political_hating_decay = 0.75
+ARGS.soothe_merchant_hating_decay = 0.75
+ARGS.soothe_merchant_hated_decay = 0.90
+# 商業的憎まれの単位
+ARGS.merchant_hated_update = 0.1
+# 商業的憎まれの下降のしにくさ
+ARGS.merchant_hated_down_mag = 0.2
+# 商業的憎しみの単位
+ARGS.merchant_hating_update = 0.1
+# 商業的憎しみの下降のしにくさ
+ARGS.merchant_hating_down_mag = 0.2
 # 軽犯罪率
 ARGS.minor_offence_rate_max = 1/100
 ARGS.minor_offence_rate_min = 1/200
@@ -391,6 +415,12 @@ ARGS.education_against_hating_rate = 0.3
 ARGS.change_ambition = False
 # 上昇指向を変化させる場合の目標値
 ARGS.ambition_goal = 0.5
+# 軽犯罪のランダムな起こりやすさ
+ARGS.minor_offence_slack = 0.0
+# 重犯罪のランダムな起こりやすさ
+ARGS.vicious_crime_slack = 0.0
+# 重犯罪の被害者のランダムななりやすさ
+ARGS.crime_victim_slack = 0.75
 
 
 SAVED_ECONOMY = None
@@ -478,6 +508,10 @@ def parse_args (view_options=['none']):
 
 def update_classes ():
     Invasion.damage_unit *= ARGS.invasion_mag
+
+    if ARGS.no_frozen:
+        delattr(Frozen, '__setattr__')
+        delattr(Frozen, '__metaclass__')
 
 
 class Person (PersonEC, PersonBT, PersonDT, PersonAD, PersonMA, PersonSUP, PersonMV, PersonDM, PersonCR, PersonPR):

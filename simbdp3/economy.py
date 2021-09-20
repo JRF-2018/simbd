@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.1' # Time-stamp: <2021-08-20T16:35:00Z>
+__version__ = '0.0.8' # Time-stamp: <2021-09-20T00:20:44Z>
 ## Language: Japanese/UTF-8
 
 """Simulation Buddhism Prototype No.3 - Economy
@@ -380,10 +380,13 @@ def calc_asset_income (f):
         lincome = np.sum(normal_levy_rand(mu, sigma, theta, cut, f.land)) \
             * (1 - f.tmp_land_damage) - wage
         if f.education < 0.5:
-            hated_update += (0.1 * ((1 - f.education) - 0.5) / 0.5) \
+            hated_update += (ARGS.merchant_hated_update
+                             * ((1 - f.education) - 0.5) / 0.5) \
                 * (1.0 if worker_num > 5 else worker_num / 5)
         else:
-            hated_update -= (0.1 * 0.2 * (f.education - 0.5) / 0.5) \
+            hated_update -= (ARGS.merchant_hated_update
+                             * ARGS.merchant_hated_down_mag
+                             * (f.education - 0.5) / 0.5) \
                 * (1.0 if worker_num > 5 else worker_num / 5)
 
     income = bincome + sincome + gincome + dincome + lincome
@@ -415,9 +418,12 @@ def calc_labor_income (f, aincome):
                           * base * (3/3))
     
     if severeness > 0.5:
-        hating_update = 0.1 * (severeness - 0.5) / 0.5
+        hating_update = ARGS.merchant_hating_update \
+            * (severeness - 0.5) / 0.5
     else:
-        hating_update = - 0.1 * 0.2 * ((1 - severeness) - 0.5) / 0.5
+        hating_update = - ARGS.merchant_hating_update \
+            * ARGS.merchant_hating_down_mag \
+            * ((1 - severeness) - 0.5) / 0.5
     
     return (income, hating_update)
 
