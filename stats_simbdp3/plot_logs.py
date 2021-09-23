@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.6' # Time-stamp: <2021-09-18T10:35:00Z>
+__version__ = '0.0.7' # Time-stamp: <2021-09-21T17:30:39Z>
 ## Language: Japanese/UTF-8
 
 """Statistics for Simulation Buddhism Prototype No.3
@@ -56,7 +56,8 @@ def parse_args ():
     parser.add_argument("-p", "--parameter", choices=[
         'Population', 'Death', 'AccDeath', 'DeathRate', 'AccDeathRate',
         'Karma', 'NewKarma', 'AccKarma',
-        'VKarma', 'AccVKarma', 'NVKarma', 'AccNVKarma', 'Hating',
+        'VKarma', 'AccVKarma', 'NVKarma', 'AccNVKarma',
+        'NKarma', 'AccNKarma', 'Hating', 'VirtualHating',
         'AccTemple', 'Abortion', 'AccAbortion',
         'Education', 'AccEducation', 'Priests', 'Power', 'Protection',
         'Labor', 'Injured', 'PoliticalHating',
@@ -340,6 +341,7 @@ def main ():
             acc_karma = 0
             acc_v_karma = 0
             acc_n_v_karma = 0
+            acc_n_karma = 0
             acc_temple = 0
             acc_brk = 0
             acc_abort = 0
@@ -363,11 +365,14 @@ def main ():
                 karma = d0['Crimes']['Karma Average'][0]
                 acc_v_karma += vc_karma
                 acc_n_v_karma += vc_n
+                n_karma = vc_n + mo_n
+                acc_n_karma += n_karma
                 n_death = d0['Population']['New Birth'][3]
                 acc_death += n_death
                 d_rate = n_death / pp
                 acc_d_rate += d_rate
                 ht = d0['Crimes']['Virtual/Real Hating'][2]
+                vht = d0['Crimes']['Virtual/Real Hating'][0]
                 n_temple = d0['Calamities']['Build Temple'][0]
                 acc_temple += n_temple
                 abort = sum(d0['Birth']['Social Abortion'])
@@ -381,7 +386,7 @@ def main ():
                 rp.append(prefix)
                 r1 = [term, pp, n_death, acc_death, d_rate, acc_d_rate,
                       karma, a_karma, acc_karma, vc_karma, acc_v_karma,
-                      vc_n, acc_n_v_karma, ht,
+                      vc_n, acc_n_v_karma, n_karma, acc_n_karma, ht, vht,
                       acc_temple, abort, acc_abort, edu, acc_edu, prst,
                       npow, prot]
                 if log_ver >= 1:
@@ -405,7 +410,8 @@ def main ():
             'Term', 'Population', 'Death', 'AccDeath', 'DeathRate',
             'AccDeathRate', 'Karma', 'NewKarma',
             'AccKarma', 'VKarma', 'AccVKarma', 'NVKarma', 'AccNVKarma',
-            'Hating', 'AccTemple', 'Abortion', 'AccAbortion',
+            'NKarma', 'AccNKarma', 'Hating', 'VirtualHating',
+            'AccTemple', 'Abortion', 'AccAbortion',
             'Education', 'AccEducation', 'Priests', 'Power', 'Protection'
         ],
         [
