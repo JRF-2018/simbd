@@ -1,8 +1,8 @@
 #!/usr/bin/python3
-__version__ = '0.0.9' # Time-stamp: <2021-09-29T10:05:33Z>
+__version__ = '0.0.1' # Time-stamp: <2021-09-25T22:30:07Z>
 ## Language: Japanese/UTF-8
 
-"""Simulation Buddhism Prototype No.3 - Miscellaneous
+"""Simulation Buddhism Prototype No.3 x.1 - Miscellaneous
 
 その他雑他のルーチン
 """
@@ -32,8 +32,8 @@ import math
 import random
 import numpy as np
 
-from simbdp3.base import ARGS
-from simbdp3.common import np_clip, interpolate
+from simbdp3x1.base import ARGS
+from simbdp3x1.common import np_clip, interpolate
 
 
 def calc_with_support_asset_rank (economy):
@@ -207,5 +207,6 @@ def print_population (economy):
                 n_f += 1
             dp[p.district] += 1
     print("New Birth:", mb, "New Death:", md,
-          "WantChildMag:", economy.want_child_mag)
+          "WantChildMag:", [dist.want_child_mag
+                            for dist in economy.nation.districts])
     print("District Population:", dp, "Male:Female:", n_m, ":", n_f)

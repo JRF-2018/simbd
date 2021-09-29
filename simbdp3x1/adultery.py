@@ -1,8 +1,8 @@
 #!/usr/bin/python3
-__version__ = '0.0.9' # Time-stamp: <2021-09-25T03:45:55Z>
+__version__ = '0.0.1' # Time-stamp: <2021-09-26T03:56:50Z>
 ## Language: Japanese/UTF-8
 
-"""Simulation Buddhism Prototype No.3 - Adultery
+"""Simulation Buddhism Prototype No.3 x.1 - Adultery
 
 不倫関連
 """
@@ -33,9 +33,9 @@ import math
 import random
 import numpy as np
 
-import simbdp3.base as base
-from simbdp3.base import ARGS, Person0, Economy0, EconomyPlot0
-from simbdp3.common import np_clip, np_random_choice, Adultery, Marriage
+import simbdp3x1.base as base
+from simbdp3x1.base import ARGS, Person0, Economy0, EconomyPlot0
+from simbdp3x1.common import np_clip, np_random_choice, Adultery, Marriage
 
 
 class PersonAD (Person0):
@@ -736,9 +736,9 @@ def update_adulteries (economy):
     for m, f in adulterers:
         matches.append(match_favor(m, f, lambda p, q: p.adultery_favor(q)))
         print("...", flush=True)
+    print("Matches:", [len(l) for l in matches], flush=True)
     m0 = matches[0]
     matches = sum(matches, [])
-    print("Matches:", len(matches), flush=True)
     # if len(m0) >= 10:
     #     print("Match Samples:", flush=True)
     #     for i in range(0, 10):

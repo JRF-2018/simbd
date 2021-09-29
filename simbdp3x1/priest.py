@@ -1,8 +1,8 @@
 #!/usr/bin/python3
-__version__ = '0.0.9' # Time-stamp: <2021-09-26T02:58:15Z>
+__version__ = '0.0.1' # Time-stamp: <2021-09-26T02:57:23Z>
 ## Language: Japanese/UTF-8
 
-"""Simulation Buddhism Prototype No.3 - Priesthood
+"""Simulation Buddhism Prototype No.3 x.1 - Priesthood
 
 僧職関連
 """
@@ -32,9 +32,9 @@ import math
 import random
 import numpy as np
 
-import simbdp3.base as base
-from simbdp3.base import ARGS, Person0
-from simbdp3.common import np_clip, np_random_choice, interpolate,\
+import simbdp3x1.base as base
+from simbdp3x1.base import ARGS, Person0
+from simbdp3x1.common import np_clip, np_random_choice, interpolate,\
     Priesthood
 
 
@@ -215,26 +215,14 @@ def recruit_priests (economy):
     n_p = []
     n_p2 = []
     for dnum, dist in enumerate(economy.nation.districts):
-        dist.priests_share_log.append(dist.priests_share)
+        q = dist.priests_share_ma.update(dist.priests_share)
         dist.priests_share = 0
-        if len(dist.priests_share_log) > 120:
-            dist.priests_share_log = dist.priests_share_log[1:121]
-        k = 12
-        if len(dist.priests_share_log) < k:
-            k = len(dist.priests_share_log)
-        m1 = np.mean(dist.priests_share_log[0:k])
-        m2 = np.mean(dist.priests_share_log)
-        if m1 == 0:
-            m1 = 1
-        if m2 == 0:
-            m2 = 1
-        q = np_clip((m1 - m2) / m2, -0.8, 0.8)
-        if q >= 0:
-            q1 = interpolate(0, ARGS.priests_rate,
-                             0.8, ARGS.priests_rate_max, q)
+        if q >= 0.5:
+            q1 = interpolate(0.5, ARGS.priests_rate,
+                             1.0, ARGS.priests_rate_max, q)
         else:
-            q1 = interpolate(0, ARGS.priests_rate,
-                             -0.8, ARGS.priests_rate_min, q)
+            q1 = interpolate(0.5, ARGS.priests_rate,
+                             0.0, ARGS.priests_rate_min, q)
         n = math.ceil(len(pp[dnum]) * q1)
         if len(prs[dnum]) == n:
             n_p.append(0)

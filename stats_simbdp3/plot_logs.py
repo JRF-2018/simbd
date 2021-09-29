@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.7' # Time-stamp: <2021-09-21T17:30:39Z>
+__version__ = '0.0.8' # Time-stamp: <2021-09-28T05:21:05Z>
 ## Language: Japanese/UTF-8
 
 """Statistics for Simulation Buddhism Prototype No.3
@@ -55,7 +55,7 @@ def parse_args ():
     parser.add_argument("prefix", nargs='+')
     parser.add_argument("-p", "--parameter", choices=[
         'Population', 'Death', 'AccDeath', 'DeathRate', 'AccDeathRate',
-        'Karma', 'NewKarma', 'AccKarma',
+        'Karma', 'NewKarma', 'AccKarma', 'NewKarma2',
         'VKarma', 'AccVKarma', 'NVKarma', 'AccNVKarma',
         'NKarma', 'AccNKarma', 'Hating', 'VirtualHating',
         'AccTemple', 'Abortion', 'AccAbortion',
@@ -320,12 +320,18 @@ def main ():
             dsum2.append(sum([v for n, v in d.items() if n != "invasion"]))
         print()
         mn = np.mean(dsum)
-        interval = stats.t.interval(alpha=0.95, df=len(dsum) - 1,
-                                    loc=mn, scale=stats.sem(dsum))
+        if len(dsum) <= 1:
+            interval = (mn, mn)
+        else:
+            interval = stats.t.interval(alpha=0.95, df=len(dsum) - 1,
+                                        loc=mn, scale=stats.sem(dsum))
         print(prefix, ":", mn, interval)
         mn = np.mean(dsum2)
-        interval = stats.t.interval(alpha=0.95, df=len(dsum2) - 1,
-                                    loc=mn, scale=stats.sem(dsum2))
+        if len(dsum2) <= 1:
+            interval = (mn, mn)
+        else:
+            interval = stats.t.interval(alpha=0.95, df=len(dsum2) - 1,
+                                        loc=mn, scale=stats.sem(dsum2))
         print("excluding invasion:", mn, interval)
         print(dict(sorted([(n, v/len(l)) for n, v in d_cals.items()],
                           key=lambda x: x[0])))
@@ -355,12 +361,12 @@ def main ():
                 mo_karma = d0['Crimes']['Minor Offences'][2]
                 vc_n = d0['Crimes']['Vicious Crimes'][0]
                 vc_karma = d0['Crimes']['Vicious Crimes'][4]
+                new_karma = (mo_karma * mo_n + vc_karma * vc_n)
                 a_karma = 0
                 if mo_n + vc_n != 0:
 #                    a_karma = (mo_karma * mo_n + vc_karma * vc_n) \
 #                        / (mo_n + vc_n)
-                    a_karma = (mo_karma * mo_n + vc_karma * vc_n) \
-                        / pp
+                    a_karma = (mo_karma * mo_n + vc_karma * vc_n) / pp
                 acc_karma += a_karma
                 karma = d0['Crimes']['Karma Average'][0]
                 acc_v_karma += vc_karma
@@ -385,7 +391,8 @@ def main ():
                             for l1 in d.values()])
                 rp.append(prefix)
                 r1 = [term, pp, n_death, acc_death, d_rate, acc_d_rate,
-                      karma, a_karma, acc_karma, vc_karma, acc_v_karma,
+                      karma, a_karma, acc_karma, new_karma,
+                      vc_karma, acc_v_karma,
                       vc_n, acc_n_v_karma, n_karma, acc_n_karma, ht, vht,
                       acc_temple, abort, acc_abort, edu, acc_edu, prst,
                       npow, prot]
@@ -408,8 +415,8 @@ def main ():
     pl1 = [
         [
             'Term', 'Population', 'Death', 'AccDeath', 'DeathRate',
-            'AccDeathRate', 'Karma', 'NewKarma',
-            'AccKarma', 'VKarma', 'AccVKarma', 'NVKarma', 'AccNVKarma',
+            'AccDeathRate', 'Karma', 'NewKarma', 'AccKarma', 'NewKarma2',
+            'VKarma', 'AccVKarma', 'NVKarma', 'AccNVKarma',
             'NKarma', 'AccNKarma', 'Hating', 'VirtualHating',
             'AccTemple', 'Abortion', 'AccAbortion',
             'Education', 'AccEducation', 'Priests', 'Power', 'Protection'

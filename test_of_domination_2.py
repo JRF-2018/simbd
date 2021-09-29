@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.14' # Time-stamp: <2021-08-30T16:17:51Z>
+__version__ = '0.0.15' # Time-stamp: <2021-09-25T04:51:30Z>
 ## Language: Japanese/UTF-8
 
 """支配と災害のシミュレーション"""
@@ -169,7 +169,7 @@ ARGS.no_successor_resentment = False
 # 支配層の能力調整の基準値
 ARGS.dominator_adder = 0.1
 # ケガ・病気の障害として残る確率
-ARGS.permanent_injure_rate = 1/2
+ARGS.permanent_injury_rate = 1/2
 # 予言の効果
 ARGS.prophecy_effect = 1.0
 
@@ -2192,15 +2192,15 @@ class EconomyDM (Economy0):
             p.political_hating = np_clip(p.political_hating + a, 0, 1)
 
     def injure (self, people, max_permanent=0.5, max_temporal=0.5,
-                permanent_injure_rate=None):
+                permanent_injury_rate=None):
         economy = self
-        if permanent_injure_rate is None:
-            permanent_injure_rate = ARGS.permanent_injure_rate
+        if permanent_injury_rate is None:
+            permanent_injury_rate = ARGS.permanent_injury_rate
         fa = set()
         for p in people:
             b = random.uniform(0, max_temporal)
             p.tmp_injured = np_clip(p.tmp_injured + b, 0, 1)
-            if random.random() < permanent_injure_rate:
+            if random.random() < permanent_injury_rate:
                 a = random.uniform(0, max_permanent)
                 p.injured = np_clip(p.injured + a, 0, 1)
 

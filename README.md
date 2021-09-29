@@ -1,7 +1,7 @@
 # シミュレーション仏教 - 仏教的哲学的社会シミュレーション
 # Simulation Buddhism - Buddhistic Philosophical Computer-Simulation of Society
 
-<!-- Time-stamp: "2021-08-22T07:31:59Z" -->
+<!-- Time-stamp: "2021-09-23T10:24:03Z" -->
 
 ## このプロジェクトについて
 
@@ -59,6 +59,11 @@ https://github.com/JRF-2018/simbd
 
 《グローバル共有メモ》  
 http://jrockford.s1010.xrea.com/demo/shared_memo.cgi?cmd=log
+
+いちおう過去のレポジトリのバックアップのいくつかが↓にもあります。
+
+《「シミュレーション仏教」のバックアップファイル置き場》  
+http://jrockford.s1010.xrea.com/archive/simbd/index.html
 
 
 ## Author

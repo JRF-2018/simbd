@@ -1,7 +1,7 @@
 
 
     仏教的哲学的社会シミュレーション
-    (Created: 2021-02-27, Time-stamp: <2021-09-01T03:50:46Z>)
+    (Created: 2021-02-27, Time-stamp: <2021-09-25T13:13:19Z>)
 
 
 ** このファイルについて
@@ -139,17 +139,21 @@ https://gist.github.com/JRF-2018/aace48ebc44229844b6f75a39a287578
 
 相続のテスト。
 
+
   * test_of_marriage_1.py
 
 近親婚のテスト。
+
 
   * test_of_domination_2.py
 
 支配と災害のテスト。
 
+
   * test_of_moving_1.py
 
 転居のテスト。
+
 
   * test_of_domination_3.py
 
@@ -157,6 +161,25 @@ https://gist.github.com/JRF-2018/aace48ebc44229844b6f75a39a287578
 
 このプログラムは実行する前に、python test_of_matching_2.py -S -t 1200
 を実行し正常終了している必要がある。
+
+
+  * test_of_mean_amplifier_2.py
+
+平均付近の増幅のテスト。
+
+初期には↓で公開されていた。
+
+https://gist.github.com/JRF-2018/ee1bfe8b3cc676a5389ed5f81c6f544f
+
+
+  * test_of_mean_amplifier_3.py
+
+平均付近の増幅のテスト。MeanAmplifier のテスト。
+
+
+  * test_of_mean_amplifier_4.py
+
+平均付近の増幅のテスト。BlockMeanAmplifier のテスト。
 
 
 
@@ -186,6 +209,14 @@ Simulation Buddhism Prototype No.3。「シミュレーション仏教」プロ�
 プ 3号。simbdp2.py に僧と犯罪のモデルを足したもの。
 
 
+  * simbdp3x1.py
+  * simbdp3x1/*.py
+
+Simulation Buddhism Prototype No.3 x.1。「シミュレーション仏教」プロト
+タイプ 3号x.1。simbdp3.py で MeanAmplifier を使うようにしたもの。
+今のところ「x.」は「extended」の略のつもり。
+
+
 
 ** 統計処理
 
@@ -199,11 +230,25 @@ run_simbdp3.sh PREFIX NUM OPTIONS
 する。PREFIX-01.log ... といったファイルができる。
 
 
+  * stats_simbdp3/run_simbdp3x1.sh
+
+simbdp3x1.py 用の run_simbdp3.sh。
+
+
   * stats_simbdp3/plot_logs.py
 
 ログの結果をグラフに描くプログラム。run_simbdp3.sh の PREFIX を(複数)
 引数として取る。-p AccDeath を付けると累積死亡数のグラフを表示。それ以
 外のオプションについてはソースを読むなりしていただきたい。
+
+
+  * stats_simbdp3/make_logs.sh
+  * stats_simbdp3/make_figs.sh
+
+ログを作り、グラフを描く際の PREFIX とパラメータの参考にするために作っ
+た。著者は実際にはこれらをちょこちょこっといじったものを使って毎度ログ
+を取り、グラフを描いている。これらを使って一気に make することは時間が
+かかり過ぎることもあり本当のところあまり考えていない。
 
 
 

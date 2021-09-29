@@ -1,8 +1,8 @@
 #!/usr/bin/python3
-__version__ = '0.0.9' # Time-stamp: <2021-09-25T04:49:26Z>
+__version__ = '0.0.1' # Time-stamp: <2021-09-25T22:27:59Z>
 ## Language: Japanese/UTF-8
 
-"""Simulation Buddhism Prototype No.3 - Domination
+"""Simulation Buddhism Prototype No.3 x.1 - Domination
 
 支配関連
 """
@@ -33,11 +33,11 @@ import math
 import random
 import numpy as np
 
-import simbdp3.base as base
-from simbdp3.base import ARGS, Person0, Economy0, \
+import simbdp3x1.base as base
+from simbdp3x1.base import ARGS, Person0, Economy0, \
     Serializable, SerializableExEconomy
-from simbdp3.random import negative_binominal_rand, half_normal_rand
-from simbdp3.common import np_clip, Child, Marriage, Rape
+from simbdp3x1.random import negative_binominal_rand, half_normal_rand
+from simbdp3x1.common import np_clip, Child, Marriage, Rape
 
 
 class PersonDM (Person0):
@@ -546,7 +546,13 @@ class District (Serializable):
         self.tmp_power = 1.0      # 国力
 
         self.priests_share = 0    # 相続で得られた僧の収入
-        self.priests_share_log = []
+        self.priests_share_ma = None
+        self.education_power_ma = None
+
+        self.want_child_mag = 1.0
+        self.prev_birth = 0
+        self.ideal_births = []
+        self.anti_marriage_level = 0
 
 
 class Nation (Serializable):
@@ -575,12 +581,7 @@ class Nation (Serializable):
 
 
 def initialize_nation (economy):
-    economy.nation = Nation()
     nation = economy.nation
-    for d_num in range(len(ARGS.population)):
-        district = District()
-        nation.districts.append(district)
-
 
     dpeople = [[] for dnum in range(len(ARGS.population))]
     for p in economy.people.values():
@@ -615,6 +616,9 @@ def initialize_nation (economy):
     for dnum in range(len(ARGS.population)):
         nation.districts[dnum].tmp_budget = ARGS.initial_budget_per_person \
             * ARGS.population[dnum]
+
+    for dnum in range(len(ARGS.population)):
+        nation.districts[dnum].prev_birth = ARGS.min_birth[dnum]
 
     for cn, ci in base.calamity_info.items():
         for dnum in range(len(ARGS.population)):

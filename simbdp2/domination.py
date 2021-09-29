@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.11' # Time-stamp: <2021-08-24T03:09:08Z>
+__version__ = '0.0.12' # Time-stamp: <2021-09-25T04:50:45Z>
 ## Language: Japanese/UTF-8
 
 """Simulation Buddhism Prototype No.2 - Domination
@@ -208,15 +208,15 @@ class EconomyDM (Economy0):
             p.political_hating = np_clip(p.political_hating + a, 0, 1)
 
     def injure (self, people, max_permanent=0.5, max_temporal=0.5,
-                permanent_injure_rate=None):
+                permanent_injury_rate=None):
         economy = self
-        if permanent_injure_rate is None:
-            permanent_injure_rate = ARGS.permanent_injure_rate
+        if permanent_injury_rate is None:
+            permanent_injury_rate = ARGS.permanent_injury_rate
         fa = set()
         for p in people:
             b = random.uniform(0, max_temporal)
             p.tmp_injured = np_clip(p.tmp_injured + b, 0, 1)
-            if random.random() < permanent_injure_rate:
+            if random.random() < permanent_injury_rate:
                 a = random.uniform(0, max_permanent)
                 p.injured = np_clip(p.injured + a, 0, 1)
 

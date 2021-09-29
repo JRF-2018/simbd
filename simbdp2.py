@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.11' # Time-stamp: <2021-08-30T16:13:23Z>
+__version__ = '0.0.12' # Time-stamp: <2021-09-25T04:51:04Z>
 ## Language: Japanese/UTF-8
 
 """Simulation Buddhism Prototype No.2 - Main
@@ -308,7 +308,7 @@ ARGS.no_successor_resentment = False
 # 支配層の能力調整の基準値
 ARGS.dominator_adder = 0.1
 # ケガ・病気の障害として残る確率
-ARGS.permanent_injure_rate = 1/2
+ARGS.permanent_injury_rate = 1/2
 # 予言の効果
 ARGS.prophecy_effect = 1.0
 

@@ -1,10 +1,10 @@
 #!/usr/bin/python3
-__version__ = '0.0.9' # Time-stamp: <2021-09-25T04:48:33Z>
+__version__ = '0.0.1' # Time-stamp: <2021-09-29T09:26:26Z>
 ## Language: Japanese/UTF-8
 
-"""Simulation Buddhism Prototype No.3 - Main
+"""Simulation Buddhism Prototype No.3 x.1 - Main
 
-「シミュレーション仏教」プロトタイプ 3号 - メインルーチン
+「シミュレーション仏教」プロトタイプ 3号x.1 - メインルーチン
 """
 
 ##
@@ -38,27 +38,28 @@ import sys
 import signal
 import argparse
 
-import simbdp3.base as base
-from simbdp3.base import ARGS, calc_increase_rate, calc_pregnant_mag,\
+import simbdp3x1.base as base
+from simbdp3x1.base import ARGS, calc_increase_rate, calc_pregnant_mag,\
     term_to_year_month, Frozen
-from simbdp3.init import initialize
-from simbdp3.economy import PersonEC, EconomyPlotEC, update_economy
-from simbdp3.birth import PersonBT, EconomyPlotBT, update_birth,\
+from simbdp3x1.common import MeanAmplifier, BlockMeanAmplifier
+from simbdp3x1.init import initialize
+from simbdp3x1.economy import PersonEC, EconomyPlotEC, update_economy
+from simbdp3x1.birth import PersonBT, EconomyPlotBT, update_birth,\
     update_fertility
-from simbdp3.death import PersonDT, EconomyDT, update_death
-from simbdp3.adultery import PersonAD, EconomyPlotAD, update_adulteries
-from simbdp3.marriage import PersonMA, EconomyMA, EconomyPlotMA,\
+from simbdp3x1.death import PersonDT, EconomyDT, update_death
+from simbdp3x1.adultery import PersonAD, EconomyPlotAD, update_adulteries
+from simbdp3x1.marriage import PersonMA, EconomyMA, EconomyPlotMA,\
     update_marriages
-from simbdp3.support import PersonSUP, update_support, check_support_consistent
-from simbdp3.moving import PersonMV, calc_moving_matrix
-from simbdp3.domination import PersonDM, EconomyDM, update_dominators
-from simbdp3.calamity import update_calamities, Invasion
-from simbdp3.crime import PersonCR, update_crimes
-from simbdp3.priest import PersonPR, update_priests, \
+from simbdp3x1.support import PersonSUP, update_support, check_support_consistent
+from simbdp3x1.moving import PersonMV, calc_moving_matrix
+from simbdp3x1.domination import PersonDM, EconomyDM, update_dominators
+from simbdp3x1.calamity import update_calamities, Invasion
+from simbdp3x1.crime import PersonCR, update_crimes
+from simbdp3x1.priest import PersonPR, update_priests, \
     update_education, update_tombs
-from simbdp3.misc import update_labor, update_eagerness,\
+from simbdp3x1.misc import update_labor, update_eagerness,\
     calc_tmp_labor, update_injured, update_ambition, print_population
-from simbdp3.inherit import recalc_inheritance_share
+from simbdp3x1.inherit import recalc_inheritance_share
 
 
 ##
@@ -70,7 +71,7 @@ from simbdp3.inherit import recalc_inheritance_share
 ARGS.load = False
 ARGS.save = False
 # セーブするファイル名
-ARGS.pickle = 'simbdp3.pickle'
+ARGS.pickle = 'simbdp3x1.pickle'
 # 途中エラーなどがある場合に備えてセーブする間隔
 ARGS.save_period = 120
 # ロード時にランダムシードをロードしない場合 True
@@ -168,6 +169,10 @@ ARGS.newborn_death_rate = 5/100
 ARGS.multipara_death_rate = 1.5/100
 # 妊娠後の不妊化の確率
 ARGS.infertility_rate = calc_increase_rate(12, 10/100)
+# 結婚抑制の効果
+ARGS.anti_marriage_level_1 = 0.15
+ARGS.anti_marriage_level_2 = 0.30
+ARGS.anti_marriage_level_3 = 0.45
 # 一般死亡率
 ARGS.general_death_rate = calc_increase_rate(12, 0.5/100)
 # 60歳から80歳までの老人死亡率
@@ -291,12 +296,12 @@ ARGS.invasion_average_term_max = 15.0 * 12
 ARGS.invasion_mag = 2.0
 # 洪水の頻度の目安
 #ARGS.flood_rate = 1.0 / 7
-ARGS.flood_rate = (1.0 / 14) * (1/4)
+ARGS.flood_rate = (1.0 / 14) * (1/6)
 # 作物の病気の頻度の目安
 ARGS.cropfailure_rate = (1/8) / 3
 # 大火事の頻度の目安
 #ARGS.bigfire_rate = (1 / (5 * 12)) * (12/15)
-ARGS.bigfire_rate = (1 / (10 * 12)) * (12/15)
+ARGS.bigfire_rate = (1 / (10 * 12)) * (12/15) * (1/2)
 # 地震の頻度の目安
 ARGS.earthquake_rate = (1 / (5 * 12)) * (1/4)
 # 次の疫病までの平均期
@@ -426,6 +431,10 @@ ARGS.vicious_crime_slack = 0.0
 # 重犯罪の被害者のランダムななりやすさ
 ARGS.crime_victim_slack = 0.75
 
+# MeanAmplifier と BlockMeanAmplifier のパラメータ
+ARGS.mean_amplifier_alpha1 = 0.3
+ARGS.mean_amplifier_alpha2 = 0.3
+
 
 SAVED_ECONOMY = None
 
@@ -447,7 +456,7 @@ def parse_args (view_options=['none']):
     parser.add_argument("--debug-term", type=int)
     parser.add_argument("-t", "--trials", type=int)
     parser.add_argument("-p", "--population", type=str)
-    parser.add_argument("--min-birth", type=float)
+    parser.add_argument("--min-birth", type=str)
     parser.add_argument("--view-1", choices=view_options)
     parser.add_argument("--view-2", choices=view_options)
     parser.add_argument("--view-3", choices=view_options)
@@ -484,7 +493,9 @@ def parse_args (view_options=['none']):
     if type(ARGS.population) is str:
         ARGS.population = list(map(int, ARGS.population.split(',')))
     if ARGS.min_birth is None:
-        ARGS.min_birth = sum([x / (12 * ARGS.init_max_age) for x in ARGS.population])
+        ARGS.min_birth = [0.8 * x / (12 * ARGS.init_max_age) for x in ARGS.population]
+    if type(ARGS.min_birth) is str:
+        ARGS.min_birth = list(map(float, ARGS.min_birth.split(',')))
     if ARGS.intended_pregnant_mag is None:
         ARGS.intended_pregnant_mag = calc_pregnant_mag(
             ARGS.intended_pregnant_rate, ARGS.worst_pregnant_rate
@@ -516,6 +527,11 @@ def update_classes ():
     if ARGS.no_frozen:
         delattr(Frozen, '__setattr__')
         delattr(Frozen, '__metaclass__')
+
+    MeanAmplifier.alpha1 = ARGS.mean_amplifier_alpha1
+    MeanAmplifier.alpha2 = ARGS.mean_amplifier_alpha2
+    BlockMeanAmplifier.alpha1 = ARGS.mean_amplifier_alpha1
+    BlockMeanAmplifier.alpha2 = ARGS.mean_amplifier_alpha2
 
 
 class Person (PersonEC, PersonBT, PersonDT, PersonAD, PersonMA, PersonSUP, PersonMV, PersonDM, PersonCR, PersonPR):
