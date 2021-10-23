@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.1' # Time-stamp: <2021-09-25T20:25:50Z>
+__version__ = '0.0.2' # Time-stamp: <2021-10-14T06:28:54Z>
 ## Language: Japanese/UTF-8
 
 """Simulation Buddhism Prototype No.3 x.1 - Crime
@@ -202,63 +202,58 @@ def _family_soohted_hate(economy, cfamily, vfamily):
     return max(l)
 
 
-def _virtual_soothed_hate_1(economy, cfamily, vfamily):
-    ht = {}
-    dht = {}
+def _family_dead_hate(economy, cfamily, vfamily):
+    s = 0
+    ds = 0
+    mx = 0
+    dmx = 0
     for pid in cfamily:
-        p = economy.get_person(pid)
-        if p is None:
+        if pid not in economy.tombs:
             continue
-        for qid in vfamily:
-            if qid in p.hating:
-                if (pid, qid) not in ht:
-                    ht[(pid, qid)] = 0
-                ht[(pid, qid)] = max([ht[(pid, qid)], p.hating[qid]])
-        if pid in economy.tombs:
-            t = economy.tombs[pid]
-            for qid in vfamily:
-                if qid in t.death_hating and t.death_hating[qid] >= 0.5:
-                    if (pid, qid) not in dht:
-                        dht[(pid, qid)] = 0.5
-                    dht[(pid, qid)] = max([dht[(pid, qid)],
-                                           t.death_hating[qid]])
-        else:
-            for qid in vfamily:
-                if qid in p.hating and p.hating[qid] >= 0.5:
-                    if (pid, qid) not in dht:
-                        dht[(pid, qid)] = 0.5
-                    dht[(pid, qid)] = max([dht[(pid, qid)],
-                                           p.hating[qid]])
-    return ht, dht
-    
+        t = economy.tombs[pid]
+        p = t.person
+        hts = [p.hating[qid] if qid in p.hating else 0
+               for qid in vfamily]
+        s += sum(hts)
+        mx = max([mx] + hts)
+        hts = [t.death_hating[qid] if qid in t.death_hating else 0
+               for qid in vfamily]
+        ds += sum(hts)
+        dmx = max([dmx] + hts)
+    return s, mx, ds, dmx
+
+
+def _family_live_hate(economy, cfamily, vfamily):
+    s = 0
+    mx = 0
+    for pid in cfamily:
+        if not economy.is_living(pid):
+            continue
+        p = economy.people[pid]
+        hts = [p.hating[qid] if qid in p.hating else 0
+               for qid in vfamily]
+        s += sum(hts)
+        mx = max([mx] + hts)
+    return s, mx
+
 
 def _virtual_soothed_hate(economy, person1, cfamily, vfamily):
-    cht, cdht = _virtual_soothed_hate_1(economy, cfamily, vfamily)
-    vht, vdht = _virtual_soothed_hate_1(economy, vfamily, cfamily)
-
-    l = []
-    for x in cht:
-        if x not in cdht:
-            l.append(x)
-    for x in l:
-        del cht[x]
-
-    if not cht:
-        return 0.5
-    h3 = max(list(cht.values()))
-    if not vdht:
-        return h3
-    h1 = max(list(vdht.values()))
-    h1ids = [x for x in vdht if vdht[x] == h1]
-    h1id = min(h1ids, key=lambda x: vht[x])
-    h2 = vht[h1id]
-    h3ids = [x for x in cht if cht[x] == h3]
-    h3id = min(h3ids, key=lambda x: cdht[x])
-    h4 = cdht[h3id]
-
+    _, h1 = _family_live_hate(economy, cfamily, vfamily)
+    sh3a, _, sh2a, h4a = _family_dead_hate(economy, cfamily, vfamily)
+    sh3b, _, sh2b, h4b = _family_dead_hate(economy, vfamily, cfamily)
+    sh2 = sh2a + sh2b
+    sh3 = sh3a + sh3b
+    h4 = max([h4a, h4b])
     p = person1
-    y = interpolate(0.0, 0.5, 1.0, 0.7, p.education)
-    h5 = min([h3, h4 * (1 -  y * (1 - h2/h1))])
+    a = interpolate(0.0, 0.75, 1.0, 1.0, p.education)
+    b = sh3/sh2 if sh2 != 0 else 0
+    if h1 < 0.5:
+        h1 = 0.5
+    if h1 > h4:
+        h5 = (h1 - h4) + h4 * (1 - a * (1 - b))
+    else:
+        h5 = h1 * (1 - a * (1 - b))
+
     return h5
 
 

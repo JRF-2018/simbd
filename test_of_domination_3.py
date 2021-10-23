@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.9' # Time-stamp: <2021-09-18T10:24:32Z>
+__version__ = '0.0.10' # Time-stamp: <2021-10-16T01:22:03Z>
 ## Language: Japanese/UTF-8
 
 """支配層の代替わりのテスト
@@ -219,7 +219,7 @@ def frozen (set):
             #If attribute already exists, simply set it
             set(self,name,value)
             return
-        elif sys._getframe(1).f_code.co_name is '__init__':
+        elif sys._getframe(1).f_code.co_name == '__init__':
             #Allow __setattr__ calls in __init__ calls of proper object types
             for k,v in sys._getframe(1).f_locals.items():
                 if k=="self" and isinstance(v, self.__class__):
@@ -857,6 +857,15 @@ class District (Serializable):
         self.prev_budget = []     # 過去10年の予算平均
         self.tmp_power = 1.0      # 国力
 
+        self.priests_share = 0    # 相続で得られた僧の収入
+        self.priests_share_ma = None
+        self.education_power_ma = None
+
+        self.want_child_mag = 1.0
+        self.prev_birth = 0
+        self.ideal_births = []
+        self.anti_marriage_level = 0
+
 
 class Nation (Serializable):
     def __init__ (self):
@@ -910,6 +919,12 @@ class Plague (Disaster):           # 「疫病」
 class Invasion (Calamity):        # 「蛮族の侵入」
     pass
 
+class MeanAmplifier (Serializable):
+    pass
+
+class BlockMeanAmplifier (Serializable):
+    pass
+
 
 class Economy0 (Frozen):
     def __init__ (self):
@@ -937,6 +952,11 @@ class Economy0 (Frozen):
 
         self.rand_state = None
         self.rand_state_np = None
+
+        self.virtual_hating_ma = None
+        self.real_hating_ma = None
+        self.education_crime_ma = None
+        self.vicious_crime_bma = None
 
 
 class EconomyBT (Economy0):

@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.1' # Time-stamp: <2021-09-29T09:26:44Z>
+__version__ = '0.0.2' # Time-stamp: <2021-10-16T05:51:50Z>
 ## Language: Japanese/UTF-8
 
 """Simulation Buddhism Prototype No.3 x.1 - Common
@@ -114,8 +114,8 @@ class Priesthood (Serializable):
 class MeanAmplifier (Serializable):
     buflen = 10 * 12
     pointlen = 1
-    alpha1 = 0.3  # replacing by ARGS.mean_amplifier_alpha1
-    alpha2 = 0.3  # replacing by ARGS.mean_amplifier_alpha2
+    alpha1 = 0.2  # replacing by ARGS.mean_amplifier_alpha1
+    alpha2 = 0.2  # replacing by ARGS.mean_amplifier_alpha2
     beta = 0.5
     
     def __init__ (self, buflen=None, pointlen=None,
@@ -163,8 +163,8 @@ class MeanAmplifier (Serializable):
 
 class BlockMeanAmplifier (Serializable):
     buflen = 10 * 12
-    alpha1 = 0.3  # replacing by ARGS.mean_amplifier_alpha1
-    alpha2 = 0.3  # replacing by ARGS.mean_amplifier_alpha2
+    alpha1 = 0.2  # replacing by ARGS.mean_amplifier_alpha1
+    alpha2 = 0.2  # replacing by ARGS.mean_amplifier_alpha2
     beta = 0.5
     
     def __init__ (self, buflen=None,

@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.1' # Time-stamp: <2021-09-29T09:26:26Z>
+__version__ = '0.0.2' # Time-stamp: <2021-10-16T04:34:52Z>
 ## Language: Japanese/UTF-8
 
 """Simulation Buddhism Prototype No.3 x.1 - Main
@@ -432,8 +432,8 @@ ARGS.vicious_crime_slack = 0.0
 ARGS.crime_victim_slack = 0.75
 
 # MeanAmplifier と BlockMeanAmplifier のパラメータ
-ARGS.mean_amplifier_alpha1 = 0.3
-ARGS.mean_amplifier_alpha2 = 0.3
+ARGS.mean_amplifier_alpha1 = 0.2
+ARGS.mean_amplifier_alpha2 = 0.2
 
 
 SAVED_ECONOMY = None

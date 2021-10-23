@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.2' # Time-stamp: <2021-02-17T17:01:45Z>
+__version__ = '0.0.3' # Time-stamp: <2021-10-16T01:26:47Z>
 ## Language: Japanese/UTF-8
 
 """不倫のマッチングのシミュレーション"""
@@ -81,7 +81,7 @@ def frozen(set):
             #If attribute already exists, simply set it
             set(self,name,value)
             return
-        elif sys._getframe(1).f_code.co_name is '__init__':
+        elif sys._getframe(1).f_code.co_name == '__init__':
             #Allow __setattr__ calls in __init__ calls of proper object types
             for k,v in sys._getframe(1).f_locals.items():
                 if k=="self" and isinstance(v, self.__class__):
