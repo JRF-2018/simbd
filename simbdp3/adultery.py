@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.9' # Time-stamp: <2021-09-25T03:45:55Z>
+__version__ = '0.0.11' # Time-stamp: <2021-10-26T07:53:12Z>
 ## Language: Japanese/UTF-8
 
 """Simulation Buddhism Prototype No.3 - Adultery
@@ -736,9 +736,9 @@ def update_adulteries (economy):
     for m, f in adulterers:
         matches.append(match_favor(m, f, lambda p, q: p.adultery_favor(q)))
         print("...", flush=True)
+    print("Matches:", [len(l) for l in matches], flush=True)
     m0 = matches[0]
     matches = sum(matches, [])
-    print("Matches:", len(matches), flush=True)
     # if len(m0) >= 10:
     #     print("Match Samples:", flush=True)
     #     for i in range(0, 10):

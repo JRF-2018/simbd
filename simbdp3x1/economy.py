@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.1' # Time-stamp: <2021-09-25T07:39:16Z>
+__version__ = '0.0.3' # Time-stamp: <2021-10-25T20:21:53Z>
 ## Language: Japanese/UTF-8
 
 """Simulation Buddhism Prototype No.3 x.1 - Economy
@@ -57,6 +57,9 @@ class EconomicalFamily (Serializable):
         self.tmp_labor = []
         self.tmp_asset = []
 
+
+    def asset_value (self):
+        return self.prop + self.land * ARGS.prop_value_of_land
 
     def trained_ambition (self):
         if self.ambition > 0.5:
@@ -289,6 +292,8 @@ def calc_asset_income (f):
         r = q * f.land - land_prop
         if r > 0:
             prop -= r
+            if prop < 0:
+                prop = 0
     aprop = f.trained_ambition() * prop
     bprop = prop - aprop
     srat = 1.0 if f.stock_exp >= 10 else f.stock_exp / 10.0
@@ -306,17 +311,18 @@ def calc_asset_income (f):
         sprop = stock_max
     gamble_max = ARGS.gamble_max * (1 + 0.3 * (len(f.members) - 1))
     if gprop > gamble_max:
-        bprop += gprop
+        bprop += gprop - gamble_max
         gprop = gamble_max
     bond_max = ARGS.bond_max * (1 + 0.3 * (len(f.members) - 1))
     if bprop > bond_max:
         dprop += bprop - bond_max
         bprop = bond_max
     seagerness = f.trained_eagerness() * 0.5 + srat * 0.5
+
     # 債券 bond
     bincome = 0
     if bprop >= 1:
-        cut = - bprop
+        cut = - bprop * ARGS.cut_slack_rate
         mu = - cut / 5 * 0.3
         theta = 0.01
         sigma = theta * 10 * mu * 0.5
@@ -328,7 +334,7 @@ def calc_asset_income (f):
     sincome = 0
     if sprop >= 5:
         stock_exp = 1
-        cut = - sprop
+        cut = - sprop * ARGS.cut_slack_rate
         mu = - cut / 5 * 1.0
         theta = 0.1
         sigma = theta * 10 * mu * 0.5
@@ -340,7 +346,7 @@ def calc_asset_income (f):
     gincome = 0
     if gprop >= 5:
         stock_exp = 1
-        cut = - gprop
+        cut = - gprop * ARGS.cut_slack_rate
         mu = normal_levy_1(cut) * 0.9
         theta = 1
         sigma = theta * 10
@@ -350,7 +356,7 @@ def calc_asset_income (f):
     # 死蔵 dead
     dincome = 0
     if dprop > 0:
-        cut = - dprop
+        cut = - dprop * ARGS.cut_slack_rate
         mu = 0
         theta = 0.01
         sigma = theta * 10
@@ -363,7 +369,7 @@ def calc_asset_income (f):
         land_exp = 1
         lrat = 1.0 if f.land_exp >= 10 else f.land_exp / 10
         leagerness = f.trained_eagerness() * 0.5 + lrat * 0.5
-        cut = - ARGS.prop_value_of_land
+        cut = - ARGS.prop_value_of_land * ARGS.cut_slack_rate
         mu = - cut / 5 * 2.0
         theta = 0.08
         sigma = theta * 10 * mu * 0.5
@@ -377,8 +383,15 @@ def calc_asset_income (f):
             + 0.5 * f.land * f.tmp_land_damage
         worker_num = virtual_land / land_per_worker
         wage = wage_per_worker * worker_num
-        lincome = np.sum(normal_levy_rand(mu, sigma, theta, cut, f.land)) \
-            * (1 - f.tmp_land_damage) - wage
+        lincome = 0
+        for i in range(f.land):
+            x = normal_levy_rand(mu, sigma, theta, cut)
+            if x > 0:
+                x *= (1 - f.tmp_land_damage)
+            x -= wage / f.land
+            if x < cut:
+                x = cut
+            lincome += x
         if f.education < 0.5:
             hated_update += (ARGS.merchant_hated_update
                              * ((1 - f.education) - 0.5) / 0.5) \
@@ -404,19 +417,36 @@ def calc_labor_income (f, aincome):
         if p.age <= 10:
             infant += (((1 - 0) / (0 - 10)) * (p.age - 10)) ** 2
     labor = sum(f.tmp_labor) - np_clip(infant, 0, 1)
+    if labor < 0:
+        labor = 0
 
-    if aincome >= 6.0 * labor:
-        severeness = random.random() * (0.5 * (1 - income_luck) + 0.5)
-        income = labor * (base * (5/3)
-                          + (0.5 * income_luck + 0.1) * base * (3/3))
+    if f.asset_value() < 0:
+        if aincome >= 10.0 * labor:
+            severeness = 0.2 + 0.8 \
+                * (random.random() * (0.5 * (1 - income_luck) + 0.5))
+            income = labor * (base * (5/3)
+                              + (0.5 * income_luck + 0.1) * base * (3/3))
+        else:
+            severeness = 0.2 + 0.8 \
+                * (np.clip((0.5 * f.trained_ambition()
+                            + random.random()) * 
+                           (0.5 * (1 - income_luck) + 0.5), 0.0, 1.0))
+            income = labor * (base * (7/3) + (0.5 * income_luck
+                                              + 0.5 * f.trained_ambition())
+                              * base * (5/3))
     else:
-        severeness = np.clip((0.5 * f.trained_ambition()
-                              + random.random()) * 
-                             (0.5 * (1 - income_luck) + 0.5), 0.0, 1.0)
-        income = labor * (base * (5/3) + (0.5 * income_luck
-                                          + 0.5 * f.trained_ambition())
-                          * base * (3/3))
-    
+        if aincome >= 6.0 * labor:
+            severeness = random.random() * (0.5 * (1 - income_luck) + 0.5)
+            income = labor * (base * (5/3)
+                              + (0.5 * income_luck + 0.1) * base * (3/3))
+        else:
+            severeness = np.clip((0.5 * f.trained_ambition()
+                                  + random.random()) * 
+                                 (0.5 * (1 - income_luck) + 0.5), 0.0, 1.0)
+            income = labor * (base * (5/3) + (0.5 * income_luck
+                                              + 0.5 * f.trained_ambition())
+                              * base * (3/3))
+
     if severeness > 0.5:
         hating_update = ARGS.merchant_hating_update \
             * (severeness - 0.5) / 0.5
@@ -430,11 +460,24 @@ def calc_labor_income (f, aincome):
 
 def calc_income (economy, families):
     n_b = 0
+    n_w = 0
 
     budget = [0] * len(ARGS.population)
 
     for f in families.values():
+        labor = 0
+        for x in f.tmp_labor:
+            labor += np_clip(x, 0.1, 1.0)
+        tfprop = sum([p.prop for p in f.members.values()])
+
         i1, se, le, hu = calc_asset_income(f)
+        wsl = ARGS.whole_cut_slack * labor
+        if tfprop + f.land * ARGS.prop_value_of_land >= 0:
+            if i1 + tfprop + f.land * ARGS.prop_value_of_land < - wsl:
+                i1 = - tfprop - f.land * ARGS.prop_value_of_land - wsl
+        else:
+            if i1 < - wsl:
+                i1 = - wsl
         i2, hu2 = calc_labor_income(f, i1)
         f.leader.stock_exp += se
         f.leader.land_exp += le
@@ -443,35 +486,50 @@ def calc_income (economy, families):
         f.leader.merchant_hating = np.clip(f.leader.merchant_hating
                                            + hu2, 0.0, 1.0)
 
+        # 生活保護 (死者の供養代も含む)
+        minincome = labor * ARGS.consumption * (2/3) \
+            + len([p for p in f.members.values() if not p.is_dead()]) \
+            * ARGS.consumption * (1/3)
+        if i2 < minincome and \
+           tfprop + f.land * ARGS.prop_value_of_land + i1 + i2 \
+           < minincome:
+            i2 = minincome
+            n_w += 1
+
         i = i1 + i2
-        for j in range(len(f.tmp_labor)):
-            f.tmp_labor[j] = np_clip(f.tmp_labor[j], 0.1, 1.0)
+        mfa = f.asset_value()
+        if mfa > 0:
+            mfa = 0
 
         c = 0
-        labor = sum(f.tmp_labor)
-        if i < 0:
+        if i + mfa <= ARGS.consumption * labor:
             c = ARGS.consumption * labor
-        elif i < 10 * labor:
-            c = i - ((i - ARGS.consumption * labor) * \
-                     (0.1 + ARGS.consumption_education * f.education))
+        elif i + mfa < 10 * labor:
+            c = i + mfa - ((i + mfa - ARGS.consumption * labor) * \
+                           (0.1 + ARGS.consumption_education * f.education))
         else:
-            c = i - ((10 * labor - ARGS.consumption * labor) * \
-                     (0.1 + ARGS.consumption_education * f.education) \
-                     + (i - 10 * labor) * \
-                     (0.5 + ARGS.consumption_education_2 * f.education))
+            c = i + mfa - ((10 * labor - ARGS.consumption * labor) * \
+                           (0.1 + ARGS.consumption_education * f.education) \
+                           + (i + mfa - 10 * labor) * \
+                           (0.5 + ARGS.consumption_education_2 * f.education))
 
-        pr = f.prop + i
+        pr = tfprop + i
         if pr < 0:
             pr = 0
         c2 = pr * 0.1 \
             * (0.6 - ARGS.consumption_education_3 * f.education) \
             + f.land * ARGS.prop_value_of_land * 0.05 * \
             (0.6 - ARGS.consumption_education_3 * f.education)
+        if (not ARGS.no_landlord_thrift) and f.asset_value() + i - c2 < 0:
+            c2 = c
         c = max([c, c2])
+
+        for j in range(len(f.tmp_labor)):
+            f.tmp_labor[j] = np_clip(f.tmp_labor[j], 0.1, 1.0)
 
         f.tmp_asset = []
         for p in f.members.values():
-            a = p.prop + p.land * ARGS.prop_value_of_land
+            a = p.asset_value()
             if a < 10:
                 a = 10
             f.tmp_asset.append(a)
@@ -491,7 +549,21 @@ def calc_income (economy, families):
         pls = sum([p.asset_value() for p in pl])
         if pls >= mns:
             for p in pl:
-                p.prop -= mns * p.prop / pls
+                p.prop -= mns * p.asset_value() / pls
+        elif pls - mns >= - ARGS.debt_slack * len(f.members):
+            for p in pl:
+                p.prop = - p.asset_value()
+            mns -= pls
+            ad = []
+            for p in f.members.values():
+                if p.is_dead():
+                    continue
+                if p.age > 10:
+                    ad.append(p)
+            if not ad:
+                ad = list(f.members.values())
+            for p in ad:
+                p.prop -= mns / len(ad)
         else:
             # 一家離散
             n_b += 1
@@ -533,6 +605,7 @@ def calc_income (economy, families):
                 p.prop -= donation
 
     print("Breakup of Family:", n_b, flush=True)
+    print("Welfare:", n_w, flush=True)
 
     budget = [b / ARGS.economy_period for b in budget]
     print("Budget:", budget)

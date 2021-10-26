@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.9' # Time-stamp: <2021-09-25T04:49:26Z>
+__version__ = '0.0.11' # Time-stamp: <2021-10-26T08:05:38Z>
 ## Language: Japanese/UTF-8
 
 """Simulation Buddhism Prototype No.3 - Domination
@@ -548,6 +548,11 @@ class District (Serializable):
         self.priests_share = 0    # 相続で得られた僧の収入
         self.priests_share_log = []
 
+        self.want_child_mag = 1.0
+        self.prev_birth = 0
+        self.ideal_births = []
+        self.anti_marriage_level = 0
+
 
 class Nation (Serializable):
     def __init__ (self):
@@ -575,12 +580,7 @@ class Nation (Serializable):
 
 
 def initialize_nation (economy):
-    economy.nation = Nation()
     nation = economy.nation
-    for d_num in range(len(ARGS.population)):
-        district = District()
-        nation.districts.append(district)
-
 
     dpeople = [[] for dnum in range(len(ARGS.population))]
     for p in economy.people.values():
@@ -615,6 +615,9 @@ def initialize_nation (economy):
     for dnum in range(len(ARGS.population)):
         nation.districts[dnum].tmp_budget = ARGS.initial_budget_per_person \
             * ARGS.population[dnum]
+
+    for dnum in range(len(ARGS.population)):
+        nation.districts[dnum].prev_birth = ARGS.min_birth[dnum]
 
     for cn, ci in base.calamity_info.items():
         for dnum in range(len(ARGS.population)):

@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.7' # Time-stamp: <2021-02-26T10:24:00Z>
+__version__ = '0.0.8' # Time-stamp: <2021-10-25T19:10:26Z>
 ## Language: Japanese/UTF-8
 
 """主に商業財産から決まる収入のテスト経済シミュレーション。"""
@@ -301,6 +301,8 @@ def asset_income (p):
         r = q * p.land - land_prop
         if r > 0:
             prop -= r
+            if prop < 0:
+                prop = 0
     aprop = p.trained_ambition() * prop
     bprop = prop - aprop
     srat = 1.0 if p.stock_exp >= 10 else p.stock_exp / 10.0
@@ -316,7 +318,7 @@ def asset_income (p):
         gprop += sprop - ARGS.stock_max
         sprop = ARGS.stock_max
     if gprop > ARGS.gamble_max:
-        bprop += gprop
+        bprop += gprop - ARGS.gamble_max
         gprop = ARGS.gamble_max
     dprop = 0
     if bprop > ARGS.bond_max:

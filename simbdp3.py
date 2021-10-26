@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.10' # Time-stamp: <2021-10-16T01:30:28Z>
+__version__ = '0.0.11' # Time-stamp: <2021-10-26T07:28:55Z>
 ## Language: Japanese/UTF-8
 
 """Simulation Buddhism Prototype No.3 - Main
@@ -168,6 +168,10 @@ ARGS.newborn_death_rate = 5/100
 ARGS.multipara_death_rate = 1.5/100
 # 妊娠後の不妊化の確率
 ARGS.infertility_rate = calc_increase_rate(12, 10/100)
+# 結婚抑制の効果
+ARGS.anti_marriage_level_1 = 0.15
+ARGS.anti_marriage_level_2 = 0.30
+ARGS.anti_marriage_level_3 = 0.45
 # 一般死亡率
 ARGS.general_death_rate = calc_increase_rate(12, 0.5/100)
 # 60歳から80歳までの老人死亡率
@@ -237,12 +241,12 @@ ARGS.hated_mag = 1.0
 ARGS.stress_mag = 1.0
 # 寄付のパラメータ
 #ARGS.donation_rate = 0.7
-#ARGS.donation_limit = 300
+#ARGS.donation_limit = 300.0
 ARGS.donation_rate = 0.3
-ARGS.donation_limit = 1000
+ARGS.donation_limit = 1000.0
 # 寄付と教育に関するパラメータ
-#ARGS.donation_education = 0
-#ARGS.donation_education_2 = 0
+#ARGS.donation_education = 0.0
+#ARGS.donation_education_2 = 0.0
 ARGS.donation_education = 0.3
 ARGS.donation_education_2 = 0.3
 # 消費と教育に関するパラメータ
@@ -250,11 +254,21 @@ ARGS.consumption_education = 0.1
 ARGS.consumption_education_2 = 0.1
 ARGS.consumption_education_3 = 0.1
 # 「債券」の個人の最大値
-ARGS.bond_max = 1000
+ARGS.bond_max = 1000.0
 # 「株式」の個人の最大値
-ARGS.stock_max = 300
+ARGS.stock_max = 300.0
 # 「大バクチ」の個人の最大値
-ARGS.gamble_max = 50
+ARGS.gamble_max = 50.0
+# 資産額がマイナスのとき地主が倹約するか
+ARGS.no_landlord_thrift = False
+# 借金可能分
+ARGS.debt_slack = 20.0
+# 個々の資産収入がマイナスになり過ぎる場合、どれぐらいマイナスを許すか
+#ARGS.cut_slack_rate = 1.0
+ARGS.cut_slack_rate = 1.1
+# 資産収入のマイナスをどれぐらい許すか
+#ARGS.whole_cut_slack = 0
+ARGS.whole_cut_slack = 27.5
 
 # 家系を辿った距離の最大値
 ARGS.max_family_distance = 6
@@ -291,12 +305,12 @@ ARGS.invasion_average_term_max = 15.0 * 12
 ARGS.invasion_mag = 2.0
 # 洪水の頻度の目安
 #ARGS.flood_rate = 1.0 / 7
-ARGS.flood_rate = (1.0 / 14) * (1/4)
+ARGS.flood_rate = (1.0 / 14) * (1/6)
 # 作物の病気の頻度の目安
 ARGS.cropfailure_rate = (1/8) / 3
 # 大火事の頻度の目安
 #ARGS.bigfire_rate = (1 / (5 * 12)) * (12/15)
-ARGS.bigfire_rate = (1 / (10 * 12)) * (12/15)
+ARGS.bigfire_rate = (1 / (10 * 12)) * (12/15) * (1/2)
 # 地震の頻度の目安
 ARGS.earthquake_rate = (1 / (5 * 12)) * (1/4)
 # 次の疫病までの平均期
@@ -318,6 +332,8 @@ ARGS.no_successor_resentment = False
 ARGS.dominator_adder = 0.1
 # 一般障害率
 ARGS.general_injury_rate = calc_increase_rate(12, 0.6/100)
+# 借金のある者の障害率
+ARGS.in_debt_injury_rate = calc_increase_rate(12, 0.8/100)
 # 災害や犯罪でケガ・病気の障害として残る確率
 ARGS.permanent_injury_rate = 1/2
 # ケガ・病気の障害として残る確率
@@ -384,9 +400,9 @@ ARGS.jail_num_base_min = 100
 ARGS.jail_num_sub_max = 1.2
 ARGS.jail_num_sub_min = 1.0
 # 軽犯罪による最大の収入
-ARGS.minor_offence_revenue = 100
+ARGS.minor_offence_revenue = 100.0
 # 重犯罪による最大の収入
-ARGS.vicious_crime_revenue = 200
+ARGS.vicious_crime_revenue = 200.0
 # 刑期
 ARGS.jail_term_max = 15 * 12
 ARGS.jail_term_min = 1
@@ -447,7 +463,7 @@ def parse_args (view_options=['none']):
     parser.add_argument("--debug-term", type=int)
     parser.add_argument("-t", "--trials", type=int)
     parser.add_argument("-p", "--population", type=str)
-    parser.add_argument("--min-birth", type=float)
+    parser.add_argument("--min-birth", type=str)
     parser.add_argument("--view-1", choices=view_options)
     parser.add_argument("--view-2", choices=view_options)
     parser.add_argument("--view-3", choices=view_options)
@@ -484,7 +500,9 @@ def parse_args (view_options=['none']):
     if type(ARGS.population) is str:
         ARGS.population = list(map(int, ARGS.population.split(',')))
     if ARGS.min_birth is None:
-        ARGS.min_birth = sum([x / (12 * ARGS.init_max_age) for x in ARGS.population])
+        ARGS.min_birth = [0.8 * x / (12 * ARGS.init_max_age) for x in ARGS.population]
+    if type(ARGS.min_birth) is str:
+        ARGS.min_birth = list(map(float, ARGS.min_birth.split(',')))
     if ARGS.intended_pregnant_mag is None:
         ARGS.intended_pregnant_mag = calc_pregnant_mag(
             ARGS.intended_pregnant_rate, ARGS.worst_pregnant_rate

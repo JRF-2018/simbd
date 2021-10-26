@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.8' # Time-stamp: <2021-09-13T16:31:23Z>
+__version__ = '0.0.11' # Time-stamp: <2021-10-26T07:42:49Z>
 ## Language: Japanese/UTF-8
 
 """Simulation Buddhism Prototype No.3 - Birth
@@ -49,7 +49,8 @@ class PersonBT (Person0):
         else:
             y = ((1 - 1/4) / (1 - 0.5)) * (x - 0.5) + 1/4
             
-        return np_clip(y * p.want_child_base * economy.want_child_mag
+        dwcm = economy.nation.districts[p.district].want_child_mag
+        return np_clip(y * p.want_child_base * dwcm
                        * ARGS.want_child_mag, 1, 12)
 
     def want_child (self, rel):
@@ -418,81 +419,104 @@ def update_birth (economy):
                 if random.random() < ARGS.multipara_death_rate:
                     dying.append(p)
     
-    pp = 0
+    dp = [0] * len(ARGS.population)
     for p in economy.people.values():
         if not p.is_dead():
-            pp += 1
-    pp = sum(ARGS.population) - pp
+            dp[p.district] += 1
+    ls = [[] for i in range(len(ARGS.population))]
+    for p, wc in l:
+        ls[p.district].append((p, wc))
 
-    q = math.ceil(max([(pp - economy.prev_birth) * 0.5 + economy.prev_birth,
-                       ARGS.min_birth]))
-    w = len([True for x in l if x[1]])
     n_a = 0
     n_b = 0
-    if q >= w:
-        if q > w + 0.5 * (len(l) - w):
-            economy.want_child_mag += ARGS.want_child_mag_increase
-            economy.want_child_mag = np_clip(economy.want_child_mag,
-                                             0.5, 1.5)
-        l2 = []
-        for p, wc in l:
-            if wc:
-                p.give_birth()
-                if p.fertility != 0:
-                    p.fertility += 0.1
-                    p.fertility = np_clip(p.fertility, 0, 1)
-            else:
-                l2.append(p)
-        if q - w < len(l2):
-            s = set(random.sample(l2, q - w))
+    for dnum, dist in enumerate(economy.nation.districts):
+        l = ls[dnum]
+        pp = ARGS.population[dnum] - dp[dnum]
+        if dp[dnum] > ARGS.population[dnum] * 1.10:
+            dist.anti_marriage_level = 3
+        elif dp[dnum] > ARGS.population[dnum] * 1.05:
+            dist.anti_marriage_level = 2
+        elif dp[dnum] > ARGS.population[dnum]:
+            dist.anti_marriage_level = 1
         else:
-            s = set(l2)
-        for p in l2:
-            if p in s:
-                p.give_birth()
-                if p.fertility != 0:
-                    p.fertility += 0.1
-                    p.fertility = np_clip(p.fertility, 0, 1)
+            dist.anti_marriage_level = 0
+        alevel = dist.anti_marriage_level
+        pp = ARGS.population[dnum] - dp[dnum]
+        q = math.ceil(max([(pp - dist.prev_birth) * 0.5 + dist.prev_birth,
+                           ARGS.min_birth[dnum]]))
+        dist.ideal_births.append(q)
+        while len(dist.ideal_births) > 12:
+            dist.ideal_births.pop(0)
+        q = dist.ideal_births[0]
+        w = len([True for x in l if x[1]])
+        if q >= w:
+            if q > w + 0.5 * (len(l) - w):
+                dist.want_child_mag += ARGS.want_child_mag_increase
+                dist.want_child_mag = np_clip(dist.want_child_mag,
+                                              0.1, 2.0)
+            l2 = []
+            for p, wc in l:
+                if wc:
+                    p.give_birth()
+                    if p.fertility != 0:
+                        p.fertility += 0.1
+                        p.fertility = np_clip(p.fertility, 0, 1)
+                else:
+                    l2.append(p)
+            if alevel >= 2 and q - w < len(l2):
+                s = set(random.sample(l2, q - w))
             else:
-                sp = p.pregnancy.relation.spouse
-                p.add_hating(sp, 0.3)
-                p.abort_pregnancy()
-                n_b += 1
-                if p.fertility != 0:
-                    p.fertility -= 0.1
-                    p.fertility = np_clip(p.fertility, 0, 1)
-    else:
-        economy.want_child_mag -= ARGS.want_child_mag_increase
-        economy.want_child_mag = np_clip(economy.want_child_mag, 0.5, 1.5)
-        l2 = []
-        for p, wc in l:
-            if wc:
-                l2.append(p)
+                s = set(l2)
+            for p in l2:
+                if p in s:
+                    p.give_birth()
+                    if p.fertility != 0:
+                        p.fertility += 0.1
+                        p.fertility = np_clip(p.fertility, 0, 1)
+                else:
+                    sp = p.pregnancy.relation.spouse
+                    p.add_hating(sp, 0.3)
+                    p.abort_pregnancy()
+                    n_b += 1
+                    if p.fertility != 0:
+                        p.fertility -= 0.1
+                        p.fertility = np_clip(p.fertility, 0, 1)
+        else:
+            dist.want_child_mag -= ARGS.want_child_mag_increase
+            dist.want_child_mag = np_clip(dist.want_child_mag, 0.1, 2.0)
+            l2 = []
+            for p, wc in l:
+                if wc:
+                    l2.append(p)
+                elif alevel >= 2:
+                    sp = p.pregnancy.relation.spouse
+                    p.add_hating(sp, 0.3)
+                    p.abort_pregnancy()
+                    n_b += 1
+                    if p.fertility != 0:
+                        p.fertility -= 0.1
+                        p.fertility = np_clip(p.fertility, 0, 1)
+            if alevel >= 3:
+                s = set(random.sample(l2, q))
             else:
-                sp = p.pregnancy.relation.spouse
-                p.add_hating(sp, 0.3)
-                p.abort_pregnancy()
-                n_b += 1
-                if p.fertility != 0:
-                    p.fertility -= 0.1
-                    p.fertility = np_clip(p.fertility, 0, 1)
-        s = set(random.sample(l2, q))
-        for p in l2:
-            if p in s:
-                p.give_birth()
-                if p.fertility != 0:
-                    p.fertility += 0.1
-                    p.fertility = np_clip(p.fertility, 0, 1)
-            else:
-                p.add_hating('P', 0.1)
-                p.abort_pregnancy()
-                n_a += 1
-                if p.fertility != 0:
-                    p.fertility -= 0.1
-                    p.fertility = np_clip(p.fertility, 0, 1)
+                s = set(l2)
+            for p in l2:
+                if p in s:
+                    p.give_birth()
+                    if p.fertility != 0:
+                        p.fertility += 0.1
+                        p.fertility = np_clip(p.fertility, 0, 1)
+                else:
+                    p.add_hating('P', 0.1)
+                    p.abort_pregnancy()
+                    n_a += 1
+                    if p.fertility != 0:
+                        p.fertility -= 0.1
+                        p.fertility = np_clip(p.fertility, 0, 1)
    
     economy.die(dying)
     print("Social Abortion:", n_a, n_b)
+
 
 def update_fertility (economy):
     print("\nFertility:...", flush=True)

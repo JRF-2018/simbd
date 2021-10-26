@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.8' # Time-stamp: <2021-09-13T17:13:36Z>
+__version__ = '0.0.11' # Time-stamp: <2021-10-26T07:47:14Z>
 ## Language: Japanese/UTF-8
 
 """Simulation Buddhism Prototype No.3 - Marriage
@@ -589,6 +589,13 @@ def update_marriage_hating (economy, person, relation):
 
 def elevate_some_to_marriages (economy):
     elevating = 0
+    arrate = []
+    for dist in economy.nation.districts:
+        arate = [0, ARGS.anti_marriage_level_1,
+                 ARGS.anti_marriage_level_2, ARGS.anti_marriage_level_3]\
+                 [dist.anti_marriage_level]
+        arrate.append(1 - arate)
+
     for p in economy.people.values():
         if p.is_dead() or p.marriage is not None \
            or p.marriage_wait is not None:
@@ -608,7 +615,7 @@ def elevate_some_to_marriages (economy):
             if (p.sex == 'M' and p.in_priesthood()) \
                or (s.sex == 'M' and s.in_priesthood()):
                 elevate_rate = ARGS.male_priest_adultery_elevate_rate
-            if not (random.random() < elevate_rate):
+            if not (random.random() < elevate_rate * arrate[p.district]):
                 continue
             # if not (p.marriage_favor(s) >= ARGS.marriage_favor_threshold
             #         and s.marriage_favor(p) >= ARGS.marriage_favor_threshold):
@@ -752,6 +759,23 @@ def remove_socially_some_marriages (economy):
     print("Social Divorce:", n_d)
 
 
+def remove_by_anti_marriage_level ( matches, anti_marriage_level):
+    arate = [0, ARGS.anti_marriage_level_1,
+             ARGS.anti_marriage_level_2, ARGS.anti_marriage_level_3]\
+             [anti_marriage_level]
+    ll = sorted(matches, key=lambda x: min([x[0].age, x[1].age]))
+    l1 = list(range(len(ll)))
+    l2 = []
+    for i, x in enumerate(l1):
+        l2.append(0.5 + (i + 1) / len(l1))
+    n = math.ceil(len(l1) * (1 - arate))
+    l2 = np.array(l2).astype(np.longdouble)
+    l3 = np_random_choice(l1, n, replace=False,
+                          p=l2/np.sum(l2))
+    
+    return [ll[i] for i in l3]
+
+
 def update_marriages (economy):
     print("\nMarriages:...", flush=True)
 
@@ -787,9 +811,20 @@ def update_marriages (economy):
                                    threshold=ARGS.marriage_favor_threshold))
         print("...", flush=True)
 
+    n_anti = []
+    for dnum, dist in enumerate(economy.nation.districts):
+        if dist.anti_marriage_level == 0:
+            n_anti.append(0)
+        else:
+            r = remove_by_anti_marriage_level(matches[dnum],
+                                              dist.anti_marriage_level)
+            n_anti.append(len(matches[dnum]) - len(r))
+            matches[dnum] = r
+    print("Anti Marriage:", n_anti)
+
+    print("Matches:", [len(l) for l in matches], flush=True)
     m0 = matches[0]
     matches = sum(matches, [])
-    print("Matches:", len(matches), flush=True)
     # if len(m0) >= 10:
     #     print("Match Samples:", flush=True)
     #     for i in range(0, 10):

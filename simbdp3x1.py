@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.2' # Time-stamp: <2021-10-16T04:34:52Z>
+__version__ = '0.0.3' # Time-stamp: <2021-10-26T07:26:53Z>
 ## Language: Japanese/UTF-8
 
 """Simulation Buddhism Prototype No.3 x.1 - Main
@@ -242,12 +242,12 @@ ARGS.hated_mag = 1.0
 ARGS.stress_mag = 1.0
 # 寄付のパラメータ
 #ARGS.donation_rate = 0.7
-#ARGS.donation_limit = 300
+#ARGS.donation_limit = 300.0
 ARGS.donation_rate = 0.3
-ARGS.donation_limit = 1000
+ARGS.donation_limit = 1000.0
 # 寄付と教育に関するパラメータ
-#ARGS.donation_education = 0
-#ARGS.donation_education_2 = 0
+#ARGS.donation_education = 0.0
+#ARGS.donation_education_2 = 0.0
 ARGS.donation_education = 0.3
 ARGS.donation_education_2 = 0.3
 # 消費と教育に関するパラメータ
@@ -255,11 +255,21 @@ ARGS.consumption_education = 0.1
 ARGS.consumption_education_2 = 0.1
 ARGS.consumption_education_3 = 0.1
 # 「債券」の個人の最大値
-ARGS.bond_max = 1000
+ARGS.bond_max = 1000.0
 # 「株式」の個人の最大値
-ARGS.stock_max = 300
+ARGS.stock_max = 300.0
 # 「大バクチ」の個人の最大値
-ARGS.gamble_max = 50
+ARGS.gamble_max = 50.0
+# 資産額がマイナスのとき地主が倹約するか
+ARGS.no_landlord_thrift = False
+# 借金可能分
+ARGS.debt_slack = 20.0
+# 個々の資産収入がマイナスになり過ぎる場合、どれぐらいマイナスを許すか
+#ARGS.cut_slack_rate = 1.0
+ARGS.cut_slack_rate = 1.1
+# 資産収入のマイナスをどれぐらい許すか
+#ARGS.whole_cut_slack = 0
+ARGS.whole_cut_slack = 27.5
 
 # 家系を辿った距離の最大値
 ARGS.max_family_distance = 6
@@ -323,6 +333,8 @@ ARGS.no_successor_resentment = False
 ARGS.dominator_adder = 0.1
 # 一般障害率
 ARGS.general_injury_rate = calc_increase_rate(12, 0.6/100)
+# 借金のある者の障害率
+ARGS.in_debt_injury_rate = calc_increase_rate(12, 0.8/100)
 # 災害や犯罪でケガ・病気の障害として残る確率
 ARGS.permanent_injury_rate = 1/2
 # ケガ・病気の障害として残る確率
@@ -389,9 +401,9 @@ ARGS.jail_num_base_min = 100
 ARGS.jail_num_sub_max = 1.2
 ARGS.jail_num_sub_min = 1.0
 # 軽犯罪による最大の収入
-ARGS.minor_offence_revenue = 100
+ARGS.minor_offence_revenue = 100.0
 # 重犯罪による最大の収入
-ARGS.vicious_crime_revenue = 200
+ARGS.vicious_crime_revenue = 200.0
 # 刑期
 ARGS.jail_term_max = 15 * 12
 ARGS.jail_term_min = 1

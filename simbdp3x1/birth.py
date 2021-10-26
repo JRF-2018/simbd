@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.1' # Time-stamp: <2021-09-26T07:28:08Z>
+__version__ = '0.0.3' # Time-stamp: <2021-10-26T07:41:46Z>
 ## Language: Japanese/UTF-8
 
 """Simulation Buddhism Prototype No.3 x.1 - Birth
@@ -516,6 +516,7 @@ def update_birth (economy):
    
     economy.die(dying)
     print("Social Abortion:", n_a, n_b)
+
 
 def update_fertility (economy):
     print("\nFertility:...", flush=True)

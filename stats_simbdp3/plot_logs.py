@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.8' # Time-stamp: <2021-09-28T05:21:05Z>
+__version__ = '0.0.9' # Time-stamp: <2021-10-25T19:45:00Z>
 ## Language: Japanese/UTF-8
 
 """Statistics for Simulation Buddhism Prototype No.3
@@ -61,7 +61,7 @@ def parse_args ():
         'AccTemple', 'Abortion', 'AccAbortion',
         'Education', 'AccEducation', 'Priests', 'Power', 'Protection',
         'Labor', 'Injured', 'PoliticalHating',
-        'Breakup', 'AccBreakup', 'Budget'
+        'Breakup', 'AccBreakup', 'Budget', 'Welfare'
     ])
     parser.add_argument("--context", choices=[
         'talk', 'paper', 'notebook', 'poster'
@@ -295,12 +295,17 @@ def main ():
     print(l[0][-1])
     print()
 
-    log_ver = 1
+    log_ver = 2
     for prefix, l in zip(ps, ls):
         for l0 in l:
             d0 = l0[1]
             if 'Average Political Hating' not in d0['Calamities']:
                 log_ver = min([0, log_ver])
+            for i in range(12):
+                d0 = l0[1 + i]
+                if 'Economy' in d0 and 'Welfare' not in d0['Economy']:
+                    log_ver = min([1, log_ver])
+                    break
 
     d_calamities = []
     sum_calamities = []
@@ -410,6 +415,9 @@ def main ():
                     r1 = [term, n_brk, acc_brk, bud]
                     if log_ver >= 1:
                         pass
+                    if log_ver >= 2:
+                        wf = d0['Economy']['Welfare'][0]
+                        r1.extend([wf])
                     r2.append(r1)
 
     pl1 = [
@@ -423,13 +431,17 @@ def main ():
         ],
         [
             'Labor', 'Injured', 'PoliticalHating'
-        ]
+        ],
+        []
     ]
     pl2 = [
         [
             'Term', 'Breakup', 'AccBreakup', 'Budget'
         ],
-        []
+        [],
+        [
+            'Welfare'
+        ]
     ]
     pl = []
     for i in range(log_ver + 1):

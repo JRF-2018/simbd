@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.11' # Time-stamp: <2021-08-28T10:16:31Z>
+__version__ = '0.0.14' # Time-stamp: <2021-10-25T13:06:32Z>
 ## Language: Japanese/UTF-8
 
 """Simulation Buddhism Prototype No.2 - Calamity
@@ -404,7 +404,8 @@ class Calamity (SerializableExEconomy):        # 「災害」＝「惨禍」
         print("Property Damage:", len(people))
         economy.add_political_hating(people, 0.5)
         for p in people:
-            p.prop *= random.random()
+            if p.prop > 0:
+                p.prop *= random.random()
 
     def damage_crop (self, scale):
         c = self
@@ -578,7 +579,8 @@ class Calamity (SerializableExEconomy):        # 「災害」＝「惨禍」
         print("Poor Property Damage:", len(l3))
         economy.add_political_hating(l3, 0.5)
         for p in l3:
-            p.prop *= random.random()
+            if p.prop > 0:
+                p.prop *= random.random()
 
 
 class Disaster (Calamity):        # 天災

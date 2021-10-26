@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.13' # Time-stamp: <2021-10-16T01:29:58Z>
+__version__ = '0.0.14' # Time-stamp: <2021-10-26T07:26:09Z>
 ## Language: Japanese/UTF-8
 
 """Simulation Buddhism Prototype No.2 - Main
@@ -228,12 +228,12 @@ ARGS.hated_mag = 1.0
 ARGS.stress_mag = 1.0
 # 寄付のパラメータ
 #ARGS.donation_rate = 0.7
-#ARGS.donation_limit = 300
+#ARGS.donation_limit = 300.0
 ARGS.donation_rate = 0.3
-ARGS.donation_limit = 1000
+ARGS.donation_limit = 1000.0
 # 寄付と教育に関するパラメータ
-#ARGS.donation_education = 0
-#ARGS.donation_education_2 = 0
+#ARGS.donation_education = 0.0
+#ARGS.donation_education_2 = 0.0
 ARGS.donation_education = 0.3
 ARGS.donation_education_2 = 0.3
 # 消費と教育に関するパラメータ
@@ -241,11 +241,11 @@ ARGS.consumption_education = 0.1
 ARGS.consumption_education_2 = 0.1
 ARGS.consumption_education_3 = 0.1
 # 「債券」の個人の最大値
-ARGS.bond_max = 1000
+ARGS.bond_max = 1000.0
 # 「株式」の個人の最大値
-ARGS.stock_max = 300
+ARGS.stock_max = 300.0
 # 「大バクチ」の個人の最大値
-ARGS.gamble_max = 50
+ARGS.gamble_max = 50.0
 
 # 家系を辿った距離の最大値
 ARGS.max_family_distance = 6

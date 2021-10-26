@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.1' # Time-stamp: <2021-08-19T21:36:06Z>
+__version__ = '0.0.11' # Time-stamp: <2021-10-26T08:05:19Z>
 ## Language: Japanese/UTF-8
 
 """Simulation Buddhism Prototype No.3 - Initialize
@@ -39,10 +39,16 @@ from simbdp3.random import negative_binominal_rand, right_triangular_rand,\
     half_normal_rand, adultery_term_rand
 from simbdp3.common import np_clip, Adultery, Marriage, Child, Wait, \
     Pregnancy
-from simbdp3.domination import initialize_nation
+from simbdp3.domination import initialize_nation, Nation, District
 
 
 def initialize (economy):
+    economy.nation = Nation()
+    nation = economy.nation
+    for d_num in range(len(ARGS.population)):
+        district = District()
+        nation.districts.append(district)
+
     pp = [0] * len(ARGS.population)
     for p in economy.people.values():
         if not p.is_dead():

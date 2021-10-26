@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.10' # Time-stamp: <2021-10-16T01:30:50Z>
+__version__ = '0.0.11' # Time-stamp: <2021-10-26T07:43:47Z>
 ## Language: Japanese/UTF-8
 
 """Simulation Buddhism Prototype No.3 - Base
@@ -212,9 +212,6 @@ class Economy0 (Frozen):
         self.calamities = []
 
         self.tmp_moving_matrix = None
-
-        self.want_child_mag = 1.0
-        self.prev_birth = ARGS.min_birth
 
         self.cur_forfeit_prop = 0
         self.cur_forfeit_land = 0

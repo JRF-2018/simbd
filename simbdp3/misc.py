@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.9' # Time-stamp: <2021-09-29T10:05:33Z>
+__version__ = '0.0.11' # Time-stamp: <2021-10-26T07:54:27Z>
 ## Language: Japanese/UTF-8
 
 """Simulation Buddhism Prototype No.3 - Miscellaneous
@@ -89,7 +89,10 @@ def update_injured (economy):
     l = []
     for p in economy.people.values():
         if not p.is_dead():
-            if random.random() < ARGS.general_injury_rate:
+            ir = ARGS.general_injury_rate
+            if p.asset_value() < 0:
+                ir = ARGS.in_debt_injury_rate
+            if random.random() < ir:
                 l.append(p)
     economy.injure(l, 0.5, 0.5, ARGS.general_permanent_injury_rate)
 
@@ -207,5 +210,6 @@ def print_population (economy):
                 n_f += 1
             dp[p.district] += 1
     print("New Birth:", mb, "New Death:", md,
-          "WantChildMag:", economy.want_child_mag)
+          "WantChildMag:", [dist.want_child_mag
+                            for dist in economy.nation.districts])
     print("District Population:", dp, "Male:Female:", n_m, ":", n_f)

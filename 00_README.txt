@@ -1,7 +1,7 @@
 
 
     仏教的哲学的社会シミュレーション
-    (Created: 2021-02-27, Time-stamp: <2021-09-25T13:13:19Z>)
+    (Created: 2021-02-27, Time-stamp: <2021-10-25T19:07:24Z>)
 
 
 ** このファイルについて
@@ -189,7 +189,7 @@ https://gist.github.com/JRF-2018/ee1bfe8b3cc676a5389ed5f81c6f544f
   * simbdp1_*.py
 
 Simulation Buddhism Prototype No.1。「シミュレーション仏教」プロトタイ
-プ 1号。test_of_matching2.py のファイルを分割し、
+プ 1号。test_of_matching_2.py のファイルを分割し、
 test_of_merchant_peasant_ratio.py と test_of_income_1.py の成果を取り
 入れたもの。
 

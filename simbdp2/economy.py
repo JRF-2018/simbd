@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.7' # Time-stamp: <2021-08-16T23:20:25Z>
+__version__ = '0.0.14' # Time-stamp: <2021-10-25T20:31:05Z>
 ## Language: Japanese/UTF-8
 
 """Simulation Buddhism Prototype No.2 - Economy
@@ -277,6 +277,8 @@ def calc_asset_income (f):
         r = q * f.land - land_prop
         if r > 0:
             prop -= r
+            if prop < 0:
+                prop = 0
     aprop = f.trained_ambition() * prop
     bprop = prop - aprop
     srat = 1.0 if f.stock_exp >= 10 else f.stock_exp / 10.0
@@ -294,7 +296,7 @@ def calc_asset_income (f):
         sprop = stock_max
     gamble_max = ARGS.gamble_max * (1 + 0.3 * (len(f.members) - 1))
     if gprop > gamble_max:
-        bprop += gprop
+        bprop += gprop - gamble_max
         gprop = gamble_max
     bond_max = ARGS.bond_max * (1 + 0.3 * (len(f.members) - 1))
     dprop = 0
@@ -366,8 +368,15 @@ def calc_asset_income (f):
             + 0.5 * f.land * f.tmp_land_damage
         worker_num = virtual_land / land_per_worker
         wage = wage_per_worker * worker_num
-        lincome = np.sum(normal_levy_rand(mu, sigma, theta, cut, f.land)) \
-            * (1 - f.tmp_land_damage) - wage
+        lincome = 0
+        for i in range(f.land):
+            x = normal_levy_rand(mu, sigma, theta, cut)
+            if x > 0:
+                x *= (1 - f.tmp_land_damage)
+            x -= wage / f.land
+            if x < cut:
+                x = cut
+            lincome += x
         if f.education < 0.5:
             hated_update += (0.1 * ((1 - f.education) - 0.5) / 0.5) \
                 * (1.0 if worker_num > 5 else worker_num / 5)
@@ -390,6 +399,8 @@ def calc_labor_income (f, aincome):
         if p.age <= 10:
             infant += (((1 - 0) / (0 - 10)) * (p.age - 10)) ** 2
     labor = sum(f.tmp_labor) - np_clip(infant, 0, 1)
+    if labor < 0:
+        labor = 0
 
     if aincome >= 6.0 * labor:
         severeness = random.random() * (0.5 * (1 - income_luck) + 0.5)
@@ -474,7 +485,7 @@ def calc_income (economy, families):
         pls = sum([p.asset_value() for p in pl])
         if pls >= mns:
             for p in pl:
-                p.prop -= mns * p.prop / pls
+                p.prop -= mns * p.asset_value() / pls
         else:
             # 一家離散
             n_b += 1
