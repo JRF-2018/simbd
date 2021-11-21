@@ -1,5 +1,5 @@
 #!/bin/sh
-VERSION="0.0.1" # Time-stamp: <2021-09-29T09:01:53Z>
+VERSION="0.0.2" # Time-stamp: <2021-11-21T18:03:50Z>
 
 DATE=`date +%Y%m%d`
 
@@ -31,6 +31,8 @@ shift 1
 python plot_logs.py normal mwar mwarmpopmamb mwarmpop -p AccAbortion -o fig-${DATE}_$1.png
 shift 1
 python plot_logs.py normal mwar mwarmpopmamb mwarmpop -p AccBreakup -o fig-${DATE}_$1.png
+shift 1
+python plot_logs.py normal mwar mwarmpopmamb mwarmpop -p Welfare -o fig-${DATE}_$1.png
 shift 1
 python plot_logs.py normal mwar mwarmpopmamb mwarmpop -p Budget -o fig-${DATE}_$1.png
 shift 1
