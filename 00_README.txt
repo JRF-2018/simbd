@@ -1,7 +1,7 @@
 
 
     仏教的哲学的社会シミュレーション
-    (Created: 2021-02-27, Time-stamp: <2021-10-25T19:07:24Z>)
+    (Created: 2021-02-27, Time-stamp: <2022-02-02T08:12:30Z>)
 
 
 ** このファイルについて
@@ -180,6 +180,12 @@ https://gist.github.com/JRF-2018/ee1bfe8b3cc676a5389ed5f81c6f544f
   * test_of_mean_amplifier_4.py
 
 平均付近の増幅のテスト。BlockMeanAmplifier のテスト。
+
+
+  * epub/make_fig_normal_levy.py
+  * epub/make_fig_binominal.py
+
+電子本で使うグラフの描画をするプログラム。
 
 
 

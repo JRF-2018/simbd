@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.10' # Time-stamp: <2021-10-16T01:22:03Z>
+__version__ = '0.0.11' # Time-stamp: <2022-01-10T17:51:57Z>
 ## Language: Japanese/UTF-8
 
 """支配層の代替わりのテスト
@@ -910,7 +910,7 @@ class Earthquake (Disaster):           # 「大地震」
 class CropFailure (Disaster):           # 「作物の病気」または「日照り」
     pass
 
-class Famine (Disaster):           # 「作物の病気」または「日照り」
+class Famine (Disaster):           # 「飢饉」
     pass
 
 class Plague (Disaster):           # 「疫病」

@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.9' # Time-stamp: <2021-08-16T23:11:38Z>
+__version__ = '0.0.14' # Time-stamp: <2022-01-06T18:15:45Z>
 ## Language: Japanese/UTF-8
 
 """Simulation Buddhism Prototype No.1 - Marriage
@@ -81,7 +81,7 @@ class PersonMA (Person0):
             t2 = ((15 - 4) / (60 - 12)) * (x - 12) + 4
             t3 = ((7 - 2) / (60 - 12)) * (x - 12) + 2
             same = math.exp(- ((q.age + t1 - p.age) / t2) ** 2)
-            suit = math.exp(- ((q.age - 24) / t3) ** 2)
+            suit = math.exp(- ((q.age - 20) / t3) ** 2)
             ed2 = 3 if p.education < 0.5 else ((4 - 3) / 0.5)\
                 * (p.education - 0.5) + 3
             if suit - 0.5 < 0:
@@ -102,7 +102,7 @@ class PersonMA (Person0):
             t2 = ((15 - 4) / (60 - 12)) * (x - 12) + 4
             t3 = ((7 - 2) / (60 - 12)) * (x - 12) + 2
             same = math.exp(- ((q.age - t1 - p.age) / t2) ** 2)
-            suit = math.exp(- ((q.age - 20) / t3) ** 2)
+            suit = math.exp(- ((q.age - 24) / t3) ** 2)
             ed2 = 2.5 if p.education < 0.5 else ((3.5 - 2.5) / 0.5)\
                 * (p.education - 0.5) + 2.5
             if suit - 0.5 < 0:

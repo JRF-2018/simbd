@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.3' # Time-stamp: <2021-10-26T07:26:53Z>
+__version__ = '0.0.4' # Time-stamp: <2022-01-07T20:34:50Z>
 ## Language: Japanese/UTF-8
 
 """Simulation Buddhism Prototype No.3 x.1 - Main
@@ -163,6 +163,10 @@ ARGS.want_child_mag = 1.0
 ARGS.want_child_mag_increase = 0.02
 # 流産確率
 ARGS.miscarriage_rate = calc_increase_rate(10, 20/100)
+# 不倫で望まれない子の堕胎確率
+ARGS.adultery_child_abortion_rate = 0.0
+# 望まれない子の堕胎確率
+ARGS.unwanted_child_abortion_rate = 0.0
 # 新生児死亡率
 ARGS.newborn_death_rate = 5/100
 # 経産婦死亡率

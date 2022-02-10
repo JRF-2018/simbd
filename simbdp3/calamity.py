@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.11' # Time-stamp: <2021-10-25T13:01:40Z>
+__version__ = '0.0.12' # Time-stamp: <2022-01-12T18:55:09Z>
 ## Language: Japanese/UTF-8
 
 """Simulation Buddhism Prototype No.3 - Calamity
@@ -272,7 +272,8 @@ class Calamity (SerializableExEconomy):        # 「災害」＝「惨禍」
         return damage * c.prophecy_error
         
     def prophecied_damage (self):
-        return self._prophecied_damage(0.0), self._prophecied_damage(1.0)
+        return self._prophecied_damage(self.counter_prophecy),\
+            self._prophecied_damage(1.0)
 
     def prophecy_prepare (self, dominator1, challenging=False):
         c = self
@@ -825,7 +826,7 @@ info = CropFailure
 base.calamity_info[info.kind] = info
 
 
-class Famine (Disaster):           # 「作物の病気」または「日照り」
+class Famine (Disaster):           # 「飢饉」
     kind = 'famine'
     protection_units_base = 0.2 # 人口千人あたりのユニット数
     training_units_base = 0.2 # 人口千人あたりのユニット数

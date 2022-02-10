@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.8' # Time-stamp: <2021-08-21T21:56:00Z>
+__version__ = '0.0.15' # Time-stamp: <2022-01-06T18:16:52Z>
 ## Language: Japanese/UTF-8
 
 """Simulation Buddhism Prototype No.2 - Adultery
@@ -100,7 +100,7 @@ class PersonAD (Person0):
             t2 = ((10 - 2) / (60 - 12)) * (x - 12) + 2
             t3 = ((7 - 2) / (60 - 12)) * (x - 12) + 2
             same = math.exp(- ((q.age + t1 - p.age) / t2) ** 2)
-            suit = math.exp(- ((q.age - 24) / t3) ** 2)
+            suit = math.exp(- ((q.age - 20) / t3) ** 2)
             ed2 = 1 if p.education < 0.5 else ((2 - 1) / 0.5)\
                 * (p.education - 0.5) + 1
             age = max([ed2 * same, 2.5 * suit])
@@ -119,7 +119,7 @@ class PersonAD (Person0):
             t2 = ((10 - 2) / (60 - 12)) * (x - 12) + 2
             t3 = ((7 - 2) / (60 - 12)) * (x - 12) + 2
             same = math.exp(- ((q.age - t1 - p.age) / t2) ** 2)
-            suit = math.exp(- ((q.age - 20) / t3) ** 2)
+            suit = math.exp(- ((q.age - 24) / t3) ** 2)
             ed2 = 1.5 if p.education < 0.5 else ((2.5 - 1.5) / 0.5)\
                 * (p.education - 0.5) + 1.5
             age = max([ed2 * same, 2 * suit])

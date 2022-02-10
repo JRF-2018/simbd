@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.11' # Time-stamp: <2021-10-26T07:42:49Z>
+__version__ = '0.0.12' # Time-stamp: <2022-01-07T20:38:23Z>
 ## Language: Japanese/UTF-8
 
 """Simulation Buddhism Prototype No.3 - Birth
@@ -389,6 +389,9 @@ class EconomyPlotBT (EconomyPlot0):
 def update_birth (economy):
     print("\nBirth:...", flush=True)
 
+    n_a = 0
+    n_b = 0
+
     # 誕生用の tmp_asset_rank の計算
     l = sorted(economy.people.values(), key=lambda p: p.asset_value(),
                reverse=True)
@@ -415,7 +418,27 @@ def update_birth (economy):
                         p.fertility += 0.1
                         p.fertility = np_clip(p.fertility, 0, 1)
                 else:
-                    l.append((p, p.want_child(preg.relation)))
+                    wc = p.want_child(preg.relation)
+                    ab = False
+                    if not wc:
+                        if isinstance(preg.relation, Marriage):
+                            if random.random() < \
+                               ARGS.unwanted_child_abortion_rate:
+                                ab = True
+                        else:
+                            if random.random() < \
+                               ARGS.adultery_child_abortion_rate:
+                                ab = True
+                    if ab:
+                        sp = p.pregnancy.relation.spouse
+                        p.add_hating(sp, 0.3)
+                        p.abort_pregnancy()
+                        n_b += 1
+                        if p.fertility != 0:
+                            p.fertility -= 0.1
+                            p.fertility = np_clip(p.fertility, 0, 1)
+                    else:
+                        l.append((p, wc))
                 if random.random() < ARGS.multipara_death_rate:
                     dying.append(p)
     
@@ -427,8 +450,6 @@ def update_birth (economy):
     for p, wc in l:
         ls[p.district].append((p, wc))
 
-    n_a = 0
-    n_b = 0
     for dnum, dist in enumerate(economy.nation.districts):
         l = ls[dnum]
         pp = ARGS.population[dnum] - dp[dnum]

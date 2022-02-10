@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.24' # Time-stamp: <2021-10-16T01:27:09Z>
+__version__ = '0.0.25' # Time-stamp: <2022-01-06T18:16:14Z>
 ## Language: Japanese/UTF-8
 
 """結婚・不倫・扶養・相続などのマッチングのシミュレーション"""
@@ -861,7 +861,7 @@ class PersonAD (Person0):
             t2 = ((10 - 2) / (60 - 12)) * (x - 12) + 2
             t3 = ((7 - 2) / (60 - 12)) * (x - 12) + 2
             same = math.exp(- ((q.age + t1 - p.age) / t2) ** 2)
-            suit = math.exp(- ((q.age - 24) / t3) ** 2)
+            suit = math.exp(- ((q.age - 20) / t3) ** 2)
             ed2 = 1 if p.education < 0.5 else ((2 - 1) / 0.5)\
                 * (p.education - 0.5) + 1
             age = max([ed2 * same, 2.5 * suit])
@@ -879,7 +879,7 @@ class PersonAD (Person0):
             t2 = ((10 - 2) / (60 - 12)) * (x - 12) + 2
             t3 = ((7 - 2) / (60 - 12)) * (x - 12) + 2
             same = math.exp(- ((q.age - t1 - p.age) / t2) ** 2)
-            suit = math.exp(- ((q.age - 20) / t3) ** 2)
+            suit = math.exp(- ((q.age - 24) / t3) ** 2)
             ed2 = 1.5 if p.education < 0.5 else ((2.5 - 1.5) / 0.5)\
                 * (p.education - 0.5) + 1.5
             age = max([ed2 * same, 2 * suit])
@@ -954,7 +954,7 @@ class PersonMA (Person0):
             t2 = ((15 - 4) / (60 - 12)) * (x - 12) + 4
             t3 = ((7 - 2) / (60 - 12)) * (x - 12) + 2
             same = math.exp(- ((q.age + t1 - p.age) / t2) ** 2)
-            suit = math.exp(- ((q.age - 24) / t3) ** 2)
+            suit = math.exp(- ((q.age - 20) / t3) ** 2)
             ed2 = 3 if p.education < 0.5 else ((4 - 3) / 0.5)\
                 * (p.education - 0.5) + 3
             if suit - 0.5 < 0:
@@ -975,7 +975,7 @@ class PersonMA (Person0):
             t2 = ((15 - 4) / (60 - 12)) * (x - 12) + 4
             t3 = ((7 - 2) / (60 - 12)) * (x - 12) + 2
             same = math.exp(- ((q.age - t1 - p.age) / t2) ** 2)
-            suit = math.exp(- ((q.age - 20) / t3) ** 2)
+            suit = math.exp(- ((q.age - 24) / t3) ** 2)
             ed2 = 2.5 if p.education < 0.5 else ((3.5 - 2.5) / 0.5)\
                 * (p.education - 0.5) + 2.5
             if suit - 0.5 < 0:
