@@ -1,7 +1,7 @@
 
 
     仏教的哲学的社会シミュレーション
-    (Created: 2021-02-27, Time-stamp: <2022-02-02T08:12:30Z>)
+    (Created: 2021-02-27, Time-stamp: <2022-03-05T12:56:57Z>)
 
 
 ** このファイルについて
@@ -47,6 +47,14 @@
 
 《グローバル共有メモ》  
 http://jrockford.s1010.xrea.com/demo/shared_memo.cgi?cmd=log
+
+また、このプロジェクトを解説する電子本が有料で発売されています。是非、
+買ってお読みいただければと思います。01_IdeaLog.txt に書いたことが元に
+なっていますが、仕様の解説などが書き足され、かなり読みやすくなっていま
+す。
+
+《「シミュレーション仏教」の試み - Amazon Kindle》  
+https://www.amazon.co.jp/dp/B09TPTYT6Q
 
 
 

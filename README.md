@@ -1,7 +1,7 @@
 # シミュレーション仏教 - 仏教的哲学的社会シミュレーション
 # Simulation Buddhism - Buddhistic Philosophical Computer-Simulation of Society
 
-<!-- Time-stamp: "2021-09-23T10:24:03Z" -->
+<!-- Time-stamp: "2022-03-05T12:57:03Z" -->
 
 ## このプロジェクトについて
 
@@ -64,6 +64,14 @@ http://jrockford.s1010.xrea.com/demo/shared_memo.cgi?cmd=log
 
 《「シミュレーション仏教」のバックアップファイル置き場》  
 http://jrockford.s1010.xrea.com/archive/simbd/index.html
+
+最後に、このプロジェクトを解説する電子本が有料で発売されています。是非、
+買ってお読みいただければと思います。01_IdeaLog.txt に書いたことが元に
+なっていますが、仕様の解説などが書き足され、かなり読みやすくなっていま
+す。
+
+《「シミュレーション仏教」の試み - Amazon Kindle》  
+https://www.amazon.co.jp/dp/B09TPTYT6Q
 
 
 ## Author
