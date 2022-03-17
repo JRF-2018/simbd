@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-__version__ = '0.0.2' # Time-stamp: <2021-10-14T06:28:54Z>
+__version__ = '0.0.5' # Time-stamp: <2022-03-17T14:16:53Z>
 ## Language: Japanese/UTF-8
 
 """Simulation Buddhism Prototype No.3 x.1 - Crime
@@ -518,7 +518,7 @@ def update_jails (economy, jail_num, arrested):
     arrested = set([x for x in arrested if not x.is_dead()])
     ld = []
     for p in [x for x in arrested]:
-        if p.karma >= 0.9:
+        if p.karma >= 0.9 and p.age >= 18:
             ld.append(p)
             arrested.remove(p)
             p.karma = 0
